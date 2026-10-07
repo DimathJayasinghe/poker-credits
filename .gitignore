@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Snapshots (runtime state, not source)
+snapshots/
+*.snapshot.json
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Next.js cache
+.next/cache/
+
+# Playwright test results
+test-results/
+playwright-report/
