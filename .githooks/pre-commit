@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Enable once with: git config core.hooksPath .githooks
+# Fast checks only. Each step is skipped when the relevant project part does not exist yet.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+staged() { git diff --cached --name-only --diff-filter=ACM; }
+
+if staged | grep -qE '\.rs$|Cargo\.(toml|lock)$' && [ -f Cargo.toml ]; then
+  if command -v cargo >/dev/null 2>&1; then
+    echo "pre-commit: cargo fmt --check"
+    cargo fmt --all --check
+    echo "pre-commit: cargo clippy"
+    cargo clippy --workspace --all-targets -- -D warnings
+  else
+    echo "pre-commit: cargo not found, skipping Rust checks (run tool/setup_dev.sh)"
+  fi
+fi
+
+if staged | grep -qE '\.dart$|pubspec\.yaml$'; then
+  if command -v fvm >/dev/null 2>&1 && [ -f pubspec.yaml ]; then
+    files=$(staged | grep -E '\.dart$' | grep -vE '\.g\.dart$|\.mapper\.dart$|\.freezed\.dart$|/gen/' || true)
+    if [ -n "$files" ]; then
+      echo "pre-commit: dart format"
+      # shellcheck disable=SC2086
+      fvm dart format --set-exit-if-changed --output=none $files || {
+        echo "pre-commit: Dart formatting needed. Run: fvm dart format app packages"; exit 1; }
+    fi
+    bash tool/check_web_safe.sh
+  else
+    echo "pre-commit: fvm or root pubspec.yaml missing, skipping Dart checks"
+  fi
+fi

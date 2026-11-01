@@ -1,0 +1,5 @@
+# Pinned the same way LocalSend does. Value copied from ~/Documents/dev_projects/localsend/rust-toolchain.toml
+# on 2026-11-01. Bump deliberately; keep CI and local in sync.
+[toolchain]
+channel = "1.97.1"
+components = ["clippy", "rustfmt"]
