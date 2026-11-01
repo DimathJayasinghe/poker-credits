@@ -56,13 +56,6 @@ Thumbs.db
 # Test coverage
 coverage/
 
-# graphify: commit graph.json and GRAPH_REPORT.md, ignore caches and scratch files
-graphify-out/cache/
-graphify-out/.graphify_*
-graphify-out/graph.html
-graphify-out/manifest.json
-graphify-out/memory/
-graphify-out/reflections/
-
-# FVM Version Cache
-.fvm/
+# graphify output is a local derived artifact (the post-commit hook rewrites it on every commit,
+# which would dirty the tree). Rebuild with `graphify update .`. Revisit committing graph.json once there is real code.
+graphify-out/

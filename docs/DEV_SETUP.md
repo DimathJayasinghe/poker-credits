@@ -55,11 +55,11 @@ graphify turns the repo into a queryable graph (god nodes, communities, relation
 
 ### Already configured in the repo
 - `.graphifyignore`: excludes build output, generated code (FRB, mappers), platform scaffolding, fonts and images, fixtures, secrets.
-- `.gitignore`: commits `graphify-out/graph.json` and `GRAPH_REPORT.md`, ignores the cache, scratch files and `graph.html`.
+- `.gitignore`: ignores all of `graphify-out/`. The post-commit hook rewrites the graph after every commit, so tracking it would leave the tree dirty after each commit. Each clone builds its own graph. Revisit committing `graph.json` once there is real code.
 - `CLAUDE.md`: contains the same "## graphify" section that `graphify claude install` writes (query before grep, `graphify update .` after code changes). It applies once a graph exists.
 
 ### Hooks (installed on this clone)
-`graphify hook install` was run: `.githooks/post-commit` and `.githooks/post-checkout` rebuild the code graph after commits and checkouts (AST only, no LLM), and `.gitattributes` maps `graphify-out/graph.json` to graphify's union merge driver. The hook files are committed, but the **merge driver is local git config**: after every fresh clone run `graphify hook install` again (or `bash tool/setup_dev.sh` will remind you). Not installed: `graphify claude install` (it edits `.claude/settings.json`, which auto mode refuses; its `CLAUDE.md` text is already in the repo).
+`graphify hook install` was run: `.githooks/post-commit` and `.githooks/post-checkout` rebuild the code graph after commits and checkouts (AST only, no LLM), and `.gitattributes` maps `graphify-out/graph.json` to graphify's union merge driver (unused while the graph is ignored). The hook files are committed; the merge driver is local git config, so after every fresh clone run `graphify hook install` again. Not installed: `graphify claude install` (it edits `.claude/settings.json`, which auto mode refuses; its `CLAUDE.md` text is already in the repo).
 
 ### Building the graph
 - Now (docs only): `/graphify .` extracts concepts from the Markdown docs with LLM subagents. It costs tokens; worth doing once the docs settle.
