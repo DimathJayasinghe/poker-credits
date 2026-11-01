@@ -1,0 +1,9 @@
+name: poker_credits_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.11.5
+
+workspace:
+  - app
+  - packages/poker_protocol
