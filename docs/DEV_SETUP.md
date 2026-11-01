@@ -13,7 +13,7 @@ Everything needed to work on Poker Credits: toolchains, Claude Code plugins, gra
 | **cargo-nextest**, **cargo-deny** (optional) | Faster tests, dependency and licence audit. | `cargo install cargo-nextest cargo-deny --locked` |
 | **graphify** | Knowledge graph of the codebase (section 3). | `uv tool install graphifyy` or `pip install graphifyy` |
 
-Machine state on the dev machine (2026-11-01, Ubuntu): installed and verified: rustup 1.29.2 with the pinned Rust 1.97.1, rust-analyzer, Android Rust targets (`aarch64-linux-android`, `armv7-linux-androideabi`, `x86_64-linux-android`), FVM 4.3.2 with the pinned Flutter 3.41.9 (`fvm install`), and the Linux desktop packages (`clang cmake ninja-build pkg-config libgtk-3-dev build-essential`). Both pins from LocalSend resolved fine. **Still open:** Android `cmdline-tools` and licence acceptance (`fvm flutter doctor --android-licenses`, you must accept the licences yourself), `flutter_rust_bridge_codegen` (Phase 3, version must match the pubspec dependency), optional `cargo-nextest`/`cargo-deny`. Shells need `~/.cargo/bin` and `~/.pub-cache/bin` on `PATH` (zsh does not source `~/.profile` in every setup; add both to `~/.zshrc`). `bash tool/setup_dev.sh --install` can redo these steps, asking first.
+Machine state on the dev machine (2026-11-01, Ubuntu): installed and verified: rustup 1.29.2 with the pinned Rust 1.97.1, rust-analyzer, Android Rust targets (`aarch64-linux-android`, `armv7-linux-androideabi`, `x86_64-linux-android`), FVM 4.3.2 with the pinned Flutter 3.41.9 (`fvm install`), and the Linux desktop packages (`clang cmake ninja-build pkg-config libgtk-3-dev build-essential`). Both pins from LocalSend resolved fine. Also installed: Android `cmdline-tools` (in `~/Android/Sdk`) with all SDK licences accepted at your request, `flutter_rust_bridge_codegen` 2.13.0 (**the `flutter_rust_bridge` Dart and Rust dependencies must be pinned to 2.13.0** in Phase 3), `cargo-nextest` 0.9.150, `cargo-deny` 0.20.2, and the graphify git hooks. `fvm flutter doctor` reports no issues. **Still open:** shells need `~/.cargo/bin` and `~/.pub-cache/bin` on `PATH`; auto mode refused to edit `~/.zshrc`, so add `. "$HOME/.cargo/env"` and `export PATH="$PATH:$HOME/.pub-cache/bin"` there yourself. `.claude/settings.json` is also not applied (refused as self-modification). `bash tool/setup_dev.sh --install` can redo these steps, asking first.
 
 Platform extras (only for the targets you build): Android SDK + NDK and `rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android`; Linux desktop needs `clang cmake ninja-build pkg-config libgtk-3-dev`; Windows needs Visual Studio 2022 with the C++ desktop workload; iOS/macOS need Xcode and the Apple Rust targets.
 
@@ -58,13 +58,8 @@ graphify turns the repo into a queryable graph (god nodes, communities, relation
 - `.gitignore`: commits `graphify-out/graph.json` and `GRAPH_REPORT.md`, ignores the cache, scratch files and `graph.html`.
 - `CLAUDE.md`: contains the same "## graphify" section that `graphify claude install` writes (query before grep, `graphify update .` after code changes). It applies once a graph exists.
 
-### Steps for you (blocked in auto mode, need your approval)
-Auto mode refused to run these because they register persistent hooks:
-```bash
-graphify hook install     # post-commit and post-checkout git hooks, plus a merge driver for graph.json
-graphify claude install   # optional: adds the PreToolUse nudge hook to .claude/settings.json
-```
-`core.hooksPath` is `.githooks`, so `graphify hook install` appends to files in `.githooks/`. If you prefer not to commit those, run `git config --local core.hooksPath ""` first and keep graphify's hooks in `.git/hooks`, then use `.githooks/pre-commit` manually.
+### Hooks (installed on this clone)
+`graphify hook install` was run: `.githooks/post-commit` and `.githooks/post-checkout` rebuild the code graph after commits and checkouts (AST only, no LLM), and `.gitattributes` maps `graphify-out/graph.json` to graphify's union merge driver. The hook files are committed, but the **merge driver is local git config**: after every fresh clone run `graphify hook install` again (or `bash tool/setup_dev.sh` will remind you). Not installed: `graphify claude install` (it edits `.claude/settings.json`, which auto mode refuses; its `CLAUDE.md` text is already in the repo).
 
 ### Building the graph
 - Now (docs only): `/graphify .` extracts concepts from the Markdown docs with LLM subagents. It costs tokens; worth doing once the docs settle.

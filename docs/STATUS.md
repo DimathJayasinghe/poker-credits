@@ -15,9 +15,9 @@ Last updated: 2026-11-01 (branch `docs/flutter-rust-pivot`).
 - Unchanged and still valid: `docs/GAME_LOGIC_AND_RULES.md` (language-neutral; checked for TypeScript references: none).
 
 ## Pending actions for the owner (blocked in auto mode)
-1. Apply Claude Code project settings: `mkdir -p .claude && cp tool/claude-settings.proposed.json .claude/settings.json` (plugins, permissions, format hook).
-2. `graphify hook install` (git post-commit/post-checkout hooks and merge driver) and optionally `graphify claude install`.
-3. ~~Install toolchains~~ Done for Rust, rust-analyzer, FVM, Flutter 3.41.9 and Linux desktop packages. Remaining: Android cmdline-tools + licences, add `~/.cargo/bin` and `~/.pub-cache/bin` to your zsh `PATH`.
+1. Apply Claude Code project settings yourself (auto mode refuses to write them): `mkdir -p .claude && cp tool/claude-settings.proposed.json .claude/settings.json` (plugins, permissions, format hook).
+2. ~~graphify hooks~~ Installed. Optional `graphify claude install` still not run (edits `.claude/settings.json`).
+3. ~~Install toolchains~~ Done for Rust, rust-analyzer, FVM, Flutter 3.41.9 and Linux desktop packages. Android cmdline-tools, licences, FRB codegen 2.13.0, nextest and deny are installed too. Remaining: add `~/.cargo/bin` and `~/.pub-cache/bin` to your zsh `PATH` (I could not edit `~/.zshrc`).
 4. Build the first graph with `/graphify .` when ready (costs tokens), or wait for Phase 1 code.
 
 ## Next step
