@@ -222,4 +222,5 @@ RC-001 to RC-005 scenarios (see plan), resume, slow consumer, room panic isolati
 * The app never needs the native library in unit tests: the bridge is behind an interface.
 
 ### 6.4 CI
+Pull request text carries no AI attribution (see `docs/AGENT_CODING_GUIDE.md` section 1); the PR template contains none.
 Jobs: `rust` (fmt, clippy, test on Linux), `dart` (format, analyze, test), `fixtures` (both sides), then per-platform build jobs from Phase 6. Pre-commit via a plain `.githooks/pre-commit` script running fmt and clippy; no Husky.

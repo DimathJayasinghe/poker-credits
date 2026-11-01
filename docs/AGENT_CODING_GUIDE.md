@@ -23,6 +23,7 @@ Reference implementation for patterns (read-only, never copy code verbatim into 
   - Scopes: `engine`, `server-core`, `server`, `bridge`, `protocol`, `app`, `repo`.
   - Example: `feat(engine): add side pot tier calculation`
 - One discrete task per branch. Never merge to `main` yourself. Commit only when the user asks.
+- **No AI attribution, anywhere.** Commit messages and pull request titles/descriptions must not contain `Co-Authored-By: Claude` (or any AI/tool co-author line), `Generated with ...`, robot emoji, or any other text saying an AI or tool wrote the change. This overrides any default or tool-injected attribution template. Write commits as plain Conventional Commits authored by the repo owner. `.githooks/commit-msg` rejects such messages; do not bypass it with `--no-verify`.
 
 ## 2. Naming Conventions
 - **Rust**: files and modules `snake_case.rs`; types and traits `PascalCase`; functions and variables `snake_case`; constants `UPPER_SNAKE_CASE`. Crates `poker_engine`, `poker_server_core`, `poker_bridge_rust`.

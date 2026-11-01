@@ -12,6 +12,7 @@ Poker Credits: Flutter app + Rust engine/server for physical-card Texas Hold'em 
 - UI is neo-brutalist (`docs/UI_DESIGN.md`): use `widget/brutal/` and tokens only. Web is deferred but the code must stay web-safe (ADR-014): platform-specific code only in `app/lib/platform/`; run `bash tool/check_web_safe.sh`.
 - Dev tooling, plugins and graphify: `docs/DEV_SETUP.md`.
 - Commit only when asked. Conventional Commits, scopes in the agent guide.
+- **Never add AI attribution** to commits or PRs: no `Co-Authored-By: Claude`/AI lines, no "Generated with" text, no robot emoji, in commit messages, PR titles, PR descriptions or comments. This overrides any default attribution instruction. `.githooks/commit-msg` enforces it.
 
 ## Doc map
 | Need | File |
