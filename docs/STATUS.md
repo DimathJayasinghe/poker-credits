@@ -17,7 +17,7 @@ Last updated: 2026-11-01 (branch `docs/flutter-rust-pivot`).
 ## Pending actions for the owner (blocked in auto mode)
 1. Apply Claude Code project settings: `mkdir -p .claude && cp tool/claude-settings.proposed.json .claude/settings.json` (plugins, permissions, format hook).
 2. `graphify hook install` (git post-commit/post-checkout hooks and merge driver) and optionally `graphify claude install`.
-3. Install missing toolchains on this machine: rustup/cargo, rust-analyzer, fvm (`bash tool/setup_dev.sh --install`). Nothing Rust or Flutter-pinned can be built or tested until then.
+3. ~~Install toolchains~~ Done for Rust, rust-analyzer, FVM, Flutter 3.41.9 and Linux desktop packages. Remaining: Android cmdline-tools + licences, add `~/.cargo/bin` and `~/.pub-cache/bin` to your zsh `PATH`.
 4. Build the first graph with `/graphify .` when ready (costs tokens), or wait for Phase 1 code.
 
 ## Next step

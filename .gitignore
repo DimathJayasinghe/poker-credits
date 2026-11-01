@@ -10,7 +10,6 @@ target/
 .pub-cache/
 .pub/
 build/
-.fvm/flutter_sdk
 *.g.dart.bak
 *.iml
 **/ios/Pods/
@@ -64,3 +63,6 @@ graphify-out/graph.html
 graphify-out/manifest.json
 graphify-out/memory/
 graphify-out/reflections/
+
+# FVM Version Cache
+.fvm/
