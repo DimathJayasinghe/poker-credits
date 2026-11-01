@@ -3,6 +3,8 @@
 # Fast checks only. Each step is skipped when the relevant project part does not exist yet.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
+# Hooks run with a minimal PATH; add the user-level tool dirs (rustup, fvm).
+export PATH="$HOME/.cargo/bin:$HOME/.pub-cache/bin:$PATH"
 
 staged() { git diff --cached --name-only --diff-filter=ACM; }
 

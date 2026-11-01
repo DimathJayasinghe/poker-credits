@@ -50,7 +50,7 @@ app/                          # fvm flutter create, platforms: android ios windo
 protocol/fixtures/v1/.gitkeep
 .github/workflows/ci.yml
 ```
-Agent task: empty crates that build and test; Flutter app that shows "Poker Credits" in the brutalist theme skeleton and runs on Linux desktop; `fvm flutter build web` succeeds; `tool/check_web_safe.sh` wired into CI; CI green; Android cleartext config and iOS local-network keys added per `ARCHITECTURE.md` section 8; **init error app wired in `main.dart`** (see resilience doc 2.1).
+Agent task: empty crates that build and test; Flutter app that shows "Poker Credits" in the brutalist theme skeleton and runs on Linux desktop; `fvm flutter build web` succeeds; `tool/check_web_safe.sh` wired into CI; CI green; Android manifest permissions and iOS/macOS usage descriptions and entitlements added per `ARCHITECTURE.md` section 8; **init error app wired in `main.dart`** (see resilience doc 2.1).
 
 ### Phase 1: Engine (`crates/poker_engine/`)
 ```text
@@ -122,11 +122,12 @@ app/lib/
 ├── platform/             # ONLY place for platform-specific code (ADR-014); each is interface + _io/_web/_stub
 │   ├── host_server.dart  secure_token_store.dart  file_log.dart  wake_lock.dart  haptics.dart
 │   ├── sound_unlock.dart  qr_scanner.dart  server_address.dart  window.dart  single_instance.dart
+│   ├── platform_check.dart   # isDesktop()/isMobile(); the only place besides platform/ that may use kIsWeb
 ├── provider/{connection_provider.dart,room_view_provider.dart,host_provider.dart,settings_provider.dart}
 ├── pages/{home_page.dart,host_page.dart,table_page.dart,settings_page.dart}
 ├── widget/brutal/{brutal_button.dart,brutal_card.dart,brutal_tag.dart,brutal_slider.dart,brutal_keypad.dart,brutal_banner.dart,brutal_dialog.dart,brutal_sheet.dart,brutal_text_field.dart}
 ├── widget/table/{felt_layout.dart,seat_ring.dart,pot_display.dart,action_ticker.dart,showdown_sheet.dart,qr_panel.dart}
-└── util/{platform_check.dart,strings.dart,logger.dart}
+└── util/{strings.dart,logger.dart}
 ```
 Agent task: build the `widget/brutal/` set first with golden tests (see `docs/UI_DESIGN.md`), then host a game (embedded server), show QR and typed address, render live `RoomView`, host controls (start hand, undo, pause, showdown resolve, rebuy approve), wake lock, lifecycle recovery (`ensureRunning` probe), global error hooks, desktop single-instance handover.
 
@@ -165,7 +166,7 @@ cargo test --workspace
 fvm dart format --set-exit-if-changed app/lib app/test packages
 fvm flutter analyze
 fvm flutter test
-fvm flutter build web          # web-safety smoke (ADR-014)
+fvm flutter build web --no-web-resources-cdn   # web-safety smoke (ADR-014); run in app/
 bash tool/check_web_safe.sh
 ```
 Include the actual command output summary in your report. If a check was not run (for example no Android SDK), say so.

@@ -19,7 +19,8 @@ fi
 
 # 1. Banned imports/usages in web-safe dirs.
 banned='dart:io|dart:ffi|dart:html|package:web/|package:poker_bridge|Platform\.is[A-Z]|Platform\.(operatingSystem|environment|localHostname)'
-if hits=$(grep -rnE --include='*.dart' "$banned" "${safe_dirs[@]}" 2>/dev/null); then
+# Comment-only lines may mention the banned names (for example in the rule's own documentation).
+if hits=$(grep -rnE --include='*.dart' "$banned" "${safe_dirs[@]}" 2>/dev/null | grep -vE '^[^:]+:[0-9]+:[[:space:]]*//'); then
   echo "check_web_safe: banned import or API in web-safe code (move it behind app/lib/platform/):"
   echo "$hits"
   fail=1

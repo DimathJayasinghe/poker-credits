@@ -246,8 +246,8 @@ Players enter the server URL once (default baked in at build time) and a 4-lette
 
 | Platform | Needs | Notes |
 | :--- | :--- | :--- |
-| Android | `INTERNET`, `ACCESS_NETWORK_STATE`, `CAMERA`, `FOREGROUND_SERVICE` (+ type), `POST_NOTIFICATIONS`, `WAKE_LOCK`; network security config permitting cleartext to private ranges | Rust built by cargokit for `arm64-v8a`, `armeabi-v7a`, `x86_64` |
-| iOS | `NSCameraUsageDescription`, `NSLocalNetworkUsageDescription`, ATS local-networking exception; multicast entitlement only for Phase 6 and needs Apple approval (verify) | Sockets die on suspend: probe on resume |
+| Android | `INTERNET`, `ACCESS_NETWORK_STATE`, `CAMERA`, `FOREGROUND_SERVICE` (+ type), `POST_NOTIFICATIONS`, `WAKE_LOCK`; no cleartext exception expected for `dart:io`/Rust sockets (ADR-012), verify on device in Phase 5 | Rust built by cargokit for `arm64-v8a`, `armeabi-v7a`, `x86_64` |
+| iOS | `NSCameraUsageDescription`, `NSLocalNetworkUsageDescription` (both added in Phase 0); multicast entitlement only for Phase 6 and needs Apple approval (verify) | Sockets die on suspend: probe on resume |
 | Windows | Firewall prompt on first listen (explain on host screen) | Inno Setup or MSIX packaging later |
 | macOS | App Sandbox entitlements `network.server` and `network.client`, camera | |
 | Linux | None special | Wayland/X11 differences handled by `window_manager` |
