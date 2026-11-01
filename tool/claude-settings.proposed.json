@@ -10,7 +10,10 @@
     "superpowers@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": false
+    "typescript-lsp@claude-plugins-official": false,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "chrome-devtools-mcp@claude-plugins-official": true,
+    "commit-commands@claude-plugins-official": true
   },
   "permissions": {
     "allow": [

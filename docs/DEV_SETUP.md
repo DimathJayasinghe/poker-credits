@@ -33,6 +33,11 @@ Recommended plugins for this repo (all from `claude-plugins-official`):
 | `superpowers` | Brainstorming, TDD, planning, verification workflows. |
 | `frontend-design` | Neo-brutalist UI work (`docs/UI_DESIGN.md`). |
 | `claude-md-management` | Keep `CLAUDE.md` accurate. |
+| `pr-review-toolkit` | Review agents for error handling, test coverage, types and comments before each phase merge. |
+| `chrome-devtools-mcp` | Inspect and screenshot the live Flutter web build, profile performance, check console errors (UI verification from Phase 4). |
+| `commit-commands` | Commit / push / PR workflows. |
+
+UI/design skills already present at user level and useful here: `vectorlab-ui-ux-skills` (spacing, typography, colour, anti-slop, forms, motion, reduced motion, empty states) and `ui-theme-designer`. Installed on 2026-11-01 at user scope with `claude plugin install <name>@claude-plugins-official`: `rust-analyzer-lsp`, `pr-review-toolkit`, `chrome-devtools-mcp`, `commit-commands`. They load on the next Claude Code session start.
 
 `typescript-lsp` (enabled in the user-level settings from the earlier project) is irrelevant now and the proposed project file switches it off here.
 
