@@ -1,102 +1,104 @@
 # Poker Credits (Poker Companion App)
 
-> A real-time, cross-platform companion app for physical Texas Hold'em poker games that replaces physical poker chips with a seamless digital credit and pot management system.
+> A real-time, cross-platform companion app for physical Texas Hold'em games that replaces poker chips with a digital credit and pot management system. **Flutter** app, **Rust** server and engine.
 
 ---
 
-## 🎯 Overview
+## Overview
 
-In traditional home poker games, managing physical chips is often cumbersome—stacking, counting, calculating complex side pots for all-ins, making change, and tracking pot totals can slow down play.
+In home poker games, stacking, counting, making change and working out side pots slows play. **Poker Credits** keeps the physical cards and replaces the chips:
 
-**Poker Credits** bridges the physical and digital worlds:
-* **Physical Cards**: Players shuffle and deal physical cards in real life.
-* **Central Table Display**: A tablet, laptop, or TV sits at the center of the table showing the live community pot, side pots, radial seating, dealer button `(D)`, small/big blind badges, and live action ticker.
-* **Mobile Player Controllers**: Players join on their smartphones to check, call, raise (via smooth slider), or fold with tactile haptic feedback.
-* **Dual Networking**: Play online over the cloud via 4-letter room codes, or completely offline on Local Area Network (LAN) / phone hotspot.
+* **Physical cards**: players shuffle and deal in real life.
+* **Table Display**: a tablet, laptop or TV in the middle shows the pot, side pots, radial seating, dealer button, blind badges and a live action ticker.
+* **Player Controllers**: each player uses their phone to fold, check, call or raise, with haptic feedback when it is their turn.
+* **Two ways to connect**: cloud rooms with 4-letter codes, or **Host mode** where the table device runs the server inside the app, so it works with no internet (Wi-Fi router or phone hotspot, QR join).
+
+Targets: iOS, Android, Windows (macOS and Linux come from the same code). A web Player build comes later; the code is kept web-ready (ADR-014). UI style: neo-brutalism ([`docs/UI_DESIGN.md`](docs/UI_DESIGN.md)).
+
+> **Status:** design and documentation phase. The earlier TypeScript scaffold has been removed. See [`docs/STATUS.md`](docs/STATUS.md) for what is done and what comes next.
 
 ---
 
-## 📚 Technical Documentation
-
-Comprehensive architectural design and engineering documentation is available in the [`docs/`](file:///home/dimathrj/Documents/dev_projects/Pocker_Credits/docs/) directory:
+## Documentation
 
 | Document | Purpose |
 | :--- | :--- |
-| **[Game Logic & Rules Specification](file:///home/dimathrj/Documents/dev_projects/Pocker_Credits/docs/GAME_LOGIC_AND_RULES.md)** | Complete Texas Hold'em betting rules, heads-up exception, side pot math, and showdown splits. |
-| **[Security & Edge Cases Specification](file:///home/dimathrj/Documents/dev_projects/Pocker_Credits/docs/SECURITY_AND_EDGE_CASES.md)** | Threat model, zero-trust server, session token auth, mobile backgrounding, short all-in rule, and undo stack. |
-| **[Architecture & System Design](file:///home/dimathrj/Documents/dev_projects/Pocker_Credits/docs/ARCHITECTURE.md)** | High-level topology, Texas Hold'em state machine, side-pot tier algorithm, and hardware API integrations. |
-| **[Coding Standards & Design Patterns](file:///home/dimathrj/Documents/dev_projects/Pocker_Credits/docs/CODING_STANDARDS.md)** | SOLID principles, Clean Architecture, State & Strategy design patterns, branded TypeScript types, and quality standards. |
-| **[API & Real-Time Events](file:///home/dimathrj/Documents/dev_projects/Pocker_Credits/docs/API_AND_EVENTS.md)** | Bidirectional Socket.io event schemas, Zod validation contracts, HTTP endpoints, and error handling codes. |
-| **[Architecture Decision Records (ADRs)](file:///home/dimathrj/Documents/dev_projects/Pocker_Credits/docs/DECISIONS.md)** | Formal ADRs capturing decisions for Next.js, shadcn/ui, authoritative WebSockets, and side-pot resolution. |
-| **[Implementation Plan](file:///home/dimathrj/Documents/dev_projects/Pocker_Credits/pocker_credit_plan.md)** | Phased development plan, tech stack breakdown, and verification strategy. |
+| [STATUS](docs/STATUS.md) | Where we are, next step, open questions. **Start here when resuming.** |
+| [Decisions (ADRs)](docs/DECISIONS.md) | Why Flutter + Rust, workspace layout, protocol, crash strategy, LAN join. |
+| [UI Design](docs/UI_DESIGN.md) | Neo-brutalist design system: tokens, components, screens, accessibility. |
+| [Dev Setup](docs/DEV_SETUP.md) | Toolchains, Claude Code plugins, graphify, git hooks, check scripts. |
+| [Architecture](docs/ARCHITECTURE.md) | Components, diagrams, Hold'em state machine, side-pot algorithm, network modes, platform setup. |
+| [Resilience & Crash Handling](docs/RESILIENCE_AND_CRASH_HANDLING.md) | What we copy from LocalSend and what we add: error app, panic supervision, journal, reconnect/resume. |
+| [API & Protocol](docs/API_AND_EVENTS.md) | WebSocket JSON messages, resume handshake, error codes, HTTP endpoints, versioning. |
+| [Game Logic & Rules](docs/GAME_LOGIC_AND_RULES.md) | Betting rules, heads-up, side pots, odd chips, showdown. |
+| [Security & Edge Cases](docs/SECURITY_AND_EDGE_CASES.md) | Threat model, tokens, rate limits, backgrounding, short all-in, undo. |
+| [Coding Standards](docs/CODING_STANDARDS.md) | Rust and Dart standards, lints, patterns, testing. |
+| [Agent Coding Guide](docs/AGENT_CODING_GUIDE.md) | Strict phase-by-phase instructions for implementation agents. |
+| [Implementation Plan](pocker_credit_plan.md) | Stack, structure, race conditions, phases, verification. |
 
 ---
 
-## 🛠️ Tech Stack & Ecosystem
+## Tech Stack
 
 ```
-Frontend:       Next.js 15 (App Router) + React 19
-UI & Primitives: shadcn/ui + Radix UI + Tailwind CSS
-Animations:     Framer Motion (chip physics, pot animations, turn pulse)
-Backend:        Node.js + Fastify + Socket.io (Authoritative Game Server)
-Core Engine:    @poker-credits/shared (Pure TypeScript, 0-dependency domain logic)
-Hardware APIs:  Screen Wake Lock API + Vibration API + Web Audio API
+App:            Flutter (pinned via .fvmrc), Refena state, dart_mappable, neo-brutalist widget set
+Web:            deferred; web-ready by construction (platform seam, web build in CI)
+Server:         Rust, tokio + axum WebSocket, one actor task per room
+Engine:         poker_engine (pure, deterministic, property-tested)
+Bridge:         flutter_rust_bridge + cargokit (embeds the server in the app)
+Protocol:       JSON over WebSocket, versioned, golden fixtures shared by Rust and Dart tests
+Persistence:    atomic JSON snapshot + write-ahead action journal
+Reference:      LocalSend (~/Documents/dev_projects/localsend) for layout and crash handling
 ```
 
 ---
 
-## 🏗️ Repository Structure
+## Repository Structure (target)
 
 ```
 pocker-credits/
-├── docs/                           # Architectural & Engineering Specifications
-│   ├── GAME_LOGIC_AND_RULES.md     # Betting rules, heads-up, side pots, odd chips
-│   ├── SECURITY_AND_EDGE_CASES.md  # Threat model, auth, reconnections, undo stack
-│   ├── ARCHITECTURE.md             # System design, state machine, side-pots
-│   ├── CODING_STANDARDS.md         # Clean code, SOLID, design patterns, testing
-│   ├── API_AND_EVENTS.md           # Socket.io schemas & REST contracts
-│   └── DECISIONS.md                # Architecture Decision Records (ADRs)
+├── Cargo.toml  rust-toolchain.toml  .fvmrc  pubspec.yaml
+├── docs/                       # specs, ADRs, status
+├── protocol/fixtures/v1/       # golden JSON messages
+├── crates/
+│   ├── poker_engine/           # pure rules
+│   └── poker_server_core/      # rooms, protocol, store, supervisor
+├── server/                     # cloud binary + Dockerfile
 ├── packages/
-│   ├── shared/                     # Pure TypeScript Poker Domain Engine
-│   │   ├── src/
-│   │   │   ├── types.ts            # Branded types, Player, GameState, PotTier
-│   │   │   ├── pokerEngine.ts      # State machine & action validation
-│   │   │   ├── potCalculator.ts    # Main & side pot contribution tiers
-│   │   │   └── constants.ts
-│   │   └── test/                   # Vitest unit test suite (100% pot coverage)
-│   ├── server/                     # Authoritative Socket.io Game Server
-│   │   ├── src/
-│   │   │   ├── server.ts           # Fastify + Socket.io server
-│   │   │   ├── roomManager.ts      # Room lifecycle & session tokens
-│   │   │   ├── gameSession.ts      # Active hand management & event routing
-│   │   │   └── lanDiscovery.ts     # Local IP binding for offline play
-│   │   └── test/
-│   └── client/                     # Next.js 15 + shadcn/ui + Tailwind Frontend
-│       ├── app/
-│       │   ├── page.tsx            # Landing & Join room page
-│       │   ├── table/[roomId]/     # Central Table / Pot Display screen
-│       │   └── play/[roomId]/      # Player Mobile Controller screen
-│       ├── components/             # shadcn/ui components & poker felt views
-│       ├── hooks/                  # useSocket, useWakeLock, useHaptics
-│       └── public/                 # Sound effects & PWA manifest
-├── pocker_credit_plan.md           # Phased execution plan
-└── package.json
+│   ├── poker_protocol/         # Dart wire models
+│   └── poker_bridge/           # flutter_rust_bridge glue
+└── app/                        # Flutter app
+```
+
+
+---
+
+## Commands (once Phase 0 is done)
+
+```bash
+# One-time machine setup check (see docs/DEV_SETUP.md)
+bash tool/setup_dev.sh
+
+# Rust
+cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
+
+# Flutter (always through fvm)
+fvm flutter pub get
+fvm dart run build_runner build
+fvm flutter analyze && fvm flutter test
+fvm flutter run -d linux            # or windows / android / ios
+
+# Bridge codegen (from packages/poker_bridge)
+flutter_rust_bridge_codegen generate
 ```
 
 ---
 
-## 🚀 Key Gameplay Features
+## Key Gameplay Features
 
-1. **Zero-Friction Player Onboarding**:
-   - The central table display generates a high-contrast QR code.
-   - Players scan with their native phone camera to instantly load the mobile controller in Safari/Chrome.
-2. **Automated Blinds & Dealer Button Rotation**:
-   - Tracks Dealer `(D)`, Small Blind `(SB)`, and Big Blind `(BB)` positions.
-   - Automatically deducts blinds and transitions to Pre-Flop Under-The-Gun (UTG).
-3. **Automated Main & Side Pot Engine**:
-   - When one or more players go all-in with unequal chips, the engine automatically creates and tracks multiple side pots.
-4. **Showdown Tap Resolution**:
-   - At showdown, eligible contenders for each pot are presented on the table screen; host or players tap the winner(s) to distribute the chips.
-5. **Screen Wake Lock & Tactile Haptics**:
-   - Keeps the central table screen awake throughout the game without dimming.
-   - Vibrates the active player's smartphone when it is their turn to act.
+1. **Fast onboarding**: the table shows a QR code; players scan it in the app (or type address and room code).
+2. **Automated blinds and button**: dealer, small blind, big blind, dead button and heads-up rules handled by the engine.
+3. **Automated main and side pots**: unequal all-ins produce tiered pots.
+4. **Showdown tap**: host taps the winner(s) for each pot; split pots and odd chips handled.
+5. **Reliable reconnects**: lock your phone, come back, you are in the same hand. If the host app is killed, the room restores from its journal.
+6. **Wake lock and haptics**: table stays awake; your phone buzzes on your turn.

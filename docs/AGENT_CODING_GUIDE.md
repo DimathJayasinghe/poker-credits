@@ -1,129 +1,185 @@
 # Agent Coding Guide (Strict Instructions)
 
-**IMPORTANT INSTRUCTION FOR AI AGENT:** You are acting as a pure implementation agent. All architectural, structural, and design decisions have already been made and are documented in the `docs/` directory. Your task is to **write code exactly as specified in this document**. Do not deviate, do not introduce new libraries without asking, and do not alter the file structure or naming conventions.
+**IMPORTANT INSTRUCTION FOR AI AGENT:** You are acting as a pure implementation agent. All architectural, structural and design decisions are made and documented in `docs/`. **Write code exactly as specified.** Do not deviate, do not add libraries that are not on the approved list (section 6) without asking, do not alter the file structure or naming conventions, and do not start a phase that was not assigned.
 
-## 1. Git Workflow & Version Control
+The stack is **Flutter (Dart) + Rust**. The previous TypeScript/Next.js/Node design is retired (see `docs/DECISIONS.md`).
 
-- **Branch Naming:**
-  - `feature/<package>-<short-description>` (e.g., `feature/shared-game-types`)
-  - `fix/<package>-<short-description>` (e.g., `fix/server-action-queue`)
-  - `chore/<short-description>` (e.g., `chore/eslint-setup`)
-- **Commit Messages:**
-  - Use Conventional Commits: `<type>(<scope>): <subject>`
+## 0. Read first
+1. `docs/STATUS.md` (current state and next step)
+2. `docs/DECISIONS.md` (ADR-008 to ADR-014)
+3. `docs/ARCHITECTURE.md`
+4. `docs/API_AND_EVENTS.md`
+   `docs/UI_DESIGN.md` (neo-brutalist UI, required for any widget work)
+5. `docs/RESILIENCE_AND_CRASH_HANDLING.md`
+6. `docs/CODING_STANDARDS.md`
+7. `docs/GAME_LOGIC_AND_RULES.md` and `docs/SECURITY_AND_EDGE_CASES.md` for the phase you are on
+
+Reference implementation for patterns (read-only, never copy code verbatim into this repo): `~/Documents/dev_projects/localsend`. LocalSend's own AGENTS.md forbids AI contributions upstream; this is only a design reference.
+
+## 1. Git Workflow
+- **Branches** off `main`: `feature/<scope>-<short-description>`, `fix/<scope>-<short-description>`, `chore/<short-description>`, `docs/<short-description>`.
+- **Commits**: Conventional Commits `<type>(<scope>): <subject>`.
   - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`.
-  - Scopes: `shared`, `server`, `client`, `repo`.
-  - Example: `feat(shared): add calculatePotSplit logic`
-- **Workflow:** For every discrete task assigned to you, create a new branch off `main`, implement the feature, and prepare it for review. Do not merge directly to `main` without approval.
+  - Scopes: `engine`, `server-core`, `server`, `bridge`, `protocol`, `app`, `repo`.
+  - Example: `feat(engine): add side pot tier calculation`
+- One discrete task per branch. Never merge to `main` yourself. Commit only when the user asks.
 
 ## 2. Naming Conventions
+- **Rust**: files and modules `snake_case.rs`; types and traits `PascalCase`; functions and variables `snake_case`; constants `UPPER_SNAKE_CASE`. Crates `poker_engine`, `poker_server_core`, `poker_bridge_rust`.
+- **Dart**: files `snake_case.dart`; types `PascalCase`; members `lowerCamelCase`; constants `lowerCamelCase`. One public widget per file, file named after it.
+- **Wire**: message `type` names `SCREAMING_SNAKE_CASE`; JSON fields `camelCase`.
+- **Folders**: `snake_case` for Dart and Rust packages, as shown below.
 
-Strictly adhere to the following naming conventions across the entire monorepo:
+## 3. Strict File Structure & Phases
 
-- **Files and Folders:**
-  - React Components (Client): `PascalCase.tsx` (e.g., `PlayerCard.tsx`, `TableView.tsx`).
-  - React Hooks (Client): `camelCase.ts` prefixed with `use` (e.g., `useGameState.ts`).
-  - Non-Component TypeScript files (Server, Shared, Client Utils): `camelCase.ts` (e.g., `gameLogic.ts`, `actionQueue.ts`).
-  - Type/Interface Definitions: `camelCase.ts` (e.g., `types.ts`, `gameEvents.ts`).
-  - Folders: `kebab-case` (e.g., `components`, `store`, `socket-handlers`).
-- **Code Entities:**
-  - Interfaces and Types: `PascalCase` (e.g., `GameState`, `PlayerAction`). Do NOT prefix with `I`.
-  - Classes: `PascalCase` (e.g., `RoomManager`, `ActionQueue`).
-  - Variables, Functions, Methods: `camelCase` (e.g., `handlePlayerJoin`, `calculateBlinds`).
-  - Constants: `UPPER_SNAKE_CASE` (e.g., `MAX_PLAYERS`, `DEFAULT_STARTING_CHIPS`).
+Create files exactly as named. Do not create additional files without permission. Each phase ends with: all checks in section 5 green, commit on the phase branch, stop, report to the user.
 
-## 3. Strict File Structure & Implementation Phases
+### Phase 0: Bootstrap (repo tooling only, no game logic)
+The old TypeScript scaffold is already deleted (owner approved on 2026-11-01). Already in the repo before Phase 0 starts: `.fvmrc`, `rust-toolchain.toml`, `rustfmt.toml`, `clippy.toml`, `.editorconfig`, `.githooks/pre-commit`, `tool/check_web_safe.sh`, `tool/setup_dev.sh`, `.claude/settings.json`, `.graphifyignore`, `.vscode/extensions.json`. Do not recreate them; adjust if needed and say so.
 
-You will implement the system in the following order. Create files exactly as named here. Do not create additional files without explicit permission.
-
-### Phase 1: Shared Package (`packages/shared/`)
-This package contains pure TypeScript types and business logic shared by both client and server.
-
-**Directory Structure:**
 ```text
-packages/shared/
-├── src/
-│   ├── types/
-│   │   ├── game.ts        # GameState, Player, Card, Suit, Rank
-│   │   ├── actions.ts     # PlayerAction type, ActionPayloads
-│   │   └── events.ts      # ClientToServerEvents, ServerToClientEvents
-│   ├── logic/
-│   │   ├── pokerHand.ts   # Hand evaluation logic (pure functions)
-│   │   ├── pot.ts         # Pot splitting, side pots logic
-│   │   └── validation.ts  # Zod schemas for validating payloads
-│   ├── constants/
-│   │   └── rules.ts       # Max players, blind increments, etc.
-│   └── index.ts           # Export all
+Cargo.toml                  # [workspace] members, resolver = "3", lints, profiles
+pubspec.yaml                # pub workspace: app, packages/poker_bridge, packages/poker_protocol
+crates/poker_engine/{Cargo.toml,src/lib.rs}
+crates/poker_server_core/{Cargo.toml,src/lib.rs}
+server/{Cargo.toml,src/main.rs,Dockerfile}
+packages/poker_protocol/{pubspec.yaml,lib/poker_protocol.dart}
+packages/poker_bridge/        # created by flutter_rust_bridge_codegen integrate, then trimmed to match ADR-009
+app/                          # fvm flutter create, platforms: android ios windows macos linux web (web enabled from day one, ADR-014)
+protocol/fixtures/v1/.gitkeep
+.github/workflows/ci.yml
 ```
-*Agent Task:* Implement the types based on `docs/API_AND_EVENTS.md` and logic based on `docs/GAME_LOGIC_AND_RULES.md`. Ensure zero dependencies on Node.js core modules or React. Use `zod` for validation schemas.
+Agent task: empty crates that build and test; Flutter app that shows "Poker Credits" in the brutalist theme skeleton and runs on Linux desktop; `fvm flutter build web` succeeds; `tool/check_web_safe.sh` wired into CI; CI green; Android cleartext config and iOS local-network keys added per `ARCHITECTURE.md` section 8; **init error app wired in `main.dart`** (see resilience doc 2.1).
 
-### Phase 2: Server Package (`packages/server/`)
-The authoritative backend managing the state.
-
-**Directory Structure:**
+### Phase 1: Engine (`crates/poker_engine/`)
 ```text
-packages/server/
-├── src/
-│   ├── core/
-│   │   ├── GameRoom.ts        # Class managing a single room's state
-│   │   ├── RoomManager.ts     # Singleton/Class managing all active rooms
-│   │   └── ActionQueue.ts     # FIFO queue for processing actions per room
-│   ├── socket/
-│   │   ├── connection.ts      # Main socket.io connection handler
-│   │   ├── roomHandlers.ts    # Join, leave, reconnect handlers
-│   │   └── gameHandlers.ts    # Action submissions (fold, call, raise)
-│   ├── storage/
-│   │   └── snapshot.ts        # Logic for writing/reading room state to disk (JSON)
-│   ├── utils/
-│   │   └── logger.ts          # Simple logging utility
-│   └── server.ts              # Fastify & Socket.io initialization entry point
+src/
+├── lib.rs
+├── types.rs        # Chips, PlayerId, SeatIndex, Phase, Card-less hand types
+├── state.rs        # GameState, Seat, PotTier, HandSummary
+├── command.rs      # Command, PlayerAction, AdminCommand
+├── event.rs        # Event (for ticker/sound)
+├── error.rs        # PokerError
+├── validator.rs    # can_check, can_call, min_raise_to, max_raise_to, short all-in detection
+├── pots.rs         # contribution tiers, uncalled refund, odd chip
+├── blinds.rs       # BlindsStrategy, CashGame, Tournament
+├── button.rs       # dead button, missing blinds, heads-up
+├── machine.rs      # allowed transitions, apply()
+└── undo.rs         # 5-deep history
+tests/
+├── pots.rs  validator.rs  button.rs  blinds.rs  machine.rs
+├── properties.rs   # proptest: conservation, no panic, replay equality
 ```
-*Agent Task:* Implement the Action Queue to ensure idempotency (`actionSequenceId`) and atomic state updates as detailed in `docs/ARCHITECTURE.md`. Use Fastify and Socket.io.
+Agent task: implement per `GAME_LOGIC_AND_RULES.md` and `ARCHITECTURE.md` sections 4 and 5. No async, no I/O, no RNG, no clock. `Serialize/Deserialize` on all state types (snapshots depend on it).
 
-### Phase 3: Client Package (`packages/client/`)
-The Next.js 15 UI using shadcn/ui and Tailwind.
-
-**Directory Structure:**
+### Phase 2: Server core and cloud binary (`crates/poker_server_core/`, `server/`)
 ```text
-packages/client/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx               # Landing page (Create/Join Room)
-│   │   ├── [roomId]/
-│   │   │   ├── table/page.tsx     # Central table view (big screen)
-│   │   │   └── player/page.tsx    # Mobile controller view
-│   ├── components/
-│   │   ├── ui/                    # shadcn/ui components (Agent: generate these using shadcn CLI)
-│   │   ├── game/
-│   │   │   ├── TableCards.tsx
-│   │   │   ├── PotDisplay.tsx
-│   │   │   ├── PlayerAvatar.tsx
-│   │   │   └── ActionControls.tsx
-│   │   └── layout/
-│   │       └── Header.tsx
-│   ├── hooks/
-│   │   ├── useSocket.ts           # Socket.io connection hook
-│   │   ├── useGameState.ts        # Zustand store hook bound to socket updates
-│   │   └── usePlayerActions.ts    # Functions to emit actions to server
-│   ├── store/
-│   │   └── gameStore.ts           # Zustand store definition
-│   └── lib/
-│       └── utils.ts               # Tailwind cn() utility
+crates/poker_server_core/src/
+├── lib.rs                # pub start(), ServerConfig, ServerHandle
+├── config.rs             # Limits, defaults
+├── protocol.rs           # Envelope, ClientMessage, ServerMessage, ErrorCode
+├── event.rs              # ServerEvent
+├── room/
+│   ├── actor.rs          # RoomActor loop (select! inbox + deadline)
+│   ├── handle.rs         # RoomHandle, RoomMsg
+│   ├── session.rs        # tokens, seat binding, actionSeq
+│   └── view.rs           # RoomState to RoomView mapping, per-recipient filtering
+├── supervisor.rs         # panic recovery, freeze policy
+├── store/
+│   ├── snapshot.rs       # atomic JSON write/read
+│   └── journal.rs        # append-only, replay
+├── net/
+│   ├── ws.rs             # /v1/ws handler, ping, idle timeout, rate limit
+│   ├── http.rs           # /health, /v1/info, /v1/room/{code}
+│   └── guards.rs         # ConnectionGuard, SeatReservationGuard
+└── util/{room_code.rs,token.rs,panic_hook.rs}
+crates/poker_server_core/tests/
+├── hand_flow.rs  resume.rs  races.rs  panic_recovery.rs  slow_consumer.rs  rate_limit.rs
+server/src/main.rs       # reads env: POKER_BIND, POKER_DATA_DIR, installs panic hook, calls start()
 ```
-*Agent Task:* Implement the UI ensuring strict separation between the "Table View" (read-only state display) and "Player View" (action buttons, private cards). Bind Zustand state strictly to Server socket events.
+Agent task: implement RC-001 to RC-005 mitigations from the plan, the resume handshake, journal, supervision. Add `protocol/fixtures/v1/*.json` (one file per message type) and Rust tests that round-trip them.
+
+### Phase 3: Protocol package and bridge (`packages/poker_protocol/`, `packages/poker_bridge/`)
+```text
+packages/poker_protocol/lib/src/{envelope.dart,client_message.dart,server_message.dart,room_view.dart,error_code.dart}
+packages/poker_protocol/test/fixtures_test.dart       # reads ../../protocol/fixtures/v1/*.json
+
+packages/poker_bridge/rust/src/api/{server.rs,logging.rs,network.rs}   # start/stop, events, create_room, local_addresses
+packages/poker_bridge/lib/{poker_bridge.dart,src/server_controller.dart}
+packages/poker_bridge/rust_builder/                    # cargokit
+```
+Agent task: Dart models mirroring the Rust protocol; FRB API per resilience doc 3.7; Android logs to logcat; verify and document in `STATUS.md` how FRB reports Rust panics in Dart.
+
+### Phase 4: App shell and Table screen (`app/`)
+```text
+app/lib/
+├── main.dart
+├── config/{init.dart,init_error.dart,error_hooks.dart,refena.dart}
+├── theme/{tokens.dart,brutal_theme.dart}
+├── model/
+├── net/{socket_client.dart,reconnect_controller.dart,connection_state.dart}
+├── platform/             # ONLY place for platform-specific code (ADR-014); each is interface + _io/_web/_stub
+│   ├── host_server.dart  secure_token_store.dart  file_log.dart  wake_lock.dart  haptics.dart
+│   ├── sound_unlock.dart  qr_scanner.dart  server_address.dart  window.dart  single_instance.dart
+├── provider/{connection_provider.dart,room_view_provider.dart,host_provider.dart,settings_provider.dart}
+├── pages/{home_page.dart,host_page.dart,table_page.dart,settings_page.dart}
+├── widget/brutal/{brutal_button.dart,brutal_card.dart,brutal_tag.dart,brutal_slider.dart,brutal_keypad.dart,brutal_banner.dart,brutal_dialog.dart,brutal_sheet.dart,brutal_text_field.dart}
+├── widget/table/{felt_layout.dart,seat_ring.dart,pot_display.dart,action_ticker.dart,showdown_sheet.dart,qr_panel.dart}
+└── util/{platform_check.dart,strings.dart,logger.dart}
+```
+Agent task: build the `widget/brutal/` set first with golden tests (see `docs/UI_DESIGN.md`), then host a game (embedded server), show QR and typed address, render live `RoomView`, host controls (start hand, undo, pause, showdown resolve, rebuy approve), wake lock, lifecycle recovery (`ensureRunning` probe), global error hooks, desktop single-instance handover.
+
+### Phase 5: Player and Spectator screens
+```text
+app/lib/pages/{join_page.dart,scan_page.dart,player_page.dart,spectator_page.dart}
+app/lib/widget/player/{action_buttons.dart,raise_slider.dart,turn_alert.dart,rebuy_sheet.dart}
+app/lib/util/{haptics.dart,sound.dart}
+```
+Agent task: use only `widget/brutal/` components; join by QR or typed address, resume after backgrounding, strict separation of read-only Table/Spectator views from Player actions, haptic and sound on `TURN_PROMPT`.
+
+### Phase 6: Hardening and distribution
+Android foreground service, optional multicast discovery, per-platform packaging, cloud Dockerfile and deploy doc, optional TLS fingerprint pinning, device matrix testing. Scope is set by the user when this phase is assigned.
+
+### Phase 7 (later, owner will schedule): Web Player
+Server: static serving of `POKER_WEB_DIR`, same-origin `Origin` acceptance, cache headers. App: `*_web.dart` implementations in `app/lib/platform/`, same-origin socket URL from `Uri.base`, bundled CanvasKit and fonts. Player and Spectator only. Because of ADR-014 this phase should need no refactor of existing code.
 
 ## 4. Coding Principles for the Agent
+1. **No game logic in Dart.** The app renders `RoomView` and sends intents. It does not compute pots, turns or legality beyond using `TURN_PROMPT.legal`.
+2. **Idempotency.** Every `GAME_ACTION` carries `actionSeq`; the server enforces it.
+3. **Pure engine.** `poker_engine` has no async, I/O, time or randomness.
+4. **No panics in request paths.** No `unwrap`/`expect`/slice indexing outside tests. The clippy lints in `CODING_STANDARDS.md` 3.2 are mandatory.
+5. **Errors are values.** Invalid input returns a typed error to that client only. It never crashes a room, and never takes down the process.
+6. **Bounded everything.** Channels, queues, message sizes, connection counts.
+7. **Types first.** Define Rust types and fixtures before Dart models and UI.
+8. **Log, never swallow.** Every `catch` and every ignored `Result` logs with context.
+9. **Pins.** Use `fvm flutter`/`fvm dart`; the Rust toolchain comes from `rust-toolchain.toml`.
+10. **Web-safe by construction** (ADR-014): no `dart:io`/`dart:ffi`/`Platform.isX` outside `app/lib/platform/*_io.dart`; `poker_bridge` imported only from `platform/host_server_io.dart`; ints on the wire stay below 2^53.
+11. **Brutalist UI only** (ADR-013): tokens from `theme/tokens.dart`, widgets from `widget/brutal/`, no stock Material visuals, no hex literals in widgets, fonts bundled.
 
-1. **No Local State for Game Logic:** The React client must treat the game state as read-only. Do not calculate "next turns" or "pot splits" on the client. The client strictly renders `GameState` from the server and sends `PlayerAction` requests.
-2. **Idempotency:** Every client action payload MUST include an `actionSequenceId`. The server MUST check this against the last processed action for that player.
-3. **Pure Functions:** Put all complex calculation logic (hand ranking, side pots) in `packages/shared/src/logic/` as pure functions (`(state, action) => newState` or similar).
-4. **Error Handling:** Use a standardized error response format for socket events. If an action is invalid, emit an `action_error` back to the specific client, do not crash the room.
-5. **Types First:** Always define the TypeScript interfaces in `shared` before writing the implementation in `server` or `client`.
+## 5. Checks that must pass before you stop
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+fvm dart format --set-exit-if-changed app/lib app/test packages
+fvm flutter analyze
+fvm flutter test
+fvm flutter build web          # web-safety smoke (ADR-014)
+bash tool/check_web_safe.sh
+```
+Include the actual command output summary in your report. If a check was not run (for example no Android SDK), say so.
 
-## 5. Instructions for the Agent Starting Out
+## 6. Approved dependencies
+Exact versions are chosen in Phase 0 and recorded here before use. Anything not listed needs the user's approval.
 
-When you are invoked by the user to begin coding a phase, you MUST:
-1. Read `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, and this `docs/AGENT_CODING_GUIDE.md` document.
-2. Ensure you are on the `main` branch.
-3. Create a branch for your assigned Phase (e.g., `git checkout -b feature/phase-1-shared-logic`).
-4. Implement the files listed exactly under the Phase directory structure.
-5. Do NOT proceed to the next phase. Stop, commit your work, push the branch, and inform the user that the phase is ready for review.
+**Rust:** `tokio`, `axum` (with `ws`), `serde`, `serde_json`, `thiserror`, `anyhow` (edges only), `tracing`, `tracing-subscriber`, `tracing-android` (Android only), `uuid`, `getrandom`, `subtle` (constant-time compare), `sha2`, `tempfile` (tests), `proptest` (dev), `flutter_rust_bridge`.
+
+**Dart/Flutter:** `refena_flutter`, bundled fonts (Archivo Black, Space Mono; SIL OFL files in `app/assets/fonts/`, **no** `google_fonts` runtime download), `dart_mappable` (+builder), `web_socket_channel`, `wakelock_plus`, `pretty_qr_code`, a QR scanner plugin, `window_manager` (desktop), `path_provider`, `package_info_plus`, `device_info_plus`, `logging`, `flutter_secure_storage` (or equivalent), an audio plugin, `network_info_plus` is **not** needed (use `NetworkInterface.list()`), `build_runner`, `flutter_lints`, `mockito` or `mocktail` (pick one in Phase 0).
+
+## 7. Starting a task
+1. Read section 0 files.
+2. `git checkout main && git pull` (if a remote exists), then create the phase branch.
+3. Implement only the listed files.
+4. Run section 5 checks.
+5. Update `docs/STATUS.md` (what is done, what is next, any deviations and why).
+6. Stop. Report to the user. Do not begin the next phase.
