@@ -1,0 +1,12 @@
+[package]
+name = "poker_server_core"
+description = "Authoritative poker room server: rooms as actors, WebSocket protocol, snapshots and journal."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+poker_engine = { path = "../poker_engine" }
+
+[lints]
+workspace = true

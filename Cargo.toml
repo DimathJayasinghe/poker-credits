@@ -1,0 +1,32 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/poker_engine",
+    "crates/poker_server_core",
+    "server",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Lint levels for every member (members opt in with `[lints] workspace = true`).
+# See docs/CODING_STANDARDS.md section 3.2.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+todo = "deny"
+dbg_macro = "deny"
+
+# Profiles are only honoured in the workspace root manifest.
+# Never set `panic = "abort"`: room crash recovery relies on unwinding (ADR-009, ADR-011).
+[profile.dev]
+debug = "line-tables-only"

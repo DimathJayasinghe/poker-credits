@@ -1,0 +1,12 @@
+[package]
+name = "poker_server"
+description = "Standalone cloud server binary."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+poker_server_core = { path = "../crates/poker_server_core" }
+
+[lints]
+workspace = true
