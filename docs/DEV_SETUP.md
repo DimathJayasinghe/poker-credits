@@ -39,7 +39,7 @@ Recommended plugins for this repo (all from `claude-plugins-official`):
 There is no official Dart LSP plugin in the catalog. The Dart analysis server runs inside VS Code (Dart-Code) and via `fvm flutter analyze`.
 
 ### Applying the project settings (needs your action)
-The ready-made project settings live at **`tool/claude-settings.proposed.json`**. They contain: the plugin list above, a permission allow-list for `cargo`, `fvm flutter/dart`, the check scripts, read-only `graphify` commands and read-only `git` commands, a deny-list for `.env` and signing keys, and a `PostToolUse` hook that auto-formats edited `.rs`/`.dart` files through `tool/claude_post_edit.sh`.
+The ready-made project settings live at **`tool/claude-settings.proposed.json`**. They contain: the plugin list above, an allow-list of **exact** commands (no wildcards on `cargo`, `fvm` or `git`, because flags such as `--config`, `-Z`, `--output` and `--ext-diff` can turn an allowed command into arbitrary execution; anything else prompts, including `build_runner`, codegen, `cargo build`), read-only `graphify` queries, a deny-list for `.env`, signing keys, `RUSTC_WRAPPER`, `--config` and `-Z`, and protection of `.claude/`, `.githooks/` and the format-hook script from agent edits, and a `PostToolUse` hook that auto-formats edited `.rs`/`.dart` files through `tool/claude_post_edit.sh`.
 
 Claude Code's auto mode refused to write `.claude/settings.json` itself (it counts as self-modification of permissions and hooks), so apply it yourself after reviewing it:
 

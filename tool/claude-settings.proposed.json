@@ -14,32 +14,26 @@
   },
   "permissions": {
     "allow": [
-      "Bash(cargo fmt:*)",
-      "Bash(cargo clippy:*)",
-      "Bash(cargo check:*)",
-      "Bash(cargo test:*)",
-      "Bash(cargo build:*)",
-      "Bash(cargo nextest:*)",
-      "Bash(cargo tree:*)",
-      "Bash(cargo deny:*)",
-      "Bash(fvm flutter pub get:*)",
-      "Bash(fvm flutter analyze:*)",
-      "Bash(fvm flutter test:*)",
-      "Bash(fvm flutter build web:*)",
-      "Bash(fvm dart format:*)",
-      "Bash(fvm dart run build_runner:*)",
-      "Bash(flutter_rust_bridge_codegen generate:*)",
+      "Bash(cargo fmt --all --check)",
+      "Bash(cargo fmt --all)",
+      "Bash(cargo clippy --workspace --all-targets -- -D warnings)",
+      "Bash(cargo check --workspace)",
+      "Bash(cargo test --workspace)",
+      "Bash(fvm flutter pub get)",
+      "Bash(fvm flutter analyze)",
+      "Bash(fvm flutter test)",
+      "Bash(fvm flutter build web)",
       "Bash(bash tool/check_web_safe.sh)",
       "Bash(bash tool/setup_dev.sh)",
       "Bash(graphify query:*)",
       "Bash(graphify path:*)",
       "Bash(graphify explain:*)",
-      "Bash(graphify affected:*)",
-      "Bash(graphify god-nodes:*)",
-      "Bash(graphify update:*)",
-      "Bash(git status:*)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)"
+      "Bash(graphify god-nodes)",
+      "Bash(graphify update .)",
+      "Bash(git status)",
+      "Bash(git status --short)",
+      "Bash(git diff --stat)",
+      "Bash(git log --oneline)"
     ],
     "deny": [
       "Read(./.env)",
@@ -47,7 +41,16 @@
       "Read(**/*.jks)",
       "Read(**/*.keystore)",
       "Read(**/key.properties)",
-      "Read(**/*.p12)"
+      "Read(**/*.p12)",
+      "Edit(.claude/**)",
+      "Write(.claude/**)",
+      "Edit(.githooks/**)",
+      "Write(.githooks/**)",
+      "Edit(tool/claude_post_edit.sh)",
+      "Write(tool/claude_post_edit.sh)",
+      "Bash(cargo * --config*)",
+      "Bash(cargo * -Z*)",
+      "Bash(RUSTC_WRAPPER=*)"
     ]
   },
   "hooks": {
@@ -55,7 +58,10 @@
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/tool/claude_post_edit.sh\"" }
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/tool/claude_post_edit.sh\""
+          }
         ]
       }
     ]
