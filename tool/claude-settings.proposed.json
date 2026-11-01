@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "enabledPlugins": {
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": false
+  },
+  "permissions": {
+    "allow": [
+      "Bash(cargo fmt --all --check)",
+      "Bash(cargo fmt --all)",
+      "Bash(cargo clippy --workspace --all-targets -- -D warnings)",
+      "Bash(cargo check --workspace)",
+      "Bash(cargo test --workspace)",
+      "Bash(fvm flutter pub get)",
+      "Bash(fvm flutter analyze)",
+      "Bash(fvm flutter test)",
+      "Bash(fvm flutter build web)",
+      "Bash(bash tool/check_web_safe.sh)",
+      "Bash(bash tool/setup_dev.sh)",
+      "Bash(graphify query:*)",
+      "Bash(graphify path:*)",
+      "Bash(graphify explain:*)",
+      "Bash(graphify god-nodes)",
+      "Bash(graphify update .)",
+      "Bash(git status)",
+      "Bash(git status --short)",
+      "Bash(git diff --stat)",
+      "Bash(git log --oneline)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(**/*.jks)",
+      "Read(**/*.keystore)",
+      "Read(**/key.properties)",
+      "Read(**/*.p12)",
+      "Edit(.claude/**)",
+      "Write(.claude/**)",
+      "Edit(.githooks/**)",
+      "Write(.githooks/**)",
+      "Edit(tool/claude_post_edit.sh)",
+      "Write(tool/claude_post_edit.sh)",
+      "Bash(cargo * --config*)",
+      "Bash(cargo * -Z*)",
+      "Bash(RUSTC_WRAPPER=*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/tool/claude_post_edit.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,217 +1,225 @@
 # Coding Standards, Design Patterns & Quality Guidelines
 
+Languages: **Rust** (engine, server core, cloud binary, bridge crate) and **Dart/Flutter** (app, protocol models, bridge facade). Tooling conventions follow LocalSend (`~/Documents/dev_projects/localsend/AGENTS.md`) where noted.
+
 ## 1. Core Engineering Principles
 
-To maintain high maintainability, testability, and enterprise-grade reliability, the codebase adheres to the following foundational engineering principles:
+### 1.1 SOLID
+* **SRP**: `pots` only computes chips; it does not rank hands or touch sockets. A Dart widget renders; it does not decide game outcomes.
+* **OCP**: blind schedules are a `BlindsStrategy` trait; adding a variant does not change the state machine.
+* **LSP / DIP**: the engine depends on nothing but `std`, `serde`, `thiserror`. The server depends on engine traits, never the reverse. Tests substitute fake transports.
+* **ISP**: Table, Player and Spectator screens each get a narrow provider interface (`TableViewModel`, `PlayerViewModel`, `SpectatorViewModel`); the Table never receives private action dispatchers.
 
-### 1.1. SOLID Principles
-* **Single Responsibility Principle (SRP)**: Each class, module, and hook has exactly one reason to change. The `PotCalculator` only computes chips; it does not evaluate hand ranks or manage sockets.
-* **Open/Closed Principle (OCP)**: Game variations (e.g. Tournament blind levels vs Fixed cash blinds) are extensible via strategy interfaces without modifying the core state machine.
-* **Liskov Substitution Principle (LSP)**: Betting rules adhere to standard contracts; mock adapters in tests cleanly substitute real transport layers.
-* **Interface Segregation Principle (ISP)**: Clients only depend on the interfaces they consume. Table display screens do not receive private player controller action dispatchers.
-* **Dependency Inversion Principle (DIP)**: Core poker domain logic depends on pure abstractions, never on concrete transport libraries (e.g., Socket.io) or UI frameworks.
-
-### 1.2. KISS, DRY, and YAGNI
-* **KISS (Keep It Simple, Stupid)**: Favor readable, declarative code over clever, convoluted abstractions.
-* **DRY (Don't Repeat Yourself)**: Game validation, blind structures, and type contracts are authored once in `@poker-credits/shared` and reused verbatim on client and server.
-* **YAGNI (You Aren't Gonna Need It)**: Do not prematurely abstract complex database ORMs or third-party auth services when local memory rooms and signed tokens completely fulfill the mission.
+### 1.2 KISS, DRY, YAGNI
+* Rules live once, in `poker_engine`. The Dart side holds no poker rules.
+* The wire format is defined once in Rust; Dart mirrors it and is checked by golden fixtures.
+* No database, no ORM, no auth provider, no extra isolates until measured need.
 
 ---
 
-## 2. Architectural Design Patterns
+## 2. Design Patterns
 
 ```mermaid
 classDiagram
-    class BettingStrategy {
-        <<interface>>
-        +getBlinds(handNumber, elapsedSeconds) Blinds
+    class BlindsStrategy {
+        <<trait>>
+        +blinds(hand_number, elapsed) Blinds
     }
-    class CashGameBlinds {
-        +smallBlind: number
-        +bigBlind: number
-        +getBlinds() Blinds
-    }
-    class TournamentBlinds {
-        +blindLevels: BlindLevel[]
-        +levelDurationSeconds: number
-        +getBlinds() Blinds
-    }
-    BettingStrategy <|.. CashGameBlinds
-    BettingStrategy <|.. TournamentBlinds
+    class CashGame
+    class Tournament
+    BlindsStrategy <|.. CashGame
+    BlindsStrategy <|.. Tournament
 
-    class PokerStateMachine {
-        -state: GameState
-        +applyAction(action: PlayerAction): Result~GameState, PokerError~
-        +advanceStreet(): Result~GameState, PokerError~
+    class Engine {
+        +apply(state, command) Result~Transition, PokerError~
     }
-    class PotCalculator {
-        +calculatePots(contributions, folded): PotTier[]
-        +distributePots(pots, winners): PayoutMap
+    class Pots {
+        +calculate(contributions, folded) Vec~PotTier~
+        +distribute(pots, winners) Payouts
     }
-    PokerStateMachine --> PotCalculator
-    PokerStateMachine --> BettingStrategy
+    Engine --> Pots
+    Engine --> BlindsStrategy
+
+    class RoomActor {
+        -state: RoomState
+        -inbox: Receiver~RoomMsg~
+        +run()
+    }
+    RoomActor --> Engine
 ```
 
-### 2.1. State Pattern & Pure Reducers
-The Texas Hold'em progression (`PRE_FLOP` &rarr; `FLOP` &rarr; `TURN` &rarr; `RIVER` &rarr; `SHOWDOWN`) is modeled as a deterministic state machine:
-* **Pure Transitions**: State mutations follow the reducer pattern `(previousState, action) => nextState`.
-* **Zero Mutation**: State objects are immutable. Every transition returns a cloned, validated new state representation.
-
-### 2.2. Strategy Pattern
-* **Blinds Strategy**: Easily switch between `CashGameStrategy` (fixed blinds, e.g. $5/$10) and `TournamentStrategy` (timed blind levels doubling every 15 minutes).
-
-### 2.3. Observer / Event-Driven Architecture
-* **Socket Events**: Client and server interact through strongly typed pub/sub events.
-* **Optimistic UI with Reconciliation**: Player controllers show optimistic bet updates, confirmed or rolled back upon authoritative server broadcast.
+* **Pure reducer / state machine**: `apply(&State, Command) -> Result<Transition, PokerError>`. Transition table is data (`fn allowed(from, to) -> bool`), not scattered `if` chains. Illegal transitions return `PokerError::IllegalTransition`.
+* **Command**: every player or admin intent is an enum variant of `Command` carrying `player_id`. Undo and journal both operate on commands.
+* **Strategy**: blinds (cash vs tournament).
+* **Actor**: one task per room; message passing, no shared mutable game state.
+* **Observer via events**: the engine returns `Vec<Event>` in the `Transition`; the server maps events to wire messages. The engine knows nothing about WebSockets.
+* **Factory**: `RoomCode::generate(&mut impl CryptoRng)` and `SessionToken::generate()` live in the server crate (engine has no RNG). Alphabet `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; tokens are 128 random bits from the OS RNG.
+* **Drop guards**: any reservation made before an `.await` is released by a guard (`RESILIENCE_AND_CRASH_HANDLING.md` 3.5).
 
 ---
 
-## 3. TypeScript Standards & Type Safety
+## 3. Rust Standards
 
-### 3.1. Strictness Configuration
-The `tsconfig.json` enforces maximum type safety across all packages:
-```json
-{
-  "compilerOptions": {
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "exactOptionalPropertyTypes": true
-  }
+### 3.1 Toolchain and layout
+* Toolchain pinned in `rust-toolchain.toml` with `clippy` and `rustfmt` components. Edition 2024 and resolver 3 (LocalSend uses resolver 3 at the workspace root; its member crates mix editions 2021 and 2024, we use 2024 everywhere).
+* Root `Cargo.toml` is a workspace with a single `Cargo.lock`; profiles only in the root.
+* File names: `snake_case.rs`. Module per concept, no `mod.rs` files in new code (use `foo.rs` + `foo/`).
+* Crate features: `poker_engine` has none required. A bare `cargo test -p poker_engine` must pass. Optional features in `poker_server_core` (for example `discovery`) must also build with `--no-default-features`.
+
+### 3.2 Lints (workspace-level)
+```toml
+[workspace.lints.rust]
+unsafe_code = "forbid"          # bridge crate may relax with justification
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+todo = "deny"
+dbg_macro = "deny"
+```
+Tests may `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]`.
+
+### 3.3 Domain types
+Newtypes prevent mixing money, seats and ids:
+```rust
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Chips(u64);
+impl Chips {
+    pub const ZERO: Chips = Chips(0);
+    pub fn checked_add(self, o: Chips) -> Option<Chips> { self.0.checked_add(o.0).map(Chips) }
+    pub fn checked_sub(self, o: Chips) -> Option<Chips> { self.0.checked_sub(o.0).map(Chips) }
 }
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)] #[serde(transparent)] pub struct PlayerId(String);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)] #[serde(transparent)] pub struct SeatIndex(u8);
 ```
+* All arithmetic on chips is checked; overflow returns `PokerError::Overflow`.
+* Odd-chip distribution rule from `GAME_LOGIC_AND_RULES.md` is implemented in one function and unit-tested.
 
-### 3.2. Branded Types for Domain Safety
-To prevent passing a generic integer into a currency calculation or swapping player IDs with room IDs, use **branded types**:
-```typescript
-export type Brand<K, T> = K & { readonly __brand: T };
-
-export type ChipAmount = Brand<number, 'ChipAmount'>;
-export type PlayerId = Brand<string, 'PlayerId'>;
-export type RoomId = Brand<string, 'RoomId'>;
-
-export const toChips = (amount: number): ChipAmount => {
-  if (amount < 0 || !Number.isInteger(amount)) {
-    throw new Error(`Invalid chip amount: ${amount}`);
-  }
-  return amount as ChipAmount;
-};
+### 3.4 Actions as enums
+```rust
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", rename_all_fields = "camelCase")]
+pub enum PlayerAction { Fold, Check, Call, Raise { to_amount: Chips }, AllIn }
 ```
+Match exhaustively; no wildcard arms on domain enums.
 
-### 3.3. Discriminated Unions for Actions
-All gameplay actions are strictly typed via discriminated unions:
-```typescript
-export type PlayerAction =
-  | { type: 'FOLD'; playerId: PlayerId }
-  | { type: 'CHECK'; playerId: PlayerId }
-  | { type: 'CALL'; playerId: PlayerId; amount: ChipAmount }
-  | { type: 'RAISE'; playerId: PlayerId; toAmount: ChipAmount }
-  | { type: 'ALL_IN'; playerId: PlayerId; amount: ChipAmount };
-```
+### 3.5 Errors
+* Library crates: `thiserror` enums (`PokerError`, `ProtocolError`, `StoreError`). Binary and bridge edges may use `anyhow`.
+* Anticipated domain failures are values (`Result`), never panics.
+* Error to wire code mapping is one exhaustive `match`.
 
-### 3.4. Result Pattern for Domain Operations
-Never throw untyped exceptions for anticipated domain errors (e.g., illegal raise size). Use a functional `Result` type:
-```typescript
-export type Result<T, E = PokerError> =
-  | { success: true; data: T }
-  | { success: false; error: E };
+### 3.6 Async rules (server core)
+* Never hold a `std::sync::Mutex` guard across `.await`. Prefer actors over locks.
+* Every spawned task has an owner that observes its `JoinHandle`.
+* All channels are bounded; the policy on full is documented at the creation site.
+* All network reads have a timeout; all outbound writes go through the connection's bounded queue.
+* No blocking I/O on the runtime: file writes in snapshot code use `tokio::fs` or `spawn_blocking`.
 
-export const ok = <T>(data: T): Result<T, never> => ({ success: true, data });
-export const err = <E>(error: E): Result<never, E> => ({ success: false, error });
+### 3.7 Commands
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 ```
 
 ---
 
-## 4. Frontend & React / Next.js Guidelines
+## 4. Dart / Flutter Standards
 
-### 4.1. Component Separation & Structure
-* **Separation of Concerns**:
-  * **Presentational Components**: Pure, stateless UI components (e.g. `ChipStackView`, `PotCounter`, `RadialSeat`).
-  * **Container / Screen Components**: Connect hooks and manage view state (e.g. `TableScreen`, `PlayerControllerScreen`).
-  * **Custom Hooks**: Encapsulate side effects and real-time connectivity (`usePokerSocket`, `useHaptics`, `useWakeLock`).
+### 4.1 Toolchain
+* Always `fvm flutter` and `fvm dart`, never bare binaries (same rule as LocalSend).
+* Pub workspace at the repo root (members: `app`, `packages/poker_bridge`, `packages/poker_protocol`), one `pubspec.lock`.
+* Formatting width **150** (`page_width: 150`, `trailing_commas: preserve`) in `analysis_options.yaml`, matching LocalSend.
+* Lints: `flutter_lints` plus `strict-casts`, `strict-inference`, `strict-raw-types`.
 
-### 4.2. shadcn/ui & Tailwind CSS Conventions
-* Always utilize [shadcn/ui](https://ui.shadcn.com) primitives (`@/components/ui/*`) for interactive controls:
-  * `Slider` for the Raise bet adjuster.
-  * `Dialog` and `Drawer` for modals and bottom-sheet controls.
-  * `Badge` for Dealer/Blind indicators.
-* Use Tailwind CSS with explicit design tokens (e.g. `table-felt-green: #0a4f2e`, `chip-gold: #eab308`).
-* Strictly adhere to accessibility guidelines (ARIA labels on action buttons, keyboard navigation on bet input, high-contrast text for dark room poker nights).
+### 4.2 Files and naming
+* Files and folders: `snake_case`. Types: `PascalCase`. Members: `lowerCamelCase`. Constants: `lowerCamelCase` (Dart convention), not `UPPER_SNAKE`.
+* Widgets: one public widget per file, file named after the widget (`pot_display.dart`).
+* No barrel files except package entry points.
 
-### 4.3. Animation Guidelines (Framer Motion)
-* Animations must never block gameplay or introduce input latency.
-* Use lightweight layout animations (`layoutId`, `AnimatePresence`) for:
-  * Chips moving from player bets into the central pot.
-  * Pot distribution to winner seats at showdown.
-  * Turn indicator glow pulsing around the active player.
+### 4.3 State management
+* Refena (`refena_flutter`) as in LocalSend: `NotifierProvider` for plain state, `ReduxProvider` with action classes for anything that talks to the socket or the bridge.
+* Models: `dart_mappable` (`@MappableClass`). In this repo `fromJson`/`toJson` are Map converters, as configured in LocalSend's `build.yaml`.
+* Providers never import widgets. Widgets never open sockets.
+
+### 4.4 Presentational vs container
+* **Presentational widgets**: stateless, data in, callbacks out (`ChipStack`, `PotCounter`, `SeatChip`, `RaiseSlider`).
+* **Screens**: read providers, own screen-local state, no business rules.
+* **Services** (`SocketClient`, `ReconnectController`, `SecureTokenStore`): plain Dart classes behind interfaces so tests can fake them.
+
+### 4.5 Theming and accessibility
+* Visual language is neo-brutalism (ADR-013). Tokens, components and screens are specified in `docs/UI_DESIGN.md`. All values come from `app/lib/theme/tokens.dart`; no hex colours or magic sizes in widgets.
+* Use the `widget/brutal/` components; do not use stock Material buttons, cards or dialogs for visible UI.
+* Semantics labels on every action button; minimum 48x48 tap targets (56x56 for Player action buttons); never rely on colour alone.
+
+### 4.6 Animation
+* Never block input or delay a state update for an animation. Motion tokens: 80 ms, 150 ms, max 300 ms; snappy, no springs or bounce. Respect "reduce motion" platform settings (durations to 0).
+
+### 4.7 Errors
+* Global hooks per `RESILIENCE_AND_CRASH_HANDLING.md` 2.2. Never `catch (_) {}`; always log with stack trace.
+* Socket errors are values on a state stream (`ConnectionState.reconnecting`, `.failed(reason)`), not thrown into the widget tree.
+
+### 4.8 Web-safe rules (ADR-014)
+* Outside `app/lib/platform/*_io.dart` and `packages/poker_bridge`: no `dart:io`, no `dart:ffi`, no `dart:html`/`package:web`, no `Platform.isX`. Use `defaultTargetPlatform` and `kIsWeb` only inside `app/lib/platform/` factories.
+* Platform-specific behaviour goes behind an interface in `app/lib/platform/` with conditional exports: `export 'x_stub.dart' if (dart.library.io) 'x_io.dart' if (dart.library.js_interop) 'x_web.dart';`.
+* `packages/poker_protocol` is pure Dart. `app/lib` never imports `poker_bridge` outside `platform/host_server_io.dart`.
+* Numbers on the wire stay below 2^53-1. 64-bit identifiers travel as strings.
+* No runtime downloads of assets (fonts, wasm); everything is bundled.
+* Check: `tool/check_web_safe.sh`, and `fvm flutter build web` in CI.
+
+### 4.9 Commands
+```bash
+fvm flutter pub get
+fvm dart run build_runner build          # dart_mappable
+fvm dart format --set-exit-if-changed lib test
+fvm flutter analyze
+fvm flutter test
+flutter_rust_bridge_codegen generate     # from packages/poker_bridge
+```
 
 ---
 
 ## 5. API & Validation Standards
 
-### 5.1. Boundary Validation with Zod
-Never trust incoming network data. All Socket.io payloads and HTTP parameters must be validated at the system boundary using **Zod**:
-```typescript
-import { z } from 'zod';
-
-export const PlayerActionSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('FOLD'),
-    playerId: z.string().min(1),
-  }),
-  z.object({
-    type: z.literal('CHECK'),
-    playerId: z.string().min(1),
-  }),
-  z.object({
-    type: z.literal('CALL'),
-    playerId: z.string().min(1),
-    amount: z.number().int().positive(),
-  }),
-  z.object({
-    type: z.literal('RAISE'),
-    playerId: z.string().min(1),
-    toAmount: z.number().int().positive(),
-  }),
-  // ✅ ALL_IN was missing from the original schema — now added
-  z.object({
-    type: z.literal('ALL_IN'),
-    playerId: z.string().min(1),
-  }),
-]).and(
-  // Action idempotency: every player action must include a monotonically
-  // increasing sequence ID per hand to detect and discard duplicate submissions
-  z.object({ actionSequenceId: z.number().int().nonnegative() })
-);
-```
+* **Rust is the schema.** Deserialising into `ClientMessage` with serde is the first validation layer; unknown fields are ignored, unknown variants map to `UNKNOWN_MESSAGE`.
+* **Second layer** is semantic validation in a `validate()` per message (name charset and length, seat range 0..=9, amounts non-zero where required). Return `BAD_REQUEST` or the specific code.
+* **Third layer** is the engine's rules (turn order, legal action, min raise). The engine never assumes the previous layers ran.
+* Dart side: parse server messages with generated mappers; on parse failure log and ignore the message (never crash the UI); count failures and show "Protocol error" after 5 in a row.
+* Wire contract and fixtures: `API_AND_EVENTS.md`, `protocol/fixtures/`.
 
 ---
 
-## 6. Testing Strategy & Quality Assurance
+## 6. Testing Strategy
 
 ```mermaid
 graph TD
-    subgraph TestPyramid ["Testing Pyramid"]
-        E2E["End-to-End Tests (Playwright)\nMulti-tab real-time hand simulation"]
-        Integration["Integration Tests (Vitest + Socket.io Client)\nRoom join, reconnect, multi-client action round"]
-        Unit["Domain Unit Tests (Vitest)\n100% Coverage on Side-Pots, Min-Raise, Blinds"]
-    end
+    E2E["Device/emulator E2E\nmulti-client hand on real app builds"]
+    Int["Integration (Rust)\ntokio test server + scripted WS clients; Dart widget/provider tests with fake socket"]
+    Prop["Property tests (proptest)\nchip conservation, replay equality, no panic on any command sequence"]
+    Unit["Unit tests\npots, validator, blinds, button, protocol fixtures"]
+    E2E --> Int --> Prop --> Unit
 ```
 
-### 6.1. Unit Testing Priorities (100% Target)
-* **Side Pot Calculation Engine**:
-  * Heads-up all-in with unequal stacks.
-  * 3-way, 4-way all-ins with multiple stack tiers.
-  * Split pot with odd-chip distribution (e.g. $101 split between 2 players &rarr; $51 to player closest to dealer button, $50 to second player).
-* **Betting Constraints**:
-  * Minimum raise sizing enforcement (raise must be at least the size of the previous bet/raise).
-  * Checking when facing a bet must return an explicit `CANNOT_CHECK` error.
-  * Blind rotation logic across hands and when players leave/bust out.
+### 6.1 Engine priorities (aim for 100% branch coverage on `pots`, `validator`, `button`)
+* Heads-up all-in with unequal stacks; 3-way and 4-way all-ins with several tiers.
+* Split pot with odd chips ($101 between two players: $51 to the player closest left of the button, $50 to the other).
+* Min-raise enforcement; incomplete (short) all-in does not reopen betting.
+* Check when facing a bet returns `PokerError::CannotCheck`.
+* Dead button, dead small blind, heads-up transition, simultaneous knockouts.
+* **Property tests**: (1) sum of stacks plus pots is invariant over any legal sequence; (2) fuzzing arbitrary commands never panics; (3) `replay(snapshot, journal) == live_state`, including undo.
 
-### 6.2. CI/CD & Linting Automation
-* **Linter**: ESLint with `@typescript-eslint/recommended-type-checked`.
-* **Formatter**: Prettier configured with 2 spaces, single quotes, trailing commas.
-* **Pre-commit Hooks**: Husky + lint-staged executing typecheck, lint, and unit tests prior to commit.
+### 6.2 Server integration
+RC-001 to RC-005 scenarios (see plan), resume, slow consumer, room panic isolation, listener restart, rate limit. Use `tokio::time::pause()` for timers so tests are fast and deterministic.
+
+### 6.3 Dart
+* Unit: reconnect backoff with fake clock, protocol fixture round-trips, view-model derivations.
+* Widget: init error app, Table screen golden images at phone portrait and tablet landscape, Player action buttons states.
+* The app never needs the native library in unit tests: the bridge is behind an interface.
+
+### 6.4 CI
+Jobs: `rust` (fmt, clippy, test on Linux), `dart` (format, analyze, test), `fixtures` (both sides), then per-platform build jobs from Phase 6. Pre-commit via a plain `.githooks/pre-commit` script running fmt and clippy; no Husky.

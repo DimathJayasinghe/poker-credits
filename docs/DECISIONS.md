@@ -1,152 +1,203 @@
 # Architecture Decision Records (ADRs): Poker Credits
 
-This document formally captures all key architectural and engineering decisions, along with their context, trade-offs, and consequences.
+This document captures the key architectural decisions, their context, trade-offs and consequences.
+
+**2026-11-01 pivot:** the stack changed from Next.js + Node/Socket.io to **Flutter + Rust**. ADR-001, ADR-002 and ADR-003 are superseded by ADR-008 to ADR-012. ADR-004, ADR-005, ADR-006 and ADR-007 stay in force with amendments noted in their text. The original wording of the superseded ADRs lives in git history (commit `a725aef` and earlier).
+
+| ADR | Title | Status |
+| :--- | :--- | :--- |
+| 001 | Next.js + shadcn/ui frontend | **Superseded by ADR-008** |
+| 002 | Authoritative server via Socket.io | **Superseded by ADR-009 and ADR-010** (the authoritative-server idea itself is kept) |
+| 003 | Pure TypeScript shared engine | **Superseded by ADR-009** (pure reducer idea kept, now Rust) |
+| 004 | Dual-mode connectivity (cloud + LAN) | Accepted, amended by ADR-009 |
+| 005 | Physical cards showdown tap model | Accepted |
+| 006 | In-memory state + crash snapshot | Accepted, **amended by ADR-011** (journal added) |
+| 007 | Spectator role | Accepted, amended (routes became screens) |
+| 008 | Flutter client for iOS, Android, Windows, macOS, Linux | Accepted |
+| 009 | Rust workspace: engine, server core, cloud binary, FRB bridge | Accepted |
+| 010 | Plain WebSocket + JSON protocol with explicit versioning | Accepted |
+| 011 | Crash and resilience strategy (adopted from LocalSend) | Accepted |
+| 012 | LAN join: QR first, optional multicast discovery later | Accepted |
+| 013 | Neo-brutalist UI | Accepted |
+| 014 | Web-ready codebase (web build itself deferred) | Accepted |
 
 ---
 
-## ADR-001: UI Framework Selection — Next.js 15 + shadcn/ui + Framer Motion
+## ADR-001 (Superseded): Next.js 15 + shadcn/ui + Framer Motion
 
-### Status: Accepted
-### Date: 2026-10-07
+**Status:** Superseded by ADR-008 on 2026-11-01.
 
-### Context
-The application must run smoothly across multiple platforms:
-1. Central Table Display (iPad, tablet, TV, desktop).
-2. Player Controllers (smartphones held in one hand).
-Friends gathering for a poker game have very high resistance to downloading a 50MB native app from the App Store or Google Play just to play for an evening. A frictionless web experience where friends scan a QR code on the central screen and join within 5 seconds in Mobile Safari or Chrome is essential.
+The original argument was zero-install onboarding: friends scan a QR code and play in a mobile browser. A native Flutter app gives up that default. The gain is one codebase for iOS, Android, Windows, macOS and Linux, real haptics, real wake-lock, a background service for the embedded server (ADR-009) and no browser-suspension problems. Zero-install joining is kept as an optional later phase (see ADR-008, "Browser guests").
 
-### Decision
-We select **Next.js 15 (App Router)** paired with **Tailwind CSS**, **[shadcn/ui](https://ui.shadcn.com)**, and **Framer Motion**:
-* **Next.js App Router**: Provides clean URL routing (`/table/[roomId]` for the table and `/play/[roomId]` for mobile controllers).
-* **shadcn/ui**: Eliminates building UI primitives from scratch. Provides accessible, tactile components (`Slider` for bet sizing, `Dialog` for showdown resolutions, `Drawer` for player rebuy sheets).
-* **Framer Motion**: Handles dynamic chip toss animations, pot counters, and active player glowing halos.
-* **PWA**: Easily configured with `manifest.json` for full-screen "Add to Home Screen" usage.
+## ADR-002 (Superseded): Authoritative server via Socket.io
 
-### Consequences
-* **Positive**: Instant onboarding (0 app store friction), responsive across all screen sizes, accessible UI primitives, fast development turnaround.
-* **Negative**: WebSockets require client-side mounting (`'use client'`), which is standard practice for real-time multiplayer frontends.
+**Status:** Superseded. The authoritative-server decision stays. The transport changes to plain WebSocket (ADR-010) and the runtime to Rust/tokio (ADR-009). Peer-to-peer WebRTC remains rejected: poker needs one source of truth for chip accounting.
+
+## ADR-003 (Superseded): Pure TypeScript shared engine
+
+**Status:** Superseded by ADR-009.
+
+The "one language on client and server, zero drift" argument is gone: the Dart client no longer links the engine for remote play. Drift is now controlled by a versioned wire protocol plus golden JSON fixtures tested from both Rust and Dart (ADR-010). The client still never computes game outcomes; it renders what the server sends.
 
 ---
 
-## ADR-002: Networking Architecture — Authoritative Server via Socket.io over Peer-to-Peer (WebRTC)
+## ADR-004: Dual-Mode Connectivity: Hosted Cloud + Offline LAN
 
-### Status: Accepted
-### Date: 2026-10-07
+**Status:** Accepted. Amended 2026-11-01.
 
-### Context
-A poker game requires 100% strict adherence to chip accounting, turn orders, and pot limits. We evaluated two real-time topologies:
-1. **Peer-to-Peer (WebRTC DataChannels)**: Devices communicate directly without a central server.
-2. **Authoritative Server (Socket.io / WebSockets)**: A central node maintains true game state and validates all moves.
+**Context:** Games happen in basements and cabins with no internet.
 
-### Decision
-We choose an **Authoritative Server model using Socket.io**:
-* In-person poker games cannot afford desynchronization bugs or split-brain consensus issues common in P2P mesh topologies when a phone screen locks or drops Wi-Fi.
-* WebRTC still requires a signaling server for ICE candidate exchange, meaning network infrastructure is needed regardless.
-* Socket.io provides automatic reconnections, room multiplexing, and fallback to HTTP long-polling if restrictive firewalls block raw WebSockets.
+**Decision:** Two deployment targets, **one server implementation** (`poker_server_core`):
+1. **Cloud mode.** The standalone `server/` binary runs on a host such as Fly.io. Clients connect with a server URL and a 4-letter room code.
+2. **Host mode (offline LAN).** The table device runs `poker_server_core` **inside the app** through the Flutter-Rust bridge (ADR-009). It binds `0.0.0.0:<port>`, shows a QR code, and players join over Wi-Fi or a phone hotspot with no internet.
 
-### Consequences
-* **Positive**: 100% deterministic state, zero risk of cheating or split-brain pot values, rock-solid reconnection handling via session tokens.
-* **Negative**: Requires running a lightweight Node.js server process (easily hosted for free on Render/Fly.io, or run locally for LAN games).
+**Amendment:** the old design needed a Node process on a laptop. With Rust embedded in the app, any phone, tablet or desktop can be the host. The host's own UI connects to its embedded server over loopback using the same protocol as every other client, so there is a single code path.
 
----
-
-## ADR-003: Core Game Engine Design — Pure Reducer in Shared TypeScript Package
-
-### Status: Accepted
-### Date: 2026-10-07
-
-### Context
-Poker rules involve complex math: min-raise calculations, blinds rotation, heads-up exception rules, and intricate multi-way side pots. Writing this logic in one language on the server and re-implementing it in another language for the frontend would violate DRY and cause logic discrepancies.
-
-### Decision
-We isolate all poker business logic in `@poker-credits/shared` as a **pure TypeScript library**:
-* State transitions follow the pure reducer pattern: `(currentState, action) => Result<GameState, PokerError>`.
-* Zero external runtime dependencies.
-* Both the server (authoritative verification) and client (optimistic UI previews & validation) import the exact same package.
-
-### Consequences
-* **Positive**: 100% code reuse, zero logic drift, exhaustive unit testing with Vitest without booting network or UI layers.
-* **Negative**: Requires a monorepo workspace configuration (`pnpm`).
-
----
-
-## ADR-004: Dual-Mode Connectivity — Hosted Cloud + Offline Local Area Network (LAN)
-
-### Status: Accepted
-### Date: 2026-10-07
-
-### Context
-Poker games often happen in basements, rural cabins, or places with spotty cellular or internet connections. A purely cloud-dependent app would fail in these scenarios.
-
-### Decision
-Support two deployment targets using identical server code:
-1. **Cloud Mode**: Hosted on a public server. Users connect using 4-letter room codes (`POKR-1234`).
-2. **Offline LAN Mode**: The host laptop or tablet runs the server locally on port 3000. It queries `os.networkInterfaces()` and prints a QR code containing `http://192.168.x.x:3000`. Players connect over local Wi-Fi or phone hotspot with **zero internet required**.
-
-### Consequences
-* **Positive**: Works anywhere on earth, even without internet access.
-* **Negative**: In LAN mode, players must be connected to the same Wi-Fi router or mobile hotspot.
-
----
+**Consequences:** the host device must stay awake and keep the app alive (foreground service on Android, wake-lock everywhere, see `RESILIENCE_AND_CRASH_HANDLING.md`). If the host app dies, the game pauses until it restarts and restores from its journal (ADR-011).
 
 ## ADR-005: Physical Cards Showdown Resolution Model
 
-### Status: Accepted
-### Date: 2026-10-07
+**Status:** Accepted (unchanged).
 
-### Context
-In this hybrid game, physical playing cards are dealt by hand in real life. When a hand reaches showdown, the app needs to award the chips. We considered:
-1. Requiring players to enter their hole cards into their phones + typing board cards, then using an automated hand rank evaluator.
-2. Allowing the table screen / dealer to simply tap the winning seat(s).
+At showdown the table shows eligible contenders per pot; the host taps the winner(s). No card entry, no hand evaluator. Optional card input may come later as a toggle.
 
-### Decision
-We adopt the **Direct Showdown Tap Model**:
-* Manually typing 2 hole cards and 5 board cards slows down home poker games drastically.
-* In real life, players table their physical cards, look at each other's hands, and immediately know who won.
-* At showdown, the Table Display shows the eligible contenders for the Main Pot and each Side Pot. The table host/dealer simply taps the winning player (or multiple players for a split pot) to trigger the chip award.
-* *Note: Manual card input can be added later as an optional visual toggle, but will not be mandatory for gameplay.*
+## ADR-006: State Storage: In-Memory + Snapshot
 
-### Consequences
-* **Positive**: Blazing fast home game pace; zero card-entry tedium.
-* **Negative**: Relies on players/dealer accurately reading physical cards in real life (which they already do in normal games).
+**Status:** Accepted. Amended by ADR-011.
+
+State lives in memory inside each room actor. The original plan snapshotted only at the end of a hand and accepted losing a hand in progress. With the host running on a phone that the OS can kill at any time, that is too weak. ADR-011 adds a per-hand **action journal** so a restart replays to the exact state. Snapshot targets: a JSON file in the app support directory (host mode) or a configurable directory/volume (cloud mode). Redis is not required.
+
+## ADR-007: Spectator Role
+
+**Status:** Accepted. Amended: `/watch/[roomId]` becomes a Spectator screen in the Flutter app. Spectators never get a seat, never receive turn prompts, are capped at 20 per room.
 
 ---
 
-## ADR-006: State Storage Strategy — In-Memory with Periodic Crash Recovery Snapshot
+## ADR-008: Flutter client for all platforms
 
-### Status: Accepted
-### Date: 2026-10-07
+**Status:** Accepted. **Date:** 2026-11-01.
 
-### Context
-We need to decide where the authoritative game state lives. Options evaluated:
-1. **Database (PostgreSQL / Redis)**: Persistent, survives restarts.
-2. **Pure In-Memory (JavaScript Map)**: Fastest, zero setup, no I/O.
-3. **Hybrid: In-Memory + Periodic JSON Snapshot to Disk**: Combines speed with basic crash recovery.
+**Context:** Target is iOS, Android and Windows at least, with macOS and Linux for free. Two screen styles exist: a landscape Table Display and a one-handed Player Controller.
 
-### Decision
-**Hybrid approach**: State lives entirely in-memory for zero-latency reads/writes. Every time a hand concludes (at `PAYOUT` state), the entire `RoomState` is serialized as JSON and written to a local file (or Redis string in cloud mode). On server restart, rooms with active snapshots are restored.
+**Decision:**
+- One Flutter app (`app/`) with role-based screens: Table (host/display), Player, Spectator.
+- State management: **Refena** (`refena_flutter`), the same as LocalSend, for consistency with the strategy being copied. Models via `dart_mappable`. This is the architect's call and can be revisited before Phase 3.
+- Flutter pinned with FVM (`.fvmrc`), always run `fvm flutter` / `fvm dart`.
+- Platform integrations use plugins: wake-lock (`wakelock_plus`), haptics (`HapticFeedback`, richer patterns via a plugin if needed), audio, QR render and scan, desktop window management. The exact package list and versions are fixed at scaffold time (Phase 0) and recorded in `AGENT_CODING_GUIDE.md` before use.
+- i18n (Slang in LocalSend) is deferred; strings go through one `strings.dart` file from day one so adding it later is mechanical.
 
-### Consequences
-* **Positive**: Sub-millisecond state reads; no database infrastructure needed for casual home game deployment; crash recovery prevents the entire night's chip counts from being lost on a server hiccup.
-* **Negative**: State is lost if the server crashes mid-hand (between snapshots). This is acceptable for a home poker app where the dealer and all players can reconstruct the in-progress hand's chip state from memory.
+**Web (owner decision 2026-11-01):** the web build comes later, but the codebase must be ready for it from day one. Rules in ADR-014. The web build is a Player and Spectator client served by the server as static assets, the same trick LocalSend uses for its web page (`packages/core/assets/web/`).
 
----
+**Consequences:** onboarding requires an install; in exchange we get reliable background behaviour, real haptics and one UI codebase. Every platform needs its own permissions and build setup (see `ARCHITECTURE.md` section 8).
 
-## ADR-007: Spectator Mode — Read-Only Route `/watch/[roomId]`
+## ADR-009: Rust workspace layout (modelled on LocalSend)
 
-### Status: Accepted
-### Date: 2026-10-07
+**Status:** Accepted. **Date:** 2026-11-01.
 
-### Context
-When a player busts out of a tournament, or when a friend arrives late and wants to watch without playing, there is no mechanism defined in the original architecture for them to view the game without occupying a player seat.
+LocalSend is a Flutter app on top of a Rust protocol core, bridged with `flutter_rust_bridge` (FRB) and built with cargokit. We copy that shape.
 
-### Decision
-Introduce a **Spectator Role** connecting via `/watch/[roomId]`:
-* Spectators join the same Socket.io room but are never assigned a seat index.
-* They receive all `game:state_updated` and `game:action_performed` broadcasts identically to the table screen.
-* The server never sends `game:turn_prompt` to spectators.
-* Spectators are listed separately from players in `RoomState` and do not affect blind rotations, pot calculations, or seat counts.
+```
+pocker-credits/
+├── Cargo.toml              # Cargo workspace root: one Cargo.lock, all [profile.*]
+├── rust-toolchain.toml     # pinned toolchain (same approach as LocalSend)
+├── .fvmrc                  # pinned Flutter (same approach as LocalSend)
+├── pubspec.yaml            # Dart pub workspace root: one pubspec.lock
+├── crates/
+│   ├── poker_engine/       # pure rules: no I/O, no async, no clock, no RNG
+│   └── poker_server_core/  # tokio + axum: rooms, WS protocol, snapshots, discovery
+├── server/                 # standalone cloud binary + Dockerfile (thin main.rs)
+├── packages/
+│   ├── poker_bridge/       # FRB glue: rust/ (plugin crate), rust_builder/ (cargokit), lib/ (Dart)
+│   └── poker_protocol/     # pure Dart wire models + golden-fixture tests
+├── protocol/fixtures/      # golden JSON messages shared by Rust and Dart tests
+└── app/                    # Flutter app
+```
 
-### Consequences
-* **Positive**: Busted players can watch the rest of the tournament; late-arriving friends can observe and join the next game.
-* **Negative**: Adds a third client role (`SPECTATOR`) to manage alongside `TABLE_HOST` and `PLAYER`.
+Dependency direction: `app` → `poker_bridge` → `poker_server_core` → `poker_engine`. `server/` → `poker_server_core`. The app depends on the bridge, never on FRB or core crates directly (same rule as LocalSend).
+
+Rules:
+- `poker_engine` is deterministic. Physical cards mean there is no shuffle, so no RNG. Same inputs always give the same output. This makes journal replay exact (ADR-011).
+- `poker_engine` builds and tests with **default features**. LocalSend's `packages/core` needs `--features full` and a bare `cargo check` fails; we do not repeat that.
+- Chips are `u64` newtypes. No floating point anywhere in money paths.
+- Profile settings live only in the root `Cargo.toml`. Do **not** set `panic = "abort"`; crash recovery relies on unwinding (ADR-011).
+
+**Consequences:** the same server code runs in the cloud and in the phone. FRB codegen and cargokit add toolchain weight; CI must build all five platforms eventually.
+
+## ADR-010: Plain WebSocket + JSON, explicit versioning
+
+**Status:** Accepted. **Date:** 2026-11-01.
+
+**Decision:**
+- axum WebSocket endpoint `GET /v1/ws`, the same route shape as LocalSend's signaling server.
+- Messages are JSON objects tagged with `type` (serde `#[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]`, as in LocalSend's `WsServerMessage`).
+- Every message carries `v` (protocol version). Unknown `v` yields `VERSION_MISMATCH`.
+- No Socket.io features are assumed. Reconnection, heartbeat and resume are specified by us (`API_AND_EVENTS.md`, `RESILIENCE_AND_CRASH_HANDLING.md`).
+- Validation is serde deserialisation plus engine rules. There is no separate schema library; Rust enums are the schema.
+- Drift control: `protocol/fixtures/*.json` hold one example per message. Rust tests deserialise and re-serialise them; Dart tests do the same through `poker_protocol`. A protocol change that breaks a fixture fails both suites.
+
+JSON is chosen over a binary format because payloads are small, human-debuggable and traffic is low.
+
+## ADR-011: Crash and resilience strategy (adopted from LocalSend)
+
+**Status:** Accepted. **Date:** 2026-11-01.
+
+Full detail in `docs/RESILIENCE_AND_CRASH_HANDLING.md`. Summary of what is copied from LocalSend and what is our own addition.
+
+**Copied from LocalSend (verified in `~/Documents/dev_projects/localsend`):**
+1. `main()` wraps `preInit` in try/catch and falls back to an error app showing the error, stack trace and app version in a copyable box (`config/init_error.dart`).
+2. Networking is off the UI thread; typed events flow Rust → Dart over a channel, one event enum, no side channels (`ServerEventV2` pattern).
+3. App lifecycle recovery: on `resumed` on mobile, probe the local server with a 1 second loopback connect and restart it if dead (`ensureRunning`); a listener-failure event triggers the same restart; on `detached` dispose isolates/server.
+4. Cancellation safety in Rust through drop guards (`PendingSessionGuard`, `UploadGuard`).
+5. Signalling server hygiene: client ping when idle, server idle timeout, per-IP connection limit, request counters cleared on a schedule.
+6. Desktop single-instance handover (`notifyRunningInstance`, then exit).
+7. Rust logs go to logcat on Android through `tracing_android`.
+8. Pinned toolchains (`.fvmrc`, `rust-toolchain.toml`).
+
+**Not found in LocalSend (verified by search for `catch_unwind`, `set_hook`, `runZonedGuarded`, `FlutterError.onError`, `PlatformDispatcher`; only `runZonedGuarded` exists, in the child isolate bootstrap). Our own additions:**
+1. Global Dart error hooks in `main` (`FlutterError.onError`, `PlatformDispatcher.instance.onError`, `runZonedGuarded`) writing to a rotating log file.
+2. Rust panic hook that logs a backtrace through `tracing`.
+3. **Room actor supervision**: one tokio task per room; a supervisor watches each `JoinHandle`. A panic in one room restores that room from its journal and never takes down other rooms or the process.
+4. **Write-ahead action journal** per hand (amends ADR-006), replayed by the deterministic engine on restore.
+5. Resume handshake with `stateVersion` and full snapshot, client-side exponential backoff with jitter.
+6. Slow-consumer policy: bounded per-connection outbound queue; overflow disconnects that client (it resumes with a snapshot) rather than blocking the room.
+
+## ADR-012: LAN joining: QR first, multicast later
+
+**Status:** Accepted. **Date:** 2026-11-01.
+
+**Decision:** The host shows a QR code containing `pokercredits://join?h=<ip>:<port>&r=<ROOM>&v=1`. Players scan, or type IP and code. Optional UDP multicast announce (LocalSend's design: announce-only, answers over unicast, one socket per interface, own messages filtered) is Phase 6 and never required for play.
+
+**Why QR is primary:** iOS gates multicast behind an entitlement that needs Apple approval (**verify at Phase 6**) and a Local Network permission prompt; Android needs a multicast lock; many hotspots and routers isolate clients or drop multicast. QR works everywhere the TCP connection works.
+
+**Transport security:** LAN uses `ws://` on a trusted network (documented warning). Android and iOS block cleartext by default, so Phase 0 must configure the Android network security config and the iOS local-networking exception. Cloud uses `wss://`. A later hardening step (open) is a per-host self-signed certificate whose fingerprint travels in the QR code, like LocalSend's fingerprint-based identity.
+
+## ADR-013: Neo-brutalist UI
+
+**Status:** Accepted (owner request). **Date:** 2026-11-01.
+
+**Decision:** The whole app uses a neo-brutalist visual language: flat saturated colours, 3-4 px black outlines, hard offset shadows with no blur, zero corner radius, heavy display type plus a monospace for labels and numbers, big blocky controls, snappy motion. Full spec: `docs/UI_DESIGN.md`.
+
+**Why it fits:** high contrast and big hit targets suit dim rooms, TVs and one-handed play; flat shapes are cheap to render on low-end phones; a custom widget set (not Material look-alikes) looks identical on iOS, Android, desktop and web.
+
+**Consequences:**
+- We build our own widget set (`app/lib/widget/brutal/`) and a `BrutalTheme` extension. More up-front work than stock Material, less styling drift later.
+- Fonts are bundled as assets (no runtime download), since LAN games are offline.
+- Accessibility must be checked deliberately (contrast, focus rings, colour is never the only signal); rules are in the UI doc.
+
+## ADR-014: Web-ready codebase (web build deferred)
+
+**Status:** Accepted (owner request). **Date:** 2026-11-01.
+
+**Decision:** We do not ship a web build in v1, but nothing we write may block one. Concretely:
+1. **Web platform is enabled in the Flutter project from Phase 0** (`flutter create --platforms=...,web`), and CI runs `fvm flutter build web` on every change from Phase 0. A web compile failure fails CI, so web-unsafe code cannot creep in.
+2. **Layer rules.** `packages/poker_protocol` and `app/lib/{model,net,provider,widget,theme,pages}` are web-safe: no `dart:io`, no `dart:ffi`, no `Platform.isX`, no direct import of `packages/poker_bridge`. A grep check (`tool/check_web_safe.sh`) enforces it in CI.
+3. **Platform seam.** Everything platform-specific lives behind an interface in `app/lib/platform/` with conditional exports (`foo.dart` exports `foo_io.dart` or `foo_web.dart` or `foo_stub.dart`): secure token storage, file logging, wake lock, haptics, sound unlock, QR scanning, window management, single-instance handover, network address listing, and **host server (the FRB bridge)**. The web implementations are either real (wake lock, haptics where supported) or explicit "unsupported" stubs.
+4. **Host mode is native only.** The embedded server (FRB) does not run in a browser. The web build is a Player and Spectator client that talks to a cloud server or to a LAN host. Hosting stays on native apps. (Owner can reopen.)
+5. **Same-origin by default.** A web client served by the server derives the socket URL from `Uri.base` (`ws(s)://<same host>/v1/ws`), so no configuration is needed on a LAN. The server serves the built web player from `POKER_WEB_DIR` (cloud) or from assets embedded into the host app (LAN), and treats same-origin `Origin` headers as allowed.
+6. **Numeric limits.** JavaScript numbers are exact only to 2^53-1. Chips and timestamps on the wire must stay below that: the engine enforces `MAX_CHIPS = 1_000_000_000_000`, and Dart models use `int` safely. No 64-bit ids or hashes as JSON numbers (send as strings).
+7. **No runtime network assets.** Bundled fonts, bundled CanvasKit (`--no-web-resources-cdn`; verify the exact flag when we build web) so the web player works on an offline LAN.
+8. **Browser quirks recorded now:** audio needs a user gesture to unlock (the Join tap does it); iOS Safari has no vibration API; camera QR scanning needs HTTPS or localhost (typed address and room code remain the fallback); tokens go to `localStorage` on web (weaker than the OS keystore, acceptable for a player token; the `hostToken` is never stored on web).
+9. **Transport.** The protocol is already browser-compatible (WebSocket, JSON, text frames). No binary frames, no custom headers, no subprotocol requirements.
+
+**Consequences:** slightly more discipline (the platform seam) and one extra CI job from day one; adding the web build later is then packaging and UI polish, not a rewrite.
+

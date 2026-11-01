@@ -1,0 +1,7 @@
+# Lint levels are set in the workspace Cargo.toml ([workspace.lints]). This file holds thresholds.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-indexing-slicing-in-tests = true
+allow-panic-in-tests = true
+too-many-arguments-threshold = 8
+cognitive-complexity-threshold = 25

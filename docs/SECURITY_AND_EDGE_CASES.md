@@ -6,23 +6,23 @@ Even in home games, a digital companion app managing financial credits and pot d
 
 ```mermaid
 flowchart TD
-    subgraph ClientThreats ["Untrusted Clients (Mobile Phones / Web Browsers)"]
+    subgraph ClientThreats ["Untrusted Clients (Flutter apps, or anything speaking the WebSocket protocol)"]
         Attacker["Potential Malicious / Buggy Client"]
         Attacker -.->|Threat 1: Spoofed Actions| S1["Emits action for another player"]
         Attacker -.->|Threat 2: Parameter Tampering| S2["Sends negative chips or illegal bet size"]
         Attacker -.->|Threat 3: Host Privilege Escalation| S3["Attempts to trigger admin undo/pause"]
-        Attacker -.->|Threat 4: Connection Spam / DoS| S4["Floods socket with rapid events"]
+        Attacker -.->|Threat 4: Connection Spam / DoS| S4["Floods socket with rapid messages"]
     end
 
-    subgraph DefenseBoundary ["Server Security Boundary (Authoritative Node.js Engine)"]
-        ZodValidator["Zod Boundary Validator\nStrict type & range checking"]
-        TokenAuth["Session Token & Host Cryptographic Auth\nHMAC / UUIDv4 secret binding"]
-        RateLimiter["Socket Rate Limiter & Debouncer\nMax 10 events/sec per socket"]
+    subgraph DefenseBoundary ["Server Security Boundary (Authoritative Rust server)"]
+        Validator["serde + validate()\nStrict type & range checking"]
+        TokenAuth["Session & Host Token Auth\n128-bit random tokens, constant-time compare"]
+        RateLimiter["Per-connection Rate Limiter\nMax 10 msgs/sec sustained"]
         ActionVerifier["Authoritative Game State Verifier\nEnforces turn order, chip balances, and rules"]
     end
 
     Attacker ==> DefenseBoundary
-    DefenseBoundary --> StateStore[("In-Memory Game State")]
+    DefenseBoundary --> StateStore[("Room actor state + snapshot + journal")]
 ```
 
 ---
@@ -41,39 +41,41 @@ flowchart TD
 
 ### 2.2. Session Authentication & Impersonation Prevention
 To prevent one player or spectator from spoofing actions for another player:
-* Upon joining a room, the server issues a cryptographically secure random session token:
-  ```typescript
-  export interface PlayerSession {
-    sessionId: string;      // UUIDv4 private token kept in client localStorage
-    playerId: string;       // Public player ID
-    roomId: string;
-    seatIndex: number;
-    isHost: boolean;
-  }
-  ```
-* Every Socket.io packet must include this `sessionId` (or attach it during the initial socket handshake auth).
-* Sockets can **only** dispatch actions for their assigned `playerId`. Any action referencing another player is rejected with a `403 FORBIDDEN` error.
+* Upon joining a room, the server issues a random 128-bit `sessionToken` from the OS RNG (`getrandom`). The server stores only a SHA-256 hash of it (in memory and in snapshots); comparison is constant-time (`subtle`).
+```rust
+pub struct PlayerSession {
+    pub token_hash: [u8; 32],   // never the raw token
+    pub player_id: PlayerId,    // public id
+    pub room_code: RoomCode,
+    pub seat_index: Option<SeatIndex>,
+    pub role: Role,             // Host | Player | Spectator
+    pub next_action_seq: u64,   // monotonic per session, advances only on applied actions
+}
+```
+* The client keeps the raw token in **platform secure storage** (Keychain, Keystore, DPAPI/libsecret via a secure-storage plugin), not in plain preferences. If secure storage is unavailable the token is held in memory only and a restart requires re-joining.
+* The first message on a connection must be `CREATE_ROOM`, `JOIN_ROOM` or `RESUME` (`NOT_AUTHENTICATED` otherwise). After that, the connection is bound to exactly one `playerId`; any message that names another player is rejected with `HOST_ONLY_ACTION` or `INVALID_SESSION` as appropriate. The server derives the acting player from the connection, never from a field in the message.
 
 ### 2.3. Host Privilege Protection
-* Administrative functions (e.g. `game:admin:undo`, `game:admin:pause`, `game:rebuy:approve`, `room:configure`) require a dedicated `hostToken`.
-* The `hostToken` is generated when the central table display creates the room and is stored only in the host device's local memory.
+* Administrative functions (e.g. `UNDO`, `PAUSE`, `APPROVE_REBUY`, `ROOM_CONFIGURE`) require a dedicated `hostToken`.
+* The `hostToken` is generated when the room is created and stored by the host app in secure storage (and, hashed, by the server).
 * If a host disconnects, host status can only be reclaimed using this secret key.
 
-### 2.4. Input Sanitization & XSS Prevention
-* Player names, room codes, and avatar strings are validated against strict Zod rules:
-  ```typescript
-  export const PlayerNameSchema = z
-    .string()
-    .trim()
-    .min(1, 'Name cannot be empty')
-    .max(20, 'Name cannot exceed 20 characters')
-    .regex(/^[a-zA-Z0-9 _-]+$/, 'Name contains invalid characters');
-  ```
-* All strings rendered in the Next.js UI are escaped by default to prevent Cross-Site Scripting (XSS).
+### 2.4. Input Validation
+* Player names, room codes and any free text are validated in the server's `validate()` step:
+```rust
+pub fn validate_name(raw: &str) -> Result<String, ErrorCode> {
+    let n = raw.trim();
+    let ok_len = (1..=20).contains(&n.chars().count());
+    let ok_chars = n.chars().all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '_' || c == '-');
+    if ok_len && ok_chars { Ok(n.to_owned()) } else { Err(ErrorCode::NameInvalid) }
+}
+```
+* Flutter `Text` widgets do not interpret markup, so there is no XSS class of bug in the native app. Names are still restricted to a safe charset so they cannot break logs or a future web guest page.
+* Maximum frame size 16 KiB; larger frames close the connection.
 
 ### 2.5. Rate Limiting & Denial-of-Service (DoS) Mitigation
-* **Socket Throttling**: Limits each socket to a maximum of 10 incoming events per second.
-* **Action Idempotency**: Prevents rapid double-clicking (e.g. tapping "Raise" twice rapidly) using an `actionSequenceId` counter. If the sequence ID has already been executed for that street, duplicate requests are discarded.
+* **Connection Throttling**: 10 messages per second sustained (burst 20) per connection; 3 strikes closes it. Per-IP connection cap and hourly counter reset follow LocalSend's signaling server (see `RESILIENCE_AND_CRASH_HANDLING.md` 3.6).
+* **Action Idempotency**: Prevents rapid double-clicking (e.g. tapping "Raise" twice rapidly) using the per-player `actionSeq` counter (rules in `API_AND_EVENTS.md` 5.3). Duplicates are acknowledged and ignored.
 
 ---
 
@@ -87,14 +89,14 @@ sequenceDiagram
     actor Table as Table Display
 
     Note over Player: Alice locks screen / receives phone call
-    Server->>Server: Heartbeat timeout detected (Socket disconnect)
-    Server-->>Table: emit("player:connection_status", { seat: 1, isConnected: false })
+    Server->>Server: Idle timeout (45 s) or socket close detected
+    Server-->>Table: PLAYER_CONNECTION { seatIndex: 1, isConnected: false }
     
     alt Alice Reconnects within 30s Grace Period
-        Note over Player: Alice unlocks phone & re-opens browser
-        Player->>Server: emit("room:reconnect", { roomId, sessionId })
-        Server-->>Player: emit("game:state_snapshot", { full authoritative state })
-        Server-->>Table: emit("player:connection_status", { seat: 1, isConnected: true })
+        Note over Player: Alice unlocks phone, app resumes and reconnects
+        Player->>Server: RESUME { roomCode, sessionToken, lastStateVersion }
+        Server-->>Player: SNAPSHOT { full authoritative view }
+        Server-->>Table: PLAYER_CONNECTION { seatIndex: 1, isConnected: true }
         Note over Player: Game resumes seamlessly
     else Grace Period Expires on Alice's Turn
         Server->>Server: Timeout reached
@@ -103,25 +105,23 @@ sequenceDiagram
         else Bet required
             Server->>Server: Auto-execute FOLD
         end
-        Server-->>Table: emit("game:state_updated", { ... })
+        Server-->>Table: STATE_UPDATE { ... }
     end
 ```
 
 ### 3.1. Mobile Screen Sleep & Backgrounding
-* **Symptom**: Mobile Safari and Chrome pause JavaScript timers and suspend WebSockets when the phone screen turns off or the user switches tabs.
-* **Resolution**:
-  1. **Disconnection Grace Timer**: If it is the disconnected player's turn, a 30-second disconnect timer is started.
-  2. **Auto-Action on Expiry**: If the player does not reconnect within the grace window:
-     * If checking is free ($0), the server executes an **Auto-Check**.
-     * If there is an outstanding bet to call, the server executes an **Auto-Fold**.
-  3. **Instant Snapshot Sync**: When the player re-opens the tab, the socket reconnects with their `sessionId`, and the server sends a full state snapshot to reconcile the client.
+* **Symptom**: iOS and Android suspend the app and its sockets when the screen locks or the user switches apps. A host app can also be killed outright.
+* **Resolution (player side)**:
+  1. **Disconnection Grace Timer**: If it is the disconnected player's turn, a 30-second timer runs (the room actor's deadline, no extra task).
+  2. **Auto-Action on Expiry**: free check means **Auto-Check**; an outstanding bet means **Auto-Fold**.
+  3. **Instant Resync**: on app `resumed` the client reconnects immediately and sends `RESUME`; the server answers with a full `SNAPSHOT`.
+* **Resolution (host side)**: Android runs a foreground service while hosting; all platforms hold a wake-lock; iOS hosting is best-effort in the foreground. On `resumed` the host app probes its own listener and restarts it if dead; if the whole app was killed, the room is restored from snapshot + journal at next launch (`RESILIENCE_AND_CRASH_HANDLING.md` 3.4). Players see "Reconnecting" and rejoin the same hand.
 
 ### 3.2. Action Race Conditions (Concurrent Submissions)
-* **Symptom**: Player A clicks "Check" at the exact millisecond Player B clicks "Raise".
-* **Resolution**: 
-  * The server processes incoming actions in a strict **FIFO serialized queue** per room.
-  * If Player B's raise is processed first, Player A's "Check" action fails validation because checking is no longer legal.
-  * The server responds with `INVALID_ACTION_ON_STREET` and sends the updated high bet ($X), prompting Player A to Call or Fold.
+* **Symptom**: Player A taps "Check" at the exact moment Player B taps "Raise".
+* **Resolution**:
+  * Each room is a single actor task with one inbox. Messages and the turn timer are handled strictly one at a time, in arrival order.
+  * If Player B's raise is processed first, Player A's "Check" fails validation (`INVALID_CHECK`) and the error carries the updated call amount, prompting Call or Fold.
 
 ---
 
@@ -188,11 +188,12 @@ flowchart LR
     S2 -->|Host taps 'Undo'| S1
 ```
 
-* **Snapshot History**: Before every action transition, a lightweight state snapshot is pushed onto the room's undo stack: `history: GameState[]`.
-* **Undo Trigger**: When the host triggers `game:admin:undo`:
+* **Snapshot History**: Before every action transition, the previous `GameState` is pushed onto the room's undo stack (`Vec<GameState>`, max 5).
+* **Undo Trigger**: When the host sends `UNDO`:
   1. The server pops the current state and restores the previous state snapshot.
   2. The restored state is immediately broadcast to all connected devices.
   3. Action ticker logs: *"Host reverted last action"*.
+  4. The journal records an `UNDO` entry so replay after a crash produces the same state.
 * **Limit**: The undo stack retains the last 5 actions within the active hand and resets when a new hand begins.
 
 ---
@@ -202,29 +203,18 @@ flowchart LR
 > [!IMPORTANT]
 > The following security controls were **absent from the original documentation** and are required before production deployment:
 
-### 6.1. CORS Configuration
-* The Socket.io and Fastify server must enforce an explicit `origin` allowlist.
-* In cloud mode, only requests from the deployed Next.js domain (e.g. `https://pokercredits.app`) are accepted.
-* In LAN mode, the origin is relaxed to `*` only within the local subnet—never for the publicly hosted instance.
-```typescript
-// server.ts
-const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.NODE_ENV === 'production'
-      ? ['https://pokercredits.app']
-      : '*',
-    methods: ['GET', 'POST'],
-  },
-});
-```
+### 6.1. Origin and Transport Policy
+* The native app is not a browser, so CORS does not apply. In **both** cloud and host mode the server checks the `Origin` header **if present** and rejects browser origins unless the origin is in `POKER_ALLOWED_ORIGINS` or is **same-origin** with the server (the `Origin` host equals the `Host` header, which is how the future web player served by the same server connects, ADR-014). This blocks malicious web pages from opening sockets to a LAN host from a user's browser (cross-site WebSocket hijacking against `ws://192.168.x.x`).
+* Cloud mode requires `wss://` (TLS terminated by the host platform or a reverse proxy).
+* Host (LAN) mode uses `ws://`; see 6.4.
 
 ### 6.2. Room TTL & Server-Side Garbage Collection
 * **Problem**: If all players disconnect without formally ending a game, the room's state object remains in server memory indefinitely, causing a memory leak in long-running servers.
-* **Solution**: Each room has a `lastActivityAt` timestamp. A background interval runs every 5 minutes and purges any room that has had no activity for **60 minutes**.
-* Upon purge, all connected sockets in that room are emitted a `room:expired` event so clients can show a graceful "Session Ended" screen.
+* **Solution**: Each room has a `lastActivityAt` timestamp. A `tokio::time::interval` task runs every 5 minutes and purges any room that has had no activity for **60 minutes**.
+* Upon purge, all connected sockets in that room receive `ROOM_EXPIRED` so clients can show a graceful "Session Ended" screen. Snapshot and journal files for the room are deleted.
 
 ### 6.3. Maximum Room Size Enforcement
-* Hard limit of **10 players** per room, enforced at the `room:join` handler.
+* Hard limit of **10 players** per room, enforced in the `JOIN_ROOM` handler.
 * Spectators (read-only, no seat) are counted separately and capped at **20 spectators** per room.
 
 ### 6.4. LAN Mode Security Considerations
@@ -232,9 +222,21 @@ const io = new Server(httpServer, {
 > In **LAN mode**, the server binds to `0.0.0.0` with no authentication on the network transport layer, because the assumption is that all devices on the local network are trusted participants. However:
 > * Never expose the LAN server port to a public-facing network interface.
 > * Clearly document to users that LAN mode should only be used on trusted private networks (home router, mobile hotspot) and not on public Wi-Fi (coffee shops, airports).
-> * The same application-layer security controls (session tokens, Zod validation, turn verification) still apply in LAN mode.
+> * The same application-layer security controls (session tokens, message validation, turn verification) still apply in LAN mode.
 
 ### 6.5. Sensitive State Isolation (Player Hand Privacy)
-* The `game:state_updated` broadcast sent to **all** room members must **never** include private player hole cards (in future card-input mode).
-* Each player's private state (e.g. any future hole card input) must be sent only via a `game:private_state` event directed exclusively to that player's socket.
+* The `STATE_UPDATE` broadcast sent to **all** room members must **never** include private player hole cards (in future card-input mode).
+* Each player's private state (e.g. any future hole card input) must be sent only via a `PRIVATE_STATE` message addressed to that player's connection only. `RoomView` is built per recipient class (public vs private) in `room/view.rs`.
 * The table host display receives only public information: chip counts, bets, actions, and pot totals.
+
+### 6.6. Room Code Guessing
+Room codes have 32^4 (about 1.05 million) values. In cloud mode:
+* `GET /v1/room/{code}` and failed `JOIN_ROOM` attempts are rate limited per IP (default 20 per minute, then 15 minute block).
+* Joining still requires the host to seat the player or the room to have open seats; the host can enable "approve joins" (Phase 5 option).
+* Idle rooms expire after 60 minutes.
+In host (LAN) mode the QR payload already carries IP and code; the typed fallback needs both.
+
+### 6.7. Data at Rest and Crash Behaviour
+* Snapshots and journals contain names, chip counts and **token hashes only**, never raw tokens or hostTokens. They live in the app support directory (host mode, app-private storage on mobile) or `POKER_DATA_DIR` (cloud).
+* A panic in one room never exposes or corrupts another room: room actors share no mutable state. Recovery policy: `RESILIENCE_AND_CRASH_HANDLING.md` 3.3.
+* The server never logs raw tokens, only the last 4 hex characters of a hash.
