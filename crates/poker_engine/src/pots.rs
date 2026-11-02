@@ -1,6 +1,7 @@
 //! Main and side pots from per-player contributions. Pure chip arithmetic: no hand ranking, no
 //! turn order.
 
+use crate::error::PokerError;
 use crate::state::PotTier;
 use crate::types::{Chips, SeatIndex};
 
@@ -45,8 +46,11 @@ pub fn uncalled_refund(contributions: &[Contribution]) -> Option<(SeatIndex, Chi
 /// of every contribution between the previous level and this one, and only non-folded players who
 /// reached the level can win it. Chips a folded player put in above the highest live level are
 /// added to the last pot. Apply [`uncalled_refund`] first.
-#[must_use]
-pub fn calculate(contributions: &[Contribution]) -> Vec<PotTier> {
+///
+/// # Errors
+/// [`PokerError::Overflow`] if the sums leave the valid chip range (a broken invariant, reported
+/// instead of silently losing chips).
+pub fn calculate(contributions: &[Contribution]) -> Result<Vec<PotTier>, PokerError> {
     let mut levels: Vec<Chips> = contributions
         .iter()
         .filter(|c| !c.folded && !c.amount.is_zero())
@@ -58,10 +62,11 @@ pub fn calculate(contributions: &[Contribution]) -> Vec<PotTier> {
     let mut pots = Vec::with_capacity(levels.len());
     let mut previous = Chips::ZERO;
     for (position, level) in levels.iter().enumerate() {
-        let amount = contributions
-            .iter()
-            .map(|c| c.amount.min(*level).saturating_sub(c.amount.min(previous)))
-            .fold(Chips::ZERO, Chips::saturating_add);
+        let mut amount = Chips::ZERO;
+        for c in contributions {
+            let slice = c.amount.min(*level).checked_sub(c.amount.min(previous))?;
+            amount = amount.checked_add(slice)?;
+        }
         let mut eligible: Vec<SeatIndex> = contributions
             .iter()
             .filter(|c| !c.folded && c.amount >= *level)
@@ -76,16 +81,16 @@ pub fn calculate(contributions: &[Contribution]) -> Vec<PotTier> {
         previous = *level;
     }
 
-    let leftover = contributions
-        .iter()
-        .map(|c| c.amount.saturating_sub(previous))
-        .fold(Chips::ZERO, Chips::saturating_add);
+    let mut leftover = Chips::ZERO;
+    for c in contributions {
+        leftover = leftover.checked_add(c.amount.saturating_sub(previous))?;
+    }
     if !leftover.is_zero()
         && let Some(last) = pots.last_mut()
     {
-        last.amount = last.amount.saturating_add(leftover);
+        last.amount = last.amount.checked_add(leftover)?;
     }
-    pots
+    Ok(pots)
 }
 
 /// Orders winners clockwise starting with the first seat after the button.

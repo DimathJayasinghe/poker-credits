@@ -894,3 +894,34 @@ fn a_real_action_clears_the_missed_turn_count() {
     act(&mut state, 0, PlayerAction::Check);
     assert_eq!(state.table.seat_of(&pid(0)).unwrap().missed_turns, 0);
 }
+
+#[test]
+fn table_total_is_capped_so_payouts_can_never_overflow() {
+    use poker_engine::{MAX_CHIPS, MAX_TABLE_CHIPS};
+    let mut state = lobby(&[1000, 1000], 10, 20);
+    // One player has concentrated nearly the whole cap (as if they had won it).
+    state.table.seats[0].chips = chips(9 * MAX_CHIPS);
+    state.table.seats[1].chips = chips(MAX_CHIPS);
+    let add = |index: usize, at: u8, amount: u64| Command::AddPlayer {
+        player_id: pid(index),
+        seat: seat(at),
+        chips: chips(amount),
+    };
+    assert_eq!(state.table.total_chips(), MAX_TABLE_CHIPS);
+    assert_eq!(
+        try_step(&mut state, add(5, 5, 1)),
+        Err(PokerError::InvalidAmount)
+    );
+
+    // Busting one player and letting them rebuy cannot push the table over the cap either.
+    state.table.seats[1].chips = chips(0);
+    let rebuy = Command::Rebuy {
+        player_id: pid(1),
+        amount: chips(MAX_CHIPS),
+    };
+    step(&mut state, rebuy.clone());
+    assert_eq!(state.table.total_chips(), MAX_TABLE_CHIPS);
+    state.table.seats[1].chips = chips(0);
+    state.table.seats[0].chips = chips(9 * MAX_CHIPS + 5);
+    assert_eq!(try_step(&mut state, rebuy), Err(PokerError::InvalidAmount));
+}

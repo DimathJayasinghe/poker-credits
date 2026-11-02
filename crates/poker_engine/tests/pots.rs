@@ -19,6 +19,10 @@ fn paid(seat_index: u8, amount: u64, folded: bool) -> Contribution {
     }
 }
 
+fn pots_of(contributions: &[Contribution]) -> Vec<poker_engine::PotTier> {
+    calculate(contributions).unwrap()
+}
+
 fn amounts(pots: &[poker_engine::PotTier]) -> Vec<u64> {
     pots.iter().map(|pot| pot.amount.get()).collect()
 }
@@ -40,7 +44,7 @@ fn rules_doc_example_four_players() {
         paid(2, 250, false),
         paid(3, 40, true),
     ];
-    let pots = calculate(&after_refund);
+    let pots = pots_of(&after_refund);
     assert_eq!(amounts(&pots), vec![340, 300]);
     assert_eq!(pots[0].eligible, vec![seat(0), seat(1), seat(2)]);
     assert_eq!(pots[1].eligible, vec![seat(1), seat(2)]);
@@ -49,7 +53,7 @@ fn rules_doc_example_four_players() {
 #[test]
 fn architecture_doc_example() {
     // ARCHITECTURE.md section 5: A all-in 50, B all-in 120, C calls 120, D folded at 20.
-    let pots = calculate(&[
+    let pots = pots_of(&[
         paid(0, 50, false),
         paid(1, 120, false),
         paid(2, 120, false),
@@ -64,7 +68,7 @@ fn architecture_doc_example() {
 
 #[test]
 fn single_pot_when_everyone_matched() {
-    let pots = calculate(&[paid(0, 60, false), paid(1, 60, false), paid(2, 60, false)]);
+    let pots = pots_of(&[paid(0, 60, false), paid(1, 60, false), paid(2, 60, false)]);
     assert_eq!(amounts(&pots), vec![180]);
     assert_eq!(pots[0].eligible.len(), 3);
 }
@@ -72,7 +76,7 @@ fn single_pot_when_everyone_matched() {
 #[test]
 fn folded_chips_never_create_a_pot_of_their_own() {
     // The folder put in more than the all-in player but less than the caller.
-    let pots = calculate(&[paid(0, 50, false), paid(1, 80, true), paid(2, 100, false)]);
+    let pots = pots_of(&[paid(0, 50, false), paid(1, 80, true), paid(2, 100, false)]);
     assert_eq!(amounts(&pots), vec![150, 80]);
     assert_eq!(pots[0].eligible, vec![seat(0), seat(2)]);
     assert_eq!(pots[1].eligible, vec![seat(2)]);
@@ -80,14 +84,14 @@ fn folded_chips_never_create_a_pot_of_their_own() {
 
 #[test]
 fn folded_overbet_is_added_to_the_last_pot() {
-    let pots = calculate(&[paid(0, 40, false), paid(1, 300, true), paid(2, 300, true)]);
+    let pots = pots_of(&[paid(0, 40, false), paid(1, 300, true), paid(2, 300, true)]);
     assert_eq!(amounts(&pots), vec![640]);
     assert_eq!(pots[0].eligible, vec![seat(0)]);
 }
 
 #[test]
 fn no_contributions_no_pots() {
-    assert!(calculate(&[]).is_empty());
+    assert!(pots_of(&[]).is_empty());
     assert_eq!(uncalled_refund(&[]), None);
 }
 
@@ -129,7 +133,7 @@ fn pots_plus_refund_always_equal_contributions() {
                 }
             }
         }
-        let pot_total: u64 = calculate(&after).iter().map(|pot| pot.amount.get()).sum();
+        let pot_total: u64 = pots_of(&after).iter().map(|pot| pot.amount.get()).sum();
         let paid_total: u64 = contributions.iter().map(|c| c.amount.get()).sum();
         assert_eq!(pot_total + refund, paid_total);
     }

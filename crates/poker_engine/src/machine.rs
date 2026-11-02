@@ -5,7 +5,6 @@
 
 use std::collections::BTreeMap;
 
-use crate::MAX_CHIPS;
 use crate::blinds::BlindsStrategy;
 use crate::button;
 use crate::command::{Allocation, Command, PlayerAction};
@@ -16,6 +15,7 @@ use crate::state::{AWAY_AFTER_MISSED_TURNS, GameState, HandStatus, Seat, Table};
 use crate::types::{Chips, MAX_SEATS, Phase, PlayerId, SeatIndex};
 use crate::undo;
 use crate::validator::{self, Resolved};
+use crate::{MAX_CHIPS, MAX_TABLE_CHIPS};
 
 /// The result of one command.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -132,6 +132,15 @@ fn run(table: &mut Table, command: Command, events: &mut Vec<Event>) -> Result<(
 // Table management
 // ---------------------------------------------------------------------------------------------
 
+/// A buy-in or top-up must keep the whole table within [`MAX_TABLE_CHIPS`], otherwise a later
+/// payout could overflow and wedge the showdown.
+fn require_table_capacity(table: &Table, amount: Chips) -> Result<(), PokerError> {
+    match table.total_chips().checked_add(amount.get()) {
+        Some(total) if total <= MAX_TABLE_CHIPS => Ok(()),
+        _ => Err(PokerError::InvalidAmount),
+    }
+}
+
 fn require_between_hands(table: &Table) -> Result<(), PokerError> {
     if matches!(table.phase, Phase::Lobby | Phase::NextHandPrep) {
         Ok(())
@@ -153,6 +162,7 @@ fn add_player(
     if table.seat_of(&player_id).is_some() {
         return Err(PokerError::PlayerExists);
     }
+    require_table_capacity(table, chips)?;
     if table.seat(seat).is_some() {
         return Err(PokerError::SeatOccupied);
     }
@@ -215,6 +225,7 @@ fn rebuy(
     if amount.is_zero() {
         return Err(PokerError::InvalidAmount);
     }
+    require_table_capacity(table, amount)?;
     let seat = table
         .seats
         .iter_mut()
@@ -619,7 +630,7 @@ fn settle(table: &mut Table, events: &mut Vec<Event>) -> Result<(), PokerError> 
             amount,
         });
     }
-    table.pots = pots::calculate(&contributions(table));
+    table.pots = pots::calculate(&contributions(table))?;
     table.active = None;
     Ok(())
 }
