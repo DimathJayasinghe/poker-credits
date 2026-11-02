@@ -1,9 +1,9 @@
 # Project Status & Handoff
 
-Last updated: 2026-11-01 (branch `docs/flutter-rust-pivot`).
+Last updated: 2026-11-02 (branch `feature/engine-core`, stacked on the unmerged `chore/bootstrap`).
 
 ## Where we are
-**Design phase. No product code exists yet.** The old TypeScript scaffold was deleted (owner approved 2026-11-01). The stack was changed to **Flutter (app) + Rust (engine and server)**, and the docs were rewritten to match, using LocalSend (`~/Documents/dev_projects/localsend`) as the model for repo layout, Flutter-Rust bridging and crash handling.
+**Phase 0 (bootstrap) is done and Phase 1 (engine) is implemented for review.** The old TypeScript scaffold was deleted (owner approved 2026-11-01). The stack was changed to **Flutter (app) + Rust (engine and server)**, and the docs were rewritten to match, using LocalSend (`~/Documents/dev_projects/localsend`) as the model for repo layout, Flutter-Rust bridging and crash handling.
 
 ### Done
 - Studied LocalSend: workspaces (Cargo + pub), FRB + cargokit, `ServerEventV2`-style event channel, `ensureRunning` probe on resume, listener-failure restart, init error app, drop guards, signaling-server idle timeout / ping / per-IP limits, desktop single-instance, logcat logging, pinned toolchains.
@@ -23,9 +23,15 @@ Last updated: 2026-11-01 (branch `docs/flutter-rust-pivot`).
 ## Phase 0 status
 Done on branch `chore/bootstrap` (not merged): Cargo workspace with empty crates, Flutter app (6 platforms) with pub workspace, `poker_protocol` package, brutalist theme skeleton (tokens, BrutalButton, BrutalCard), init error screen, global error hooks, platform seam, bundled fonts, CI workflow, platform permissions, bridge spike. Verified locally: `cargo fmt/clippy/test`, `flutter analyze`, 25 Dart tests, `tool/check_web_safe.sh`, `flutter build web --no-web-resources-cdn`, `flutter build linux`, Linux app launches, spike Android APK builds. **Not verified:** iOS/macOS/Windows builds (need those OSes), CI on GitHub (never pushed), `ws://` on real devices (Phase 5).
 
+## Phase 1 status (engine)
+Implemented on `feature/engine-core` (branched from `chore/bootstrap`, nothing committed yet): `crates/poker_engine` with `types`, `state`, `command`, `event`, `error`, `validator`, `pots`, `blinds`, `button`, `machine`, `undo`. Verified locally: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (92 tests; the 3 proptest properties check that chips are conserved over arbitrary command sequences, that rejected commands never mutate state, that accepted commands replay to an identical state through a JSON snapshot round trip, and that every command built from the engine's own legal actions is accepted). Rules the spec left open are listed in `docs/GAME_LOGIC_AND_RULES.md` section 9 for owner review.
+
+Deviations from the guide's file list: there is no separate `AdminCommand`; all commands are variants of `Command`, and `Command::origin()` returns `Player`, `Host` or `Server` so the server can enforce who may send what (`Timeout` is `Server`: only the turn timer may time a player out; the server must bind `player_id` to the session for `Action` and `SetSittingOut`). `undo.rs` is public, not private.
+
 ## Next step
-1. Owner reviews Phase 0 (branch `chore/bootstrap`) and merges it to `main`.
-2. Start **Phase 1** (engine) (see `docs/AGENT_CODING_GUIDE.md` section 3) on a `chore/bootstrap` branch. Include the labelled throwaway spike for FRB/cargokit and panic behaviour.
+1. Owner reviews Phase 0 (`chore/bootstrap`) and Phase 1 (`feature/engine-core`, which contains Phase 0) and merges to `main`.
+2. Start **Phase 2** (server core and cloud binary) after approval. The engine's `PokerError` variants `NothingToCall`, `BettingNotReopened`, `NotPaused`, `NotEnoughPlayers`, `UnknownPlayer`, `PlayerExists`, `InvalidSeat`, `InvalidAmount`, `Overflow`, `IllegalTransition`, `NothingToUndo` and `InvalidAllocation` have no wire code yet in `API_AND_EVENTS.md` section 6; add them when writing the exhaustive `From<PokerError> for ErrorCode`.
+3. Open owner questions from the engine work: when busted players are removed (decision 19; the policy below proposes a 2-minute rebuy window first). Inactive-player policy approved 2026-11-02 and recorded in `RESILIENCE_AND_CRASH_HANDLING.md` section 3.8 (engine layer done; presence check with 90 s vote and the busted-player rebuy window are Phase 2). Answered 2026-11-02: no missed-blind catch-up (decision 10); several short all-ins that add up reopen betting per TDA rule 47 (decision 4).
 
 ## Decisions made by the assistant (not yet confirmed by the owner)
 Please confirm or change; each is recorded in the docs.

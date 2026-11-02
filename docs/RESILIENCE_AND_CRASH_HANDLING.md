@@ -158,6 +158,20 @@ FRB exposes an opaque `RsServerHandle` plus one `Stream<RsServerEvent>`. The clo
 
 ---
 
+## 3.8 Inactive and departed players **[NEW]** (owner-approved 2026-11-02)
+Three layers, from automatic to social. Layer 1 lives in the engine; layers 2 and 3 are server (Phase 2) with wire messages added to `API_AND_EVENTS.md` at that time.
+
+1. **Auto sit-out (engine, done).** The turn timer sends `Timeout`; the engine checks if free, else folds, and counts a missed turn. Two missed turns in a row (`AWAY_AFTER_MISSED_TURNS`) sit the player out when the hand ends (`Event::PlayerAway`). Any real action or sitting back in resets the count. A player who quits, or whose connection is gone for good, is sent `LeaveHand`: they fold at once and sit out, and play again from the next hand (no missed-blind catch-up).
+2. **Presence check (server).** Starts when a player has been sitting out for **5 minutes or 5 hands**, whichever comes first (a player who sat out on purpose gets the same check). The other seated players get "Is NAME still playing?" with Yes / No, and the clock is **90 seconds**.
+   - The **host's answer is final** and ends the check at once.
+   - Without a host answer: a strict majority of the *other* seated players who replied decides; players who do not reply abstain. No replies at all means nothing happens and the check may repeat after another 5 minutes.
+   - If only one other player is seated, that player decides alone.
+   - The subject of the check cannot vote, and answering "Yes, still playing" on their own device (a `PRESENCE_ACK`) cancels the check immediately.
+   - "No" wins: server sends `LeaveHand` (if needed), then `RemovePlayer`, and **credits the returned chips to the room ledger** so nothing vanishes. The player can rejoin as a spectator or with a fresh buy-in.
+3. **Busted players (server).** At zero chips a player is offered a rebuy between hands. With no answer after **2 minutes** they become a spectator and keep their seat reserved until the host removes them. The server decides when `RemovePlayer` is sent for busted seats; see `GAME_LOGIC_AND_RULES.md` section 9 item 19.
+
+All timings are server config with these defaults. Voting results and kicks are written to the action journal so a restarted room reaches the same table.
+
 ## 4. Client reconnect and resume
 
 ### 4.1 Reconnect loop **[NEW]**

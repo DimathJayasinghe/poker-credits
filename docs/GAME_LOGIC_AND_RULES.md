@@ -6,7 +6,7 @@
 * **Cards (Physical)**: Players shuffle, cut, deal, and reveal physical cards on the table.
 * **Credits / Chips (Digital)**: The application manages all financial and betting rules: blinds, turn order, minimum raise validation, all-in side pot calculations, and split pot payouts.
 
-This document details the exact rules, state transitions, constraints, and edge-case behaviors implemented in `@poker-credits/shared`.
+This document details the exact rules, state transitions, constraints, and edge-case behaviors implemented in the Rust crate `crates/poker_engine`.
 
 ---
 
@@ -227,3 +227,31 @@ When two or more eligible players tie with the exact same hand strength:
 * If a player's timer expires without an action:
   * If the player can legally **Check** for free, the engine executes an automatic `CHECK`.
   * If facing an active bet/raise, the engine executes an automatic `FOLD`.
+
+---
+
+## 9. Engine decisions (Phase 1, for owner review)
+
+The spec above left these open. The engine implements the following; each is covered by a test in `crates/poker_engine/tests/`. Tell us if a house rule differs.
+
+1. **Run-out trigger.** Betting ends and the hand goes to `ALL_IN_RUNOUT` as soon as at most one non-folded player still has chips and every bet is matched. (A lone player with chips is never asked to check through the remaining streets against an all-in opponent.)
+2. **Uncalled bet.** The top contribution minus the second-highest contribution among *all* contributors, folded players included, goes back to its owner when betting ends. A folder who matched part of a bet counts as having called that part.
+3. **Folded chips.** Folded players' chips fill pots but never create a pot of their own; only non-folded players who reached a tier can win it. A folded overbet above the highest live tier is added to the last pot.
+4. **Short (incomplete) all-in (TDA rule 47).** It is legal. It does not change the minimum raise increment. On its own it does not reopen raising for players who already acted: they may only call or fold (`BettingNotReopened`). Several short all-ins whose increases together reach a full raise do reopen betting for everyone (the increment stays that of the last full raise). Players who have not acted yet may always raise. An all-in at or above the minimum raise is a full raise and reopens betting for everyone.
+5. **Minimum raise.** `current bet + last full raise increment`; after the flop the first bet must be at least the big blind. A raise below the minimum is rejected unless it is the player's whole stack.
+6. **Odd chips.** Applied per pot. Everyone gets the floor share; the remainder goes one chip at a time to the winners in clockwise order starting with the first seat after the button (a remainder above one is spread, not given to one player).
+7. **Pots are paid highest side pot first**, main pot last. Every pot needs an allocation; a winner must be eligible for that pot.
+8. **Button and blinds (dead-button rule).** The big blind moves to the next player who can be dealt in, so nobody skips it. The small blind is the seat just before the big blind, the button the seat before that. If the small blind seat cannot be dealt in (busted or sitting out) the small blind is dead and nobody posts it. If the button seat cannot be dealt in the button is dead; it still marks where post-flop action starts.
+9. **Heads-up.** With exactly two players who can be dealt in, the button posts the small blind, acts first before the flop and last after it. Going from three players to two, the big blind still rotates to the next player and the other player takes the small blind and the button.
+10. **Missed blinds (owner decision 2026-11-02).** No catch-up post. A player who leaves or sits out is skipped, and when they come back they wait for the next hand and are dealt in with whatever position the rotation gives them.
+11. **Sit-out timing.** Toggling sit-out during a hand only takes effect from the next hand. `LeaveHand` is the immediate version: a player who is live in the hand folds at once (even out of turn, so the hand never waits on someone who has gone), then sits out. An all-in player who leaves stays in the hand for the showdown. Coming back is `SetSittingOut false`, which applies from the next deal. Removing a player or topping up a stack is only allowed between hands.
+12. **Antes** are posted by every player dealt in (up to their stack), go to the pot, and are not part of the street bet.
+13. **Short blinds.** A player who cannot cover a blind posts what they have and is all-in. The call amount is still the full big blind.
+14. **Timeout.** The engine decides: check if the player owes nothing, otherwise fold. The event is flagged `auto`.
+15. **Game over.** When one player (or nobody) has chips after a payout the table returns to `LOBBY`; the host can top players up and start again.
+16. **Pause** is a flag, not a phase, so resuming restores the exact street and turn. It is only possible during a betting street. Undoing while paused keeps the game paused.
+17. **Undo** steps back up to 5 commands (actions, deals, showdown steps). Seating, top-ups and blind changes clear the history.
+18. **Phases.** The wire phases `STARTING_HAND`, `POSTING_BLINDS` and `PAYOUT` are not stored: one `StartHand` posts everything and lands on `PRE_FLOP` (or `ALL_IN_RUNOUT`), and a payout lands on `NEXT_HAND_PREP`. The server maps the `paused` flag to the wire phase `PAUSED`.
+19. **Busted seats stay seated.** Decision 8 assumes a player with no chips keeps their seat (and `Seat` entry) until the host sends `RemovePlayer`. If the server removes busted players before the next deal, the dead-small-blind and dead-button outcomes change. Phase 2 must choose the removal timing on purpose.
+20. **Removing a player returns their chips in the event** (`PlayerRemoved.chips`). The server must credit them to the room ledger, otherwise a kicked or departed player's credits vanish.
+21. **Auto sit-out.** A turn that ends by `Timeout` counts as a missed turn. Two in a row sit the player out when the hand ends and emit `PlayerAway`; any real action or sitting back in resets the count. See `RESILIENCE_AND_CRASH_HANDLING.md` section 3.8 for the presence check and vote built on top (server, Phase 2).
