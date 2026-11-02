@@ -109,7 +109,7 @@ packages/poker_bridge/rust/src/api/{server.rs,logging.rs,network.rs}   # start/s
 packages/poker_bridge/lib/{poker_bridge.dart,src/server_controller.dart}
 packages/poker_bridge/rust_builder/                    # cargokit
 ```
-Agent task: Dart models mirroring the Rust protocol; FRB API per resilience doc 3.7; Android logs to logcat; verify and document in `STATUS.md` how FRB reports Rust panics in Dart.
+Agent task: Dart models mirroring the Rust protocol; FRB API per resilience doc 3.7; Android logs to logcat; the Dart facade catches `PanicException` on every bridge call (see `docs/SPIKE_BRIDGE_FINDINGS.md` for layout, codegen notes and version pins: FRB 2.13.0).
 
 ### Phase 4: App shell and Table screen (`app/`)
 ```text

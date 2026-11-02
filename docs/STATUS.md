@@ -50,7 +50,7 @@ Please confirm or change; each is recorded in the docs.
 7. Brutalist palette and fonts (`docs/UI_DESIGN.md` section 2: Archivo Black + Space Mono, signal yellow) are the assistant's proposal; confirm or adjust before Phase 4.
 
 ## Things to verify during Phase 0 / 3 (marked "verify" in docs)
-- How `flutter_rust_bridge` surfaces a Rust panic in Dart (expected: exception; confirm and document).
+- ~~How `flutter_rust_bridge` surfaces a Rust panic in Dart~~ Verified in the Phase 0 spike: `PanicException`, app survives. See `docs/SPIKE_BRIDGE_FINDINGS.md`.
 - Whether iOS multicast entitlement still needs Apple approval (only matters for Phase 6 discovery).
 - Exact plugin choices and versions for QR scanning, secure storage and audio.
 - That the Rust toolchain version copied from LocalSend (`1.97.1`, as pinned there on 2026-11-01) is available locally; otherwise choose the current stable and record it.

@@ -16,7 +16,7 @@ Rule for implementers: a failure in one room, one connection or one screen must 
 | Exception during startup (storage, native lib load, permissions) | Dart `preInit` | Show the init error app with copyable details **[LS]** |
 | Uncaught Dart error after startup | Dart | Log to file, keep app alive, show non-blocking error banner **[NEW]** |
 | Rust panic inside a room | Server core | Log backtrace, restart that room from its journal, tell clients **[NEW]** |
-| Rust panic crossing the FRB boundary | Bridge | FRB converts it to a Dart exception; the bridge layer catches it and reports a typed error (verify FRB behaviour at Phase 0) **[NEW]** |
+| Rust panic crossing the FRB boundary | Bridge | FRB converts it to a Dart `PanicException` with a Rust backtrace (verified in the Phase 0 spike, `docs/SPIKE_BRIDGE_FINDINGS.md`); the bridge layer catches it and reports a typed error. Panics in background tokio tasks are NOT reported by FRB; the room supervisor reports them as events **[NEW]** |
 | Listening socket dies (iOS suspension, interface change) | Host mode | Event from Rust triggers restart **[LS]**; probe on resume **[LS]** |
 | Host app killed by the OS | Host mode | On next launch, restore rooms from snapshot + journal **[NEW]** |
 | Client loses connection (screen lock, Wi-Fi blip) | Client | Backoff reconnect, resume handshake, full snapshot **[NEW]** |
