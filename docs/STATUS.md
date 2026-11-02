@@ -20,9 +20,12 @@ Last updated: 2026-11-01 (branch `docs/flutter-rust-pivot`).
 3. ~~Install toolchains~~ Done for Rust, rust-analyzer, FVM, Flutter 3.41.9 and Linux desktop packages. Android cmdline-tools, licences, FRB codegen 2.13.0, nextest and deny are installed too. Remaining: add `~/.cargo/bin` and `~/.pub-cache/bin` to your zsh `PATH` (I could not edit `~/.zshrc`).
 4. Build the first graph with `/graphify .` when ready (costs tokens), or wait for Phase 1 code.
 
+## Phase 0 status
+Done on branch `chore/bootstrap` (not merged): Cargo workspace with empty crates, Flutter app (6 platforms) with pub workspace, `poker_protocol` package, brutalist theme skeleton (tokens, BrutalButton, BrutalCard), init error screen, global error hooks, platform seam, bundled fonts, CI workflow, platform permissions, bridge spike. Verified locally: `cargo fmt/clippy/test`, `flutter analyze`, 25 Dart tests, `tool/check_web_safe.sh`, `flutter build web --no-web-resources-cdn`, `flutter build linux`, Linux app launches, spike Android APK builds. **Not verified:** iOS/macOS/Windows builds (need those OSes), CI on GitHub (never pushed), `ws://` on real devices (Phase 5).
+
 ## Next step
-1. Owner reviews this doc set and the open questions below.
-2. Start **Phase 0** (see `docs/AGENT_CODING_GUIDE.md` section 3) on a `chore/bootstrap` branch. Include the labelled throwaway spike for FRB/cargokit and panic behaviour.
+1. Owner reviews Phase 0 (branch `chore/bootstrap`) and merges it to `main`.
+2. Start **Phase 1** (engine) (see `docs/AGENT_CODING_GUIDE.md` section 3) on a `chore/bootstrap` branch. Include the labelled throwaway spike for FRB/cargokit and panic behaviour.
 
 ## Decisions made by the assistant (not yet confirmed by the owner)
 Please confirm or change; each is recorded in the docs.

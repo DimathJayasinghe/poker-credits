@@ -9,7 +9,7 @@ Throwaway spike (not in the repo) run on 2026-11-01/02 to learn how `flutter_rus
 | Does FRB + cargokit build and run on Linux desktop? | **Yes.** `flutter test integration_test -d linux` compiled the Rust library through cargokit, loaded it and called it. |
 | How does a Rust panic surface in Dart? | As a Dart **`PanicException`** (class from the `flutter_rust_bridge` package) whose text carries the panic message and a full **Rust backtrace**. Verified for a synchronous (`#[frb(sync)]`) function and for an `async fn`. |
 | Does the app survive a panic? | **Yes.** After both panics, a following call returned normally. The panic is converted at the boundary; the process does not abort (we do not set `panic = "abort"`). |
-| Does it build for Android? | See "Android" below. |
+| Does it build for Android? | **Yes.** `flutter build apk --debug --target-platform android-arm64` produced a 79 MB debug APK in about 8 minutes on a cold cache (Gradle plus cargokit compiling the Rust library for `aarch64`, `i686` and `x86_64` Android targets, NDK 27.1). Cargokit installs missing Rust Android targets itself. Not run on a device or emulator yet. |
 
 ## What this means for the design
 - The bridge facade (`packages/poker_bridge/lib`) must catch `PanicException` at every call and map it to a typed app error (log with the Rust backtrace, show a non-fatal error, offer to restart the embedded server). This closes the "verify" item in `RESILIENCE_AND_CRASH_HANDLING.md` section 1.
