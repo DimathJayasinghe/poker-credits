@@ -1,0 +1,19 @@
+{
+  "v": 1,
+  "type": "RESOLVE_SHOWDOWN",
+  "allocations": [
+    {
+      "potIndex": 0,
+      "winnerPlayerIds": [
+        "p_1",
+        "p_2"
+      ]
+    },
+    {
+      "potIndex": 1,
+      "winnerPlayerIds": [
+        "p_2"
+      ]
+    }
+  ]
+}

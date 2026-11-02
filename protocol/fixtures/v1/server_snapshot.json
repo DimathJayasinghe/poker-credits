@@ -1,0 +1,54 @@
+{
+  "v": 1,
+  "type": "SNAPSHOT",
+  "stateVersion": 42,
+  "serverTime": 1730000000000,
+  "nextActionSeq": 4,
+  "view": {
+    "roomCode": "KQ7M",
+    "handNumber": 7,
+    "phase": "FLOP",
+    "dealerSeat": 2,
+    "smallBlindSeat": 3,
+    "bigBlindSeat": 4,
+    "activeSeat": 5,
+    "currentHighBet": 60,
+    "minRaiseTo": 120,
+    "totalPot": 210,
+    "pots": [
+      {
+        "tierIndex": 0,
+        "amount": 150,
+        "eligiblePlayerIds": [
+          "p_1",
+          "p_2",
+          "p_3"
+        ]
+      },
+      {
+        "tierIndex": 1,
+        "amount": 60,
+        "eligiblePlayerIds": [
+          "p_2",
+          "p_3"
+        ]
+      }
+    ],
+    "seats": [
+      {
+        "seatIndex": 0,
+        "playerId": "p_1",
+        "name": "Alice",
+        "chips": 940,
+        "streetBet": 60,
+        "hasFolded": false,
+        "isAllIn": false,
+        "isSittingOut": false,
+        "isConnected": true
+      }
+    ],
+    "paused": false,
+    "turnDeadlineMs": 1730000030000,
+    "spectatorCount": 2
+  }
+}

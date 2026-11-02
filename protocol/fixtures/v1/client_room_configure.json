@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "type": "ROOM_CONFIGURE",
+  "config": {
+    "startingChips": 1000,
+    "smallBlind": 10,
+    "bigBlind": 20,
+    "ante": 0,
+    "isTournament": false,
+    "blindLevelMinutes": 15,
+    "turnTimeLimitSeconds": 30
+  }
+}

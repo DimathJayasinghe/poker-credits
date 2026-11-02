@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "type": "ACTION_PERFORMED",
+  "playerId": "p_3",
+  "playerName": "Charlie",
+  "kind": "RAISE",
+  "amount": 60,
+  "chipsRemaining": 940,
+  "allIn": false,
+  "auto": false
+}

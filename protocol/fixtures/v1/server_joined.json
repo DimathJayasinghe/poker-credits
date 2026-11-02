@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "reqId": "c-2",
+  "type": "JOINED",
+  "playerId": "p_3",
+  "role": "PLAYER",
+  "seatIndex": 1,
+  "sessionToken": "0123456789abcdef0123456789abcdef"
+}

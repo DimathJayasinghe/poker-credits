@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "reqId": "c-17",
+  "type": "GAME_ACTION",
+  "actionSeq": 4,
+  "action": {
+    "kind": "RAISE",
+    "toAmount": 60
+  }
+}

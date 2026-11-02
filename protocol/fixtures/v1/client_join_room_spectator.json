@@ -1,0 +1,7 @@
+{
+  "v": 1,
+  "type": "JOIN_ROOM",
+  "roomCode": "KQ7M",
+  "name": "Bob",
+  "spectator": true
+}

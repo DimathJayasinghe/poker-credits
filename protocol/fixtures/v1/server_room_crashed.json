@@ -1,0 +1,5 @@
+{
+  "v": 1,
+  "type": "ROOM_CRASHED",
+  "reason": "room frozen after repeated faults"
+}

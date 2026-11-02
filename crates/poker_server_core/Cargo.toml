@@ -6,7 +6,19 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-poker_engine = { path = "../poker_engine" }
+axum = { version = "0.8.9", features = ["ws"] }
+getrandom = "0.4.3"
+poker_engine = { version = "0.1.0", path = "../poker_engine" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+subtle = "2.6.1"
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "fs"] }
+tracing = "0.1.44"
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+tempfile = "3.27.0"

@@ -133,6 +133,18 @@ No extra fields. Deals the next hand from `LOBBY` or `NEXT_HAND_PREP`.
 ### 3.9 `PING`
 `{ "type":"PING", "t": 1730000000000 }`. Server answers `PONG` with the same `t`. Clients send it after 15 s with no other outgoing message.
 
+### 3.10 Additions in Phase 2 (additive, no version bump)
+| Type | Sender | Body | Purpose |
+| :--- | :--- | :--- | :--- |
+| `BEGIN_SHOWDOWN` | host | none | Ends the `ALL_IN_RUNOUT` after the cards are dealt, moves to `SHOWDOWN`. |
+| `SET_SITTING_OUT` | player | `sittingOut` | Skip or rejoin from the next hand. |
+| `LEAVE_TABLE` | player | none | Fold now (if live) and sit out; the session stays valid. |
+| `PRESENCE_VOTE` | player | `playerId, stillPlaying` | Answer a presence check (3.11). |
+| `PRESENCE_ACK` | player | none | "I am still here": cancels a check about the sender. |
+
+### 3.11 Presence check (inactive players)
+See `RESILIENCE_AND_CRASH_HANDLING.md` 3.8. The server sends `PRESENCE_CHECK { subjectPlayerId, subjectName, deadlineMs }` to every seated player except the subject, and `PRESENCE_RESOLVED { subjectPlayerId, removed }` when it ends. The host's vote is final; otherwise a strict majority of the replies decides; silence abstains.
+
 ---
 
 ## 4. Server → Client (`ServerMessage`)
@@ -172,7 +184,7 @@ Sent to all connections after each state change. In v1 this is always the **full
   "spectatorCount":2
 }
 ```
-`phase` is one of: `LOBBY`, `STARTING_HAND`, `POSTING_BLINDS`, `PRE_FLOP`, `FLOP`, `TURN`, `RIVER`, `ALL_IN_RUNOUT`, `SHOWDOWN`, `HAND_WON_UNCONTESTED`, `PAYOUT`, `NEXT_HAND_PREP`, `PAUSED`. `turnDeadlineMs` is an absolute server time; clients compute the countdown locally using `serverTime` offset, so the old per-second `timer_tick` broadcast is not needed.
+`phase` is one of: `LOBBY`, `PRE_FLOP`, `FLOP`, `TURN`, `RIVER`, `ALL_IN_RUNOUT`, `SHOWDOWN`, `NEXT_HAND_PREP`, `PAUSED`. `PAUSED` is shown while `paused` is true (the engine keeps the real phase). `STARTING_HAND`, `POSTING_BLINDS`, `HAND_WON_UNCONTESTED` and `PAYOUT` are transient inside one command and never appear. `minRaiseTo` is the smallest legal raise-to total for the next raise (current bet plus the last full raise increment), zero outside a betting street; the per-player cap is in `TURN_PROMPT.legal`. `turnDeadlineMs` is an absolute server time; clients compute the countdown locally using `serverTime` offset, so the old per-second `timer_tick` broadcast is not needed.
 
 ### 4.4 `TURN_PROMPT` (only to the acting player)
 ```json
@@ -185,9 +197,9 @@ Triggers haptics and sound in the Player app.
 ### 4.5 `ACTION_PERFORMED`
 Broadcast for the ticker and sound effects.
 ```json
-{ "v":1, "type":"ACTION_PERFORMED", "playerId":"p_3", "playerName":"Charlie", "kind":"RAISE", "amount":60, "chipsRemaining":940, "auto":false }
+{ "v":1, "type":"ACTION_PERFORMED", "playerId":"p_3", "playerName":"Charlie", "kind":"RAISE", "amount":60, "chipsRemaining":940, "allIn":false, "auto":false }
 ```
-`auto` is true for timer-driven auto-check or auto-fold.
+`auto` is true for timer-driven auto-check or auto-fold. `kind` is `FOLD`, `CHECK`, `CALL`, `BET` or `RAISE` (`BET` opens the betting). `amount` is the player's **street total after the action** ("raises to 60", "calls 60"), not the chips added. `allIn` is true when the action used the last chip.
 
 ### 4.6 `ACK` and `ERROR`
 ```json
@@ -260,8 +272,20 @@ Socket.io's automatic reconnection is gone, so this section is the contract.
 | `RATE_LIMITED` | Too many messages. | Back off. Connection closes after 3 strikes. |
 | `SUPERSEDED` | Same seat connected elsewhere. | Show "Opened on another device". |
 | `ROOM_CRASHED` | Room frozen after repeated server panics. | Show support message, offer leave. |
+| `ALREADY_SEATED` | Player already has a seat. | Ignore. |
+| `INVALID_ACTION` | Action makes no sense now (call with nothing to call). | Refresh from snapshot. |
+| `BETTING_NOT_REOPENED` | Raise after a short all-in that did not reopen betting. | Show Call / Fold only. |
+| `INVALID_AMOUNT` | Amount zero, above the stack limit or over the table cap. | Inline field error. |
+| `NOT_PAUSED` | Resume while not paused. | Ignore. |
+| `NOT_ENOUGH_PLAYERS` | Fewer than two players can be dealt in. | "Waiting for players". |
+| `UNKNOWN_PLAYER` | No such player. | Refresh from snapshot. |
+| `NOTHING_TO_UNDO` | Undo history empty. | Toast. |
+| `INVALID_ALLOCATION` | Showdown winners rejected (missing pot, ineligible winner). | Re-open the picker. |
+| `ILLEGAL_STATE` | Command not allowed in this phase. | Refresh from snapshot. |
+| `NO_PRESENCE_CHECK` | Vote for a player with no running check. | Ignore. |
+| `INTERNAL_ERROR` | Unexpected server fault. | Generic error; report. |
 
-Engine errors map to codes through one `impl From<PokerError> for ErrorCode`; the mapping is exhaustive (no wildcard arm).
+Engine errors map to codes through one `impl From<&PokerError> for ErrorCode` in `protocol.rs`; the mapping is exhaustive (no wildcard arm). `BELOW_MIN_RAISE` carries `details.minRaiseTo`, `INSUFFICIENT_FUNDS` carries `details.maxTo`, and `INVALID_CHECK` carries `details.callAmount` (added by the room).
 
 ---
 

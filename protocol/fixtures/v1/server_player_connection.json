@@ -1,0 +1,7 @@
+{
+  "v": 1,
+  "type": "PLAYER_CONNECTION",
+  "seatIndex": 1,
+  "playerId": "p_3",
+  "isConnected": false
+}

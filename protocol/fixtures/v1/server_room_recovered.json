@@ -1,0 +1,5 @@
+{
+  "v": 1,
+  "type": "ROOM_RECOVERED",
+  "reason": "room restarted after a server fault"
+}

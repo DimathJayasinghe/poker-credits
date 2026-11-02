@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "reqId": "c-2",
+  "type": "JOIN_ROOM",
+  "roomCode": "KQ7M",
+  "name": "Alice",
+  "seatIndex": 1,
+  "spectator": false
+}

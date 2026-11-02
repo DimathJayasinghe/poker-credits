@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "reqId": "c-17",
+  "type": "ERROR",
+  "code": "BELOW_MIN_RAISE",
+  "message": "minimum raise is to 40",
+  "details": {
+    "minRaiseTo": 40
+  }
+}

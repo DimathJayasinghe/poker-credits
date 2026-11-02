@@ -1,0 +1,17 @@
+{
+  "v": 1,
+  "type": "TURN_PROMPT",
+  "playerId": "p_3",
+  "seatIndex": 5,
+  "turnDeadlineMs": 1730000030000,
+  "nextActionSeq": 4,
+  "legal": {
+    "canFold": true,
+    "canCheck": false,
+    "canCall": true,
+    "callAmount": 20,
+    "canRaise": true,
+    "minRaiseTo": 40,
+    "maxRaiseTo": 940
+  }
+}

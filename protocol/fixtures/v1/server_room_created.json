@@ -1,0 +1,8 @@
+{
+  "v": 1,
+  "type": "ROOM_CREATED",
+  "roomCode": "KQ7M",
+  "hostToken": "fedcba9876543210fedcba9876543210",
+  "sessionToken": "0123456789abcdef0123456789abcdef",
+  "playerId": "p_1"
+}
