@@ -197,8 +197,12 @@ pub fn restore(
     if let Ok(outcome) = recovered.apply(recover.clone(), timings)
         && outcome.changed
     {
-        journal.append(&recover)?;
-        state = recovered;
+        // A full disk must not keep the room from coming back: a turn that times out is better
+        // than a room that stays down, and the next journal write will report the problem.
+        match journal.append(&recover) {
+            Ok(_) => state = recovered,
+            Err(error) => tracing::warn!(%error, "could not journal the clock restart; skipped"),
+        }
     }
     Ok(spawn(
         state,

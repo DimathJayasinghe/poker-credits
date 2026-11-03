@@ -55,7 +55,7 @@ Deviations from the guide, for review:
 
 Still to do: Phase 3 (protocol package and bridge), plus open owner questions below. Update `docs/API_AND_EVENTS.md` section 6 error list if the exhaustive `PokerError` mapping gained codes (check against `protocol.rs`).
 
-`main` was fast-forwarded locally (not pushed) to the store commit `056923d` on 2026-11-03; the actor work is on `feature/server-core` only.
+Local `main` was fast-forwarded (not pushed) to the end of Phase 2 (`2173d0f`) on 2026-11-03; `feature/server-core` holds the same commits.
 
 ## Next step
 1. Owner reviews Phase 0 (`chore/bootstrap`) and Phase 1 (`feature/engine-core`, which contains Phase 0) and merges to `main`.
