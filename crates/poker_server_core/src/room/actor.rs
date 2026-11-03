@@ -308,11 +308,36 @@ impl RoomActor {
             return Err(internal("could not persist the change"));
         }
         self.state = next;
+        self.revoke_removed();
         self.publish(&outcome);
         if outcome.engine_events.iter().any(snapshot_worthy) {
             self.write_snapshot();
         }
         Ok(outcome)
+    }
+
+    /// Closes the connections of people who are no longer in the room (kicked, voted out).
+    /// They get one `INVALID_SESSION` error, then their channel is dropped, so they receive no
+    /// further state and cannot keep acting on an old connection.
+    fn revoke_removed(&mut self) {
+        let removed: Vec<ConnId> = self
+            .conns
+            .iter()
+            .filter(|(_, conn)| !self.state.players.contains_key(&conn.player_id))
+            .map(|(id, _)| *id)
+            .collect();
+        for id in removed {
+            if let Some(conn) = self.conns.remove(&id) {
+                let _ = conn.tx.try_send(Outbound {
+                    req_id: None,
+                    message: RoomError::new(
+                        ErrorCode::InvalidSession,
+                        "you were removed from the room",
+                    )
+                    .to_message(),
+                });
+            }
+        }
     }
 
     fn write_snapshot(&mut self) {

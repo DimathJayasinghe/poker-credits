@@ -426,3 +426,52 @@ async fn end_game_stops_the_room() {
     );
     let _ = host.token;
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_kicked_player_is_cut_off_and_cannot_resume() {
+    let room = new_room(None);
+    let mut host = attach_host(&room, 1).await;
+    let mut bob = join(&room.handle, 2, "Bob").await;
+    host.drain().await;
+    bob.drain().await;
+    room.handle
+        .send(
+            host.conn,
+            None,
+            ClientMessage::Kick {
+                player_id: bob.id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    let to_bob = bob.drain().await;
+    assert!(
+        matches!(
+            to_bob.as_slice(),
+            [ServerMessage::Error {
+                code: ErrorCode::InvalidSession,
+                ..
+            }]
+        ),
+        "kicked player gets one error and no state: {to_bob:?}"
+    );
+    // Anything Bob sends on the old connection is refused, and the token no longer works.
+    room.handle
+        .send(bob.conn, Some("x".into()), ClientMessage::Ping { t: 1 })
+        .await
+        .unwrap();
+    assert!(bob.drain().await.is_empty());
+    let (tx, _rx) = mpsc::channel(8);
+    let again = room
+        .handle
+        .resume(5, tx, None, bob.token.clone(), None)
+        .await;
+    assert_eq!(again.unwrap_err().code, ErrorCode::InvalidSession);
+    // The room keeps working for the others.
+    assert!(
+        host.drain()
+            .await
+            .iter()
+            .any(|m| matches!(m, ServerMessage::StateUpdate { .. }))
+    );
+}
