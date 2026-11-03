@@ -10,7 +10,13 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <!-- Phase 6 adds the foreground service permissions for hosting in the background. -->
+    <!-- allowBackup is off: the session tokens live in the Android Keystore, whose keys are never
+         restored from a backup, so a restored copy would only be undecryptable data.
+         usesCleartextTraffic: LAN games use plain ws:// to the host's address (ADR-012); a LAN IP
+         cannot hold a certificate, and the host's own screen talks to its server on loopback. -->
     <application
+        android:allowBackup="false"
+        android:usesCleartextTraffic="true"
         android:label="Poker Credits"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

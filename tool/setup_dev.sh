@@ -33,7 +33,7 @@ check "gh (optional)"          gh      "https://cli.github.com"
 echo
 echo "Platform toolchains (only for the targets you build):"
 echo "  Android: Android SDK + NDK (for cargokit), accept licences:  fvm flutter doctor --android-licenses"
-echo "  Linux desktop: clang, cmake, ninja-build, pkg-config, libgtk-3-dev"
+echo "  Linux desktop: clang, cmake, ninja-build, pkg-config, libgtk-3-dev, libsecret-1-dev"
 echo "  Windows: Visual Studio 2022 'Desktop development with C++'"
 echo "  iOS/macOS: Xcode (macOS only). Rust targets: rustup target add aarch64-apple-ios aarch64-apple-darwin"
 echo "  Android Rust targets: rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android"

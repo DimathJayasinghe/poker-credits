@@ -1,35 +1,43 @@
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logging/logging.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/platform/token_store.dart';
 
 final _log = Logger('TokenStore');
 
-/// Session file in the app-private support folder. On Android and iOS that folder is sandboxed
-/// per app; on desktop the file is restricted to the owner where the OS allows it.
-///
-/// `flutter_secure_storage` would be stronger on desktop but needs `libsecret` on Linux; it can
-/// replace this class behind the same interface.
-TokenStore createTokenStore() => FileTokenStore(() async => (await getApplicationSupportDirectory()).path);
+/// The session tokens are bearer secrets, so they go into the operating system's secure store:
+/// Android Keystore, iOS and macOS Keychain, Windows Credential Locker (DPAPI) and the Secret
+/// Service keyring on Linux. There is deliberately no plain-file fallback: if the store is
+/// unavailable the session is simply not remembered and the host starts a new game.
+TokenStore createTokenStore() => const SecureTokenStore(
+  FlutterSecureStorage(
+    // The legacy macOS keychain needs no `keychain-access-groups` entitlement or provisioning
+    // profile, and the app shares nothing with other apps.
+    mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+    // Never copy the secrets into iCloud Keychain or a device backup.
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+  ),
+);
 
-final class FileTokenStore implements TokenStore {
-  FileTokenStore(this._folder);
+final class SecureTokenStore implements TokenStore {
+  const SecureTokenStore(this._storage);
 
-  final Future<String> Function() _folder;
+  static const String _key = 'poker_credits.session.v1';
 
-  Future<File> _file() async => File('${await _folder()}${Platform.pathSeparator}session.json');
+  final FlutterSecureStorage _storage;
 
   @override
   Future<StoredSession?> read() async {
     try {
-      final file = await _file();
-      if (!await file.exists()) return null;
-      return StoredSession.fromJson(jsonDecode(await file.readAsString()));
+      final raw = await _storage.read(key: _key);
+      if (raw == null) return null;
+      return StoredSession.fromJson(jsonDecode(raw));
     } on Object catch (error) {
-      _log.warning('cannot read the stored session', error);
+      // Never log the value itself.
+      _log.warning('cannot read the stored session: ${error.runtimeType}');
+      await clear();
       return null;
     }
   }
@@ -37,31 +45,18 @@ final class FileTokenStore implements TokenStore {
   @override
   Future<void> write(StoredSession session) async {
     try {
-      final file = await _file();
-      await file.parent.create(recursive: true);
-      // Write to a temp file and rename so a crash never leaves half a file.
-      final temp = File('${file.path}.tmp');
-      await temp.writeAsString(jsonEncode(session.toJson()), flush: true);
-      await _restrict(temp);
-      await temp.rename(file.path);
+      await _storage.write(key: _key, value: jsonEncode(session.toJson()));
     } on Object catch (error) {
-      _log.warning('cannot store the session', error);
+      _log.warning('cannot store the session: ${error.runtimeType}');
     }
   }
 
   @override
   Future<void> clear() async {
     try {
-      final file = await _file();
-      if (await file.exists()) await file.delete();
+      await _storage.delete(key: _key);
     } on Object catch (error) {
-      _log.warning('cannot clear the stored session', error);
-    }
-  }
-
-  Future<void> _restrict(File file) async {
-    if (Platform.isLinux || Platform.isMacOS) {
-      await Process.run('chmod', <String>['600', file.path]);
+      _log.warning('cannot clear the stored session: ${error.runtimeType}');
     }
   }
 }
