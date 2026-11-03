@@ -3,13 +3,31 @@
 //! These are not game state, so plain locks are fine here; no guard is held across an `.await`.
 
 use std::collections::HashMap;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv6Addr};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use tokio::time::Instant;
 
 type Counts = Arc<Mutex<HashMap<IpAddr, usize>>>;
+
+/// The identity limits are counted against. One IPv6 customer normally owns a whole `/64`
+/// (billions of addresses), so counting single addresses would give a scanner a fresh budget
+/// per request. IPv6 addresses are therefore reduced to their `/64` prefix, and IPv4-mapped
+/// IPv6 addresses (`::ffff:a.b.c.d`) are treated as the IPv4 address they carry.
+#[must_use]
+pub fn limiter_key(ip: IpAddr) -> IpAddr {
+    match ip {
+        IpAddr::V4(_) => ip,
+        IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or_else(
+            || {
+                let [a, b, c, d, ..] = v6.segments();
+                IpAddr::V6(Ipv6Addr::new(a, b, c, d, 0, 0, 0, 0))
+            },
+            IpAddr::V4,
+        ),
+    }
+}
 
 /// Caps simultaneous connections per IP address.
 #[derive(Clone, Debug)]
@@ -32,6 +50,7 @@ impl IpLimiter {
     /// the guard is dropped, however the connection task ends.
     #[must_use]
     pub fn try_acquire(&self, ip: IpAddr) -> Option<ConnectionGuard> {
+        let ip = limiter_key(ip);
         let mut counts = self.counts.lock().unwrap_or_else(PoisonError::into_inner);
         let count = counts.entry(ip).or_insert(0);
         if *count >= self.max {
@@ -47,6 +66,7 @@ impl IpLimiter {
     /// Connections currently held by `ip`.
     #[must_use]
     pub fn open(&self, ip: IpAddr) -> usize {
+        let ip = limiter_key(ip);
         let counts = self.counts.lock().unwrap_or_else(PoisonError::into_inner);
         counts.get(&ip).copied().unwrap_or(0)
     }
@@ -148,6 +168,7 @@ impl KeyedRateLimiter {
 
     /// May this address make a request now?
     pub fn check(&self, ip: IpAddr) -> bool {
+        let ip = limiter_key(ip);
         let now = Instant::now();
         let mut buckets = self.buckets.lock().unwrap_or_else(PoisonError::into_inner);
         if buckets.len() > PRUNE_ABOVE {
@@ -192,6 +213,7 @@ impl FailureLimiter {
 
     /// May this address try now?
     pub fn allowed(&self, ip: IpAddr) -> bool {
+        let ip = limiter_key(ip);
         let now = Instant::now();
         let entries = self.entries.lock().unwrap_or_else(PoisonError::into_inner);
         entries
@@ -202,6 +224,7 @@ impl FailureLimiter {
 
     /// Counts one failed attempt.
     pub fn record_failure(&self, ip: IpAddr) {
+        let ip = limiter_key(ip);
         let now = Instant::now();
         let mut entries = self.entries.lock().unwrap_or_else(PoisonError::into_inner);
         if entries.len() > PRUNE_ABOVE {
@@ -304,6 +327,51 @@ mod tests {
         assert!(!limiter.allowed(IP));
         tokio::time::sleep(Duration::from_mins(2)).await;
         assert!(limiter.allowed(IP), "the block ends");
+    }
+
+    #[test]
+    fn ipv6_addresses_share_a_budget_per_64_prefix() {
+        let in_prefix =
+            |last: u16| -> IpAddr { format!("2001:db8:1:2::{last:x}").parse().unwrap() };
+        let other_prefix: IpAddr = "2001:db8:1:3::1".parse().unwrap();
+        assert_eq!(limiter_key(in_prefix(1)), limiter_key(in_prefix(0xffff)));
+        assert_ne!(limiter_key(in_prefix(1)), limiter_key(other_prefix));
+        let high_bits: IpAddr = "2001:db8:1:2:aaaa:bbbb:cccc:dddd".parse().unwrap();
+        assert_eq!(limiter_key(high_bits), limiter_key(in_prefix(1)));
+    }
+
+    #[test]
+    fn ipv4_mapped_ipv6_is_the_ipv4_address() {
+        let mapped: IpAddr = "::ffff:10.0.0.1".parse().unwrap();
+        assert_eq!(limiter_key(mapped), IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)));
+        let plain: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
+        assert_eq!(limiter_key(plain), plain);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn rotating_addresses_inside_one_prefix_does_not_reset_the_failure_budget() {
+        let limiter = FailureLimiter::new(3, Duration::from_mins(1), Duration::from_mins(15));
+        for n in 1..=3_u16 {
+            limiter.record_failure(format!("2001:db8:9:9::{n:x}").parse().unwrap());
+        }
+        assert!(!limiter.allowed("2001:db8:9:9::dead:beef".parse().unwrap()));
+        assert!(
+            limiter.allowed("2001:db8:9:8::1".parse().unwrap()),
+            "a different /64 is separate"
+        );
+    }
+
+    #[test]
+    fn connection_slots_are_counted_per_prefix() {
+        let limiter = IpLimiter::new(2);
+        let a = limiter.try_acquire("2001:db8::1".parse().unwrap());
+        let b = limiter.try_acquire("2001:db8::2".parse().unwrap());
+        assert!(a.is_some() && b.is_some());
+        assert!(
+            limiter
+                .try_acquire("2001:db8::3".parse().unwrap())
+                .is_none()
+        );
     }
 
     #[tokio::test(start_paused = true)]
