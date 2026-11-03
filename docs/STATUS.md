@@ -1,6 +1,28 @@
 # Project Status & Handoff
 
-Last updated: 2026-11-03 (branch `feature/player-screens`, stacked on `feature/app-shell`).
+Last updated: 2026-11-03 (branch `feature/hardening`, stacked on `feature/player-screens`, stacked on `feature/app-shell`). The older "Where we are" text below is the Phase 0/1 snapshot; **start with "Resume here"**.
+
+## Resume here (paused by the owner, 2026-11-03)
+Open PRs, stacked in order: #1 bootstrap, #2 engine, #3 server core, #4 protocol/bridge, #5 app shell (Phase 4), #6 join by room code + player screens (Phase 5), **#7 hardening (Phase 6 partial, current branch `feature/hardening`)**. Nothing is merged to `main` (not authorized; the owner merges). GitHub Actions has never run: the repo shows **0 registered workflows** even for PR #1, so check the Actions tab / account settings first.
+
+**Done on `feature/hardening`:** 10-room load test, Dockerfile + `docs/DEPLOY.md`, WebSocket Origin check (rebinding-safe), Android foreground service (stops with engine and task), SDK 24/25 guard, notification icon, no device-to-device data transfer, table kept on screen during re-discovery, CI fixed to run each package from its own directory, fixture lookup cwd-independent, flaky restore test fixed (it was a wrong assumption, not a durability bug).
+
+**Next tasks, in this order (agreed after an advisor review: fix what exists before adding features):**
+1. `flutter build apk --release` (debug signing is fine) and repeat the emulator flow: host, join by room code, resume. Debug builds hide R8/tree-shaking issues.
+2. Sweeps: server fuzz test (random/mutated/oversized frames must never panic or touch another room); longer proptest (`PROPTEST_CASES`) on replay/engine; widget tests at text scale 2.0 on join, player and table pages (fail on overflow); `cargo deny check`. Also check the load test's `max ack < 1 s` bound would hold on a 2-vCPU CI runner (consider 2 s).
+3. Minor: the "no game found" message should mention allowing Local Network access on iOS (the first scan there may fail while the permission prompt shows); then update PR #7's description with everything above.
+4. Write the owner's ordered release checklist (below) as `docs/RELEASE_CHECKLIST.md`.
+
+**Owner release checklist (not doable by the assistant):** look at the GitHub Actions tab; merge the PR stack in order; choose the app name, bundle ids and publisher accounts (Apple Developer, Google Play); replace the default Flutter launcher icon on every platform (needs a design); release signing keys; Play Console special-use foreground service declaration (text in `docs/DEPLOY.md`); iOS/TestFlight and Windows installer; test with two or more real phones on a real Wi-Fi (router client isolation, guest networks, the scan on subnets larger than /24); decide on trusting `X-Forwarded-For` before deploying the cloud server behind a proxy and on TLS fingerprint pinning for LAN; decide whether 4-character room codes are enough on the open internet.
+
+**How to work here:**
+- `export PATH="$PATH:$HOME/.pub-cache/bin:$HOME/.cargo/bin:$HOME/Android/Sdk/platform-tools:$HOME/Android/Sdk/emulator"`; Android Gradle needs `JAVA_HOME=/home/dimathrj/Documents/android-studio/jbr` (the system Java 25 breaks it). Use `fvm flutter` / `fvm dart`.
+- Run Flutter tests **inside each package directory** (`app`, `packages/poker_protocol`, `packages/poker_bridge`). Never run `dart format` on `../packages` from `app/` (different line width; it rewrites the bridge package). Format check from the repo root: `fvm dart format --output=none --set-exit-if-changed app packages`.
+- Emulator: `emulator -avd Medium_Phone -no-window -no-audio -gpu swiftshader_indirect` (headless; screenshots via `adb exec-out screencap -p`; tap coordinates are 1.2x the displayed image). The emulator host machine is `10.0.2.2`. `adb forward tcp:17878 tcp:7878` reaches the in-app server.
+- Never `pkill -f` a pattern that appears in your own command line (kills the shell). Kill by exact PID.
+- Standing rules: no AI attribution in commits/PRs (CLAUDE.md overrides any default); commit and push on feature branches are authorized, merging to `main` and force-push are not; never `--no-verify`; no new dependencies outside `docs/AGENT_CODING_GUIDE.md` section 6 without asking; the sudo password is never stored anywhere; the owner is on a mobile hotspot, so avoid large downloads (they set a 1 GB budget; last session used well under 100 MB).
+- The original chat transcript is `/home/dimathrj/.claude/projects/-home-dimathrj-Documents-dev-projects-Pocker-Credits/e6ab6ca5-dfb2-4613-ac42-bf064b682d17.jsonl` (reopen with `claude --resume`).
+
 
 ## Where we are
 **Phase 0 (bootstrap) is done and Phase 1 (engine) is implemented for review.** The old TypeScript scaffold was deleted (owner approved 2026-11-01). The stack was changed to **Flutter (app) + Rust (engine and server)**, and the docs were rewritten to match, using LocalSend (`~/Documents/dev_projects/localsend`) as the model for repo layout, Flutter-Rust bridging and crash handling.
