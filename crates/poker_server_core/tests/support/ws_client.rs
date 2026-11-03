@@ -33,10 +33,11 @@ pub struct WsClient {
 
 /// Opens the TCP connection, sends the upgrade request and returns the stream with the status
 /// code and any bytes that followed the response headers.
-async fn handshake(addr: SocketAddr) -> (TcpStream, u16, Vec<u8>) {
+async fn handshake(addr: SocketAddr, origin: Option<&str>) -> (TcpStream, u16, Vec<u8>) {
     let mut stream = TcpStream::connect(addr).await.unwrap();
+    let origin = origin.map_or_else(String::new, |o| format!("Origin: {o}\r\n"));
     let request = format!(
-        "GET /v1/ws HTTP/1.1\r\nHost: {addr}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\
+        "GET /v1/ws HTTP/1.1\r\nHost: {addr}\r\n{origin}Upgrade: websocket\r\nConnection: Upgrade\r\n\
          Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
     );
     stream.write_all(request.as_bytes()).await.unwrap();
@@ -58,14 +59,19 @@ async fn handshake(addr: SocketAddr) -> (TcpStream, u16, Vec<u8>) {
 impl WsClient {
     /// Connects and expects `101 Switching Protocols`.
     pub async fn connect(addr: SocketAddr) -> WsClient {
-        let (stream, status, buf) = handshake(addr).await;
+        let (stream, status, buf) = handshake(addr, None).await;
         assert_eq!(status, 101, "expected an upgrade");
         WsClient { stream, buf }
     }
 
     /// Connects and returns the HTTP status instead of asserting it (for refusals).
     pub async fn try_connect(addr: SocketAddr) -> Result<WsClient, u16> {
-        let (stream, status, buf) = handshake(addr).await;
+        Self::try_connect_from(addr, None).await
+    }
+
+    /// Like [`WsClient::try_connect`], sending an `Origin` header like a browser page would.
+    pub async fn try_connect_from(addr: SocketAddr, origin: Option<&str>) -> Result<WsClient, u16> {
+        let (stream, status, buf) = handshake(addr, origin).await;
         if status == 101 {
             Ok(WsClient { stream, buf })
         } else {

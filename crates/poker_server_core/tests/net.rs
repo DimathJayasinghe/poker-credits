@@ -167,6 +167,42 @@ async fn room_lookups_are_rate_limited_per_ip() {
     server.stop().await;
 }
 
+#[tokio::test]
+async fn browser_pages_from_other_origins_cannot_open_a_socket() {
+    let limits = Limits {
+        allowed_origins: vec!["https://play.example.com".to_owned()],
+        ..Limits::default()
+    };
+    let server = boot_with(limits, None).await;
+    let addr = server.local_addr();
+    assert!(
+        WsClient::try_connect_from(addr, None).await.is_ok(),
+        "the native app sends no Origin"
+    );
+    assert!(
+        WsClient::try_connect_from(addr, Some(&format!("http://{addr}")))
+            .await
+            .is_ok(),
+        "same origin"
+    );
+    assert!(
+        WsClient::try_connect_from(addr, Some("https://play.example.com"))
+            .await
+            .is_ok(),
+        "listed"
+    );
+    for foreign in ["https://evil.example", "null", "http://127.0.0.1:1"] {
+        assert_eq!(
+            WsClient::try_connect_from(addr, Some(foreign)).await.err(),
+            Some(403),
+            "{foreign}"
+        );
+    }
+    let (status, _) = http_get(addr, "/health").await;
+    assert_eq!(status, 200, "plain HTTP endpoints are not affected");
+    server.stop().await;
+}
+
 // -------------------------------------------------------------------------------------------
 // Authentication and framing
 // -------------------------------------------------------------------------------------------

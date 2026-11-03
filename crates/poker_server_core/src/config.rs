@@ -55,6 +55,9 @@ pub struct Limits {
     pub crash_limit: usize,
     /// Window for counting room panics.
     pub crash_window: Duration,
+    /// Browser origins (`https://play.example.com`) allowed to open a socket besides the server's
+    /// own origin. Clients that send no `Origin` header (the native app) are always accepted.
+    pub allowed_origins: Vec<String>,
 }
 
 impl Default for Limits {
@@ -83,6 +86,7 @@ impl Default for Limits {
             room_ttl: Duration::from_hours(1),
             crash_limit: 3,
             crash_window: Duration::from_mins(1),
+            allowed_origins: Vec::new(),
         }
     }
 }

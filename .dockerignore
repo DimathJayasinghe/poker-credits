@@ -1,0 +1,17 @@
+target
+app
+docs
+.git
+.github
+.githooks
+graphify-out
+**/.dart_tool
+**/build
+packages/poker_protocol
+packages/poker_bridge/lib
+packages/poker_bridge/android
+packages/poker_bridge/ios
+packages/poker_bridge/macos
+packages/poker_bridge/linux
+packages/poker_bridge/windows
+packages/poker_bridge/cargokit

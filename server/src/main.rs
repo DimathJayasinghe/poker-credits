@@ -1,7 +1,8 @@
 //! Standalone cloud server.
 //!
 //! Environment: `POKER_BIND` (default `0.0.0.0:7878`), `POKER_DATA_DIR` (default `./data`),
-//! `POKER_SERVER_NAME` (default `Poker Credits`), `RUST_LOG` (default `info`).
+//! `POKER_SERVER_NAME` (default `Poker Credits`),
+//! `POKER_ALLOWED_ORIGINS` (comma-separated browser origins besides the server's own, default none), `RUST_LOG` (default `info`).
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -22,6 +23,7 @@ struct Settings {
     bind: SocketAddr,
     data_dir: PathBuf,
     server_name: String,
+    allowed_origins: Vec<String>,
 }
 
 impl Settings {
@@ -38,6 +40,14 @@ impl Settings {
             server_name: get("POKER_SERVER_NAME")
                 .filter(|name| !name.trim().is_empty())
                 .unwrap_or_else(|| DEFAULT_NAME.to_owned()),
+            allowed_origins: get("POKER_ALLOWED_ORIGINS")
+                .map(|list| {
+                    list.split(',')
+                        .map(|origin| origin.trim().to_owned())
+                        .filter(|origin| !origin.is_empty())
+                        .collect()
+                })
+                .unwrap_or_default(),
         })
     }
 }
@@ -82,7 +92,10 @@ async fn main() -> anyhow::Result<()> {
     let server = poker_server_core::start(ServerConfig {
         bind: settings.bind,
         data_dir: Some(settings.data_dir),
-        limits: Limits::default(),
+        limits: Limits {
+            allowed_origins: settings.allowed_origins,
+            ..Limits::default()
+        },
         timings: Timings::default(),
         mode: ServerMode::Cloud,
         server_name: settings.server_name,
@@ -114,6 +127,20 @@ mod tests {
             .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
             .collect();
         Settings::from_lookup(|key| map.get(key).cloned())
+    }
+
+    #[test]
+    fn allowed_origins_are_a_trimmed_comma_list() {
+        assert!(settings(&[]).unwrap().allowed_origins.is_empty());
+        let s = settings(&[(
+            "POKER_ALLOWED_ORIGINS",
+            " https://a.example , ,https://b.example ",
+        )])
+        .unwrap();
+        assert_eq!(
+            s.allowed_origins,
+            ["https://a.example", "https://b.example"]
+        );
     }
 
     #[test]

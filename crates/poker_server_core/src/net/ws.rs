@@ -12,13 +12,13 @@ use std::sync::Arc;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use tokio::sync::watch;
 use tokio::time::{Instant, sleep_until, timeout, timeout_at};
 
 use super::NetState;
-use super::guards::{ConnectionGuard, TokenBucket};
+use super::guards::{ConnectionGuard, TokenBucket, origin_allowed};
 use crate::protocol::{
     ClientMessage, ErrorCode, MAX_MESSAGE_BYTES, ParseError, ServerMessage, encode_server,
     parse_client,
@@ -31,8 +31,21 @@ use crate::room::state::RoomError;
 pub(crate) async fn upgrade(
     State(net): State<Arc<NetState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     ws: WebSocketUpgrade,
 ) -> Response {
+    let header_text = |name| headers.get(name).and_then(|value| value.to_str().ok());
+    let origin = headers
+        .get(header::ORIGIN)
+        .map(|value| value.to_str().unwrap_or("null"));
+    if !origin_allowed(
+        origin,
+        header_text(header::HOST),
+        &net.limits.allowed_origins,
+    ) {
+        tracing::warn!(peer = %addr.ip(), "websocket refused: foreign origin");
+        return StatusCode::FORBIDDEN.into_response();
+    }
     let Some(guard) = net.ip_limiter.try_acquire(addr.ip()) else {
         return StatusCode::TOO_MANY_REQUESTS.into_response();
     };

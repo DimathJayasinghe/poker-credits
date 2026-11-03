@@ -11,6 +11,34 @@ use tokio::time::Instant;
 
 type Counts = Arc<Mutex<HashMap<IpAddr, usize>>>;
 
+/// Whether a WebSocket upgrade with this `Origin` header may proceed.
+///
+/// Browsers always send `Origin`, and any web page can open a socket to a LAN address, so an
+/// origin is accepted only when it is the server's own (its host and port equal the `Host`
+/// header, which is how a web player served by the same server connects) or is listed in
+/// `allowed`. A request without `Origin` comes from a native client, not a page, and passes.
+/// The opaque origin `null` (sandboxed frames, `file:`) never passes.
+#[must_use]
+pub fn origin_allowed(origin: Option<&str>, host: Option<&str>, allowed: &[String]) -> bool {
+    let Some(origin) = origin else {
+        return true;
+    };
+    let origin = origin.trim().trim_end_matches('/');
+    if origin.eq_ignore_ascii_case("null") {
+        return false;
+    }
+    if allowed
+        .iter()
+        .any(|a| a.trim().trim_end_matches('/').eq_ignore_ascii_case(origin))
+    {
+        return true;
+    }
+    let authority = origin
+        .strip_prefix("http://")
+        .or_else(|| origin.strip_prefix("https://"));
+    matches!((authority, host), (Some(authority), Some(host)) if !authority.is_empty() && authority.eq_ignore_ascii_case(host.trim()))
+}
+
 /// The identity limits are counted against.
 ///
 /// One IPv6 customer normally owns a whole `/64` (billions of addresses), so counting single
@@ -408,5 +436,71 @@ mod tests {
         limiter.record_failure(IP);
         limiter.record_failure(IP);
         assert!(limiter.allowed(IP), "only two failures inside one window");
+    }
+}
+
+#[cfg(test)]
+mod origin_tests {
+    use super::origin_allowed;
+
+    fn check(origin: Option<&str>, host: Option<&str>, allowed: &[&str]) -> bool {
+        let allowed: Vec<String> = allowed.iter().map(|a| (*a).to_owned()).collect();
+        origin_allowed(origin, host, &allowed)
+    }
+
+    #[test]
+    fn native_clients_send_no_origin() {
+        assert!(check(None, Some("192.168.1.5:7878"), &[]));
+    }
+
+    #[test]
+    fn same_origin_passes_for_http_and_https() {
+        assert!(check(
+            Some("http://192.168.1.5:7878"),
+            Some("192.168.1.5:7878"),
+            &[]
+        ));
+        assert!(check(
+            Some("https://Play.Example.com"),
+            Some("play.example.com"),
+            &[]
+        ));
+    }
+
+    #[test]
+    fn foreign_pages_are_refused() {
+        assert!(!check(
+            Some("https://evil.example"),
+            Some("192.168.1.5:7878"),
+            &[]
+        ));
+        assert!(!check(
+            Some("http://192.168.1.5:9999"),
+            Some("192.168.1.5:7878"),
+            &[]
+        ));
+        assert!(!check(
+            Some("http://192.168.1.5"),
+            Some("192.168.1.5:7878"),
+            &[]
+        ));
+        assert!(!check(Some("null"), Some("null"), &[]));
+        assert!(!check(Some("file://"), Some(""), &[]));
+        assert!(!check(Some("http://"), Some(""), &[]));
+        assert!(!check(Some("https://evil.example"), None, &[]));
+    }
+
+    #[test]
+    fn listed_origins_pass() {
+        assert!(check(
+            Some("https://play.example.com/"),
+            Some("10.0.0.2:7878"),
+            &["https://play.example.com"]
+        ));
+        assert!(!check(
+            Some("https://other.example.com"),
+            Some("10.0.0.2:7878"),
+            &["https://play.example.com"]
+        ));
     }
 }
