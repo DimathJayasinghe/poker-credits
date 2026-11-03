@@ -14,10 +14,14 @@ type Counts = Arc<Mutex<HashMap<IpAddr, usize>>>;
 /// Whether a WebSocket upgrade with this `Origin` header may proceed.
 ///
 /// Browsers always send `Origin`, and any web page can open a socket to a LAN address, so an
-/// origin is accepted only when it is the server's own (its host and port equal the `Host`
-/// header, which is how a web player served by the same server connects) or is listed in
-/// `allowed`. A request without `Origin` comes from a native client, not a page, and passes.
-/// The opaque origin `null` (sandboxed frames, `file:`) never passes.
+/// origin is accepted only when it is listed in `allowed` or is "the server's own": equal to the
+/// `Host` header **and** that host is an IP address or `localhost`. The second condition matters
+/// because `Host` is chosen by whoever opened the page: under DNS rebinding a hostile site
+/// `evil.example` resolves to the server's LAN address and sends `Origin: http://evil.example`
+/// with `Host: evil.example`, which would otherwise look same-origin. A page loaded from an IP
+/// literal cannot be rebound. A server reached by name (a cloud web player) must list its public
+/// origin in `allowed`. A request without `Origin` comes from a native client, not a page, and
+/// passes. The opaque origin `null` (sandboxed frames, `file:`) never passes.
 #[must_use]
 pub fn origin_allowed(origin: Option<&str>, host: Option<&str>, allowed: &[String]) -> bool {
     let Some(origin) = origin else {
@@ -36,7 +40,26 @@ pub fn origin_allowed(origin: Option<&str>, host: Option<&str>, allowed: &[Strin
     let authority = origin
         .strip_prefix("http://")
         .or_else(|| origin.strip_prefix("https://"));
-    matches!((authority, host), (Some(authority), Some(host)) if !authority.is_empty() && authority.eq_ignore_ascii_case(host.trim()))
+    match (authority, host) {
+        (Some(authority), Some(host)) => {
+            !authority.is_empty()
+                && authority.eq_ignore_ascii_case(host.trim())
+                && is_address_host(authority)
+        }
+        _ => false,
+    }
+}
+
+/// Whether the host part of `authority` (`host` or `host:port`) is an IP literal or `localhost`.
+fn is_address_host(authority: &str) -> bool {
+    let host = if let Some(rest) = authority.strip_prefix('[') {
+        rest.split(']').next().unwrap_or_default()
+    } else if authority.matches(':').count() > 1 {
+        authority
+    } else {
+        authority.split(':').next().unwrap_or_default()
+    };
+    host.eq_ignore_ascii_case("localhost") || host.parse::<IpAddr>().is_ok()
 }
 
 /// The identity limits are counted against.
@@ -454,16 +477,38 @@ mod origin_tests {
     }
 
     #[test]
-    fn same_origin_passes_for_http_and_https() {
+    fn same_origin_passes_for_ip_literals_and_localhost() {
         assert!(check(
             Some("http://192.168.1.5:7878"),
             Some("192.168.1.5:7878"),
             &[]
         ));
         assert!(check(
-            Some("https://Play.Example.com"),
+            Some("http://localhost:7878"),
+            Some("localhost:7878"),
+            &[]
+        ));
+        assert!(check(Some("http://[::1]:7878"), Some("[::1]:7878"), &[]));
+        assert!(check(Some("http://[fe80::1]"), Some("[fe80::1]"), &[]));
+    }
+
+    #[test]
+    fn a_named_host_is_not_trusted_just_because_origin_equals_host() {
+        // DNS rebinding: the attacker's name resolves to the server, so Origin and Host agree.
+        assert!(!check(
+            Some("http://evil.example:7878"),
+            Some("evil.example:7878"),
+            &[]
+        ));
+        assert!(!check(
+            Some("https://play.example.com"),
             Some("play.example.com"),
             &[]
+        ));
+        assert!(check(
+            Some("https://play.example.com"),
+            Some("play.example.com"),
+            &["https://play.example.com"]
         ));
     }
 
