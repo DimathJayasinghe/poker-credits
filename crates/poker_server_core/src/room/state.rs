@@ -420,15 +420,23 @@ impl RoomState {
         Ok(state)
     }
 
-    /// Allocates the next player or spectator id.
-    pub fn allocate_id(&mut self, spectator: bool) -> String {
-        let id = format!(
+    /// The id the next joiner would get. Does not reserve it: `Op::Join` advances the counter,
+    /// so replaying the journal ends with the same counter.
+    #[must_use]
+    pub fn peek_id(&self, spectator: bool) -> String {
+        format!(
             "{}_{}",
             if spectator { "s" } else { "p" },
             self.next_player_no
-        );
-        self.next_player_no = self.next_player_no.saturating_add(1);
-        id
+        )
+    }
+
+    /// Moves the id counter past `id` (called when a join is applied).
+    pub(super) fn reserve_id(&mut self, id: &str) {
+        let number = id.split_once('_').and_then(|(_, n)| n.parse::<u32>().ok());
+        if let Some(number) = number {
+            self.next_player_no = self.next_player_no.max(number.saturating_add(1));
+        }
     }
 
     /// Whether this id belongs to a seated participant (host or player).
@@ -466,7 +474,7 @@ impl RoomState {
         let away = if self.presence.is_none() {
             self.players
                 .values()
-                .filter(|p| p.seat.is_some())
+                .filter(|p| p.seat.is_some() && p.id != self.host_id)
                 .filter_map(|p| p.sat_out_since_ms)
                 .map(|since| since.saturating_add(timings.away_after_ms))
                 .min()

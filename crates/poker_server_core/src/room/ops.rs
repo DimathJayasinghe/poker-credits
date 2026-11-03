@@ -437,6 +437,7 @@ impl RoomState {
         } else {
             self.seat_player(id, &name, Role::Player, seat, token_hash)?;
         }
+        self.reserve_id(id);
         out.changed = true;
         Ok(())
     }
@@ -609,7 +610,7 @@ impl RoomState {
         Ok(())
     }
 
-    fn op_approve_rebuy(&mut self, id: &str, amount: u64, _out: &mut Outcome) -> Done {
+    fn op_approve_rebuy(&mut self, id: &str, amount: u64, out: &mut Outcome) -> Done {
         self.require_seated(id)?;
         if amount == 0 || amount > MAX_CHIPS {
             return Err(RoomError::new(
@@ -623,6 +624,7 @@ impl RoomState {
             amount,
             approved: true,
         });
+        out.changed = true;
         Ok(())
     }
 

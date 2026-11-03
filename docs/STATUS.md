@@ -31,7 +31,11 @@ Deviations from the guide's file list: there is no separate `AdminCommand`; all 
 ## Phase 2 status (server core), in progress on `feature/server-core`
 Done and committed: `protocol.rs` + golden fixtures, `config.rs` (Limits, Timings), `util/` (room code, token hash, panic hook), `room/state.rs` + `room/ops.rs` (pure `RoomState::apply` reducer: join, act, timeout, host commands, rebuy, presence check, removals), `room/view.rs`, `store/` (atomic `snapshot.json`, fsynced `journal.jsonl` with poisoned-entry marks, `store::restore`). Tests: `tests/reducer.rs` (20), `tests/store.rs` (7: replay equals live, cut-off last line ignored, mid-file corruption detected, snapshot/journal overlap). Verified: fmt, clippy `-D warnings`, `cargo test --workspace`.
 
-Still to do: `room/actor.rs` (journal first, apply to a clone, swap in, then broadcast; snapshot at end of hand/config/rebuy then `Journal::truncate`), `handle.rs`, `session.rs`, `supervisor.rs` (3 panics in 60 s freezes the room, mark the journal entry poisoned), `net/{ws,http,guards}.rs`, `start()`/`ServerHandle`, `server/` binary, integration tests (`hand_flow`, `resume`, `races`, `panic_recovery`, `slow_consumer`, `rate_limit`).
+Also done: `room/actor.rs` + `room/handle.rs` (one task per room; every change is applied to a clone, journaled, then swapped in and broadcast; snapshot plus journal truncate at hand end, config change and rebuy; turn timeout and presence ticks from a paused-time-friendly `Clock`; room TTL; slow consumers dropped by `try_send`; `create()` and `restore()`). `tests/actor.rs` (10 tests over plain channels). The reducer id counter now advances inside `Op::Join` so replay reproduces ids.
+
+Still to do: `supervisor.rs` (catch actor panic, restore from disk, 3 panics in 60 s freezes the room with `ROOM_CRASHED`, reattach live connections), a room registry (`CREATE_ROOM`, lookup by code, room limit), the 30 s turn grace on disconnect (Resilience 3.6; not implemented yet), `net/{ws,http,guards}.rs`, `start()`/`ServerHandle`, `server/` binary, integration tests (`resume`, `races`, `panic_recovery`, `slow_consumer`, `rate_limit` over real sockets).
+
+`main` was fast-forwarded locally (not pushed) to the store commit `056923d` on 2026-11-03; the actor work is on `feature/server-core` only.
 
 ## Next step
 1. Owner reviews Phase 0 (`chore/bootstrap`) and Phase 1 (`feature/engine-core`, which contains Phase 0) and merges to `main`.
