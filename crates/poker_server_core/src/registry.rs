@@ -11,7 +11,7 @@ use tokio::sync::watch;
 use crate::config::{Limits, Timings};
 use crate::protocol::{ErrorCode, RoomConfig, ServerMessage};
 use crate::room::actor::{self, Clock, NewRoom};
-use crate::room::handle::{ConnSender, Outbound, RoomHandle, RoomStatus};
+use crate::room::handle::{ConnSender, Outbound, RoomHandle, RoomInfo, RoomStatus};
 use crate::room::session::Session;
 use crate::room::state::RoomError;
 use crate::store;
@@ -33,6 +33,14 @@ struct Inner {
 #[derive(Clone)]
 pub struct Registry {
     inner: Arc<Inner>,
+}
+
+impl std::fmt::Debug for Registry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Registry")
+            .field("rooms", &self.room_count())
+            .finish_non_exhaustive()
+    }
 }
 
 fn internal(text: &str) -> RoomError {
@@ -94,6 +102,12 @@ impl Registry {
     #[must_use]
     pub fn contains(&self, code: &str) -> bool {
         room_code::normalize(code).is_some_and(|code| self.rooms().contains_key(&code))
+    }
+
+    /// Public facts about a room, or `None` if it is unknown, frozen or just stopped.
+    pub async fn room_info(&self, code: &str) -> Option<RoomInfo> {
+        let (handle, _) = self.lookup(code).ok()?;
+        handle.info().await.ok()
     }
 
     /// The configured limits.

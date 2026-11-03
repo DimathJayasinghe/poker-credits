@@ -30,6 +30,8 @@ pub struct Limits {
     pub rate_burst: u32,
     /// Strikes before a rate-limited connection is closed.
     pub rate_strikes: u32,
+    /// Give up writing a frame to a socket after this long (a stuck TCP peer).
+    pub write_timeout: Duration,
     /// Close a socket that has not sent `CREATE_ROOM`, `JOIN_ROOM` or `RESUME` by then.
     pub auth_timeout: Duration,
     /// Sustained HTTP requests per second per IP (room lookups are guessable, so limited).
@@ -58,6 +60,7 @@ impl Default for Limits {
             rate_per_second: 10,
             rate_burst: 20,
             rate_strikes: 3,
+            write_timeout: Duration::from_secs(10),
             auth_timeout: Duration::from_secs(10),
             http_rate_per_second: 2,
             http_burst: 10,

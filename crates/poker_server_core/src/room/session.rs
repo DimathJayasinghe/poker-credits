@@ -86,15 +86,18 @@ impl Session {
         }
     }
 
-    /// Waits for the room to change under this connection (restart, freeze, end) and reacts:
-    /// re-attaches after a restart (sending `ROOM_RECOVERED` first, then the room sends a fresh
-    /// `SNAPSHOT`), or sends `ROOM_CRASHED` when frozen. Returns `false` once the room is gone
-    /// for good, so the caller can close the socket. Call it in a loop from `select!`.
-    pub async fn changed(&mut self) -> bool {
-        if self.status.changed().await.is_err() {
-            return false;
-        }
-        let status = self.status.borrow_and_update().clone();
+    /// Waits until the room's status changes (restart, freeze, end). Cancel-safe. `false` when
+    /// the registry itself is gone. Pair with [`Session::follow_change`], run outside any
+    /// `select!` future so that it always finishes.
+    pub async fn wait_change(&mut self) -> bool {
+        self.status.changed().await.is_ok()
+    }
+
+    /// Reacts to the current status: re-attaches after a restart (`ROOM_RECOVERED`, then the
+    /// room sends a fresh `SNAPSHOT`), sends `ROOM_CRASHED` when frozen. Returns `false` once
+    /// the room is gone for good, so the caller can close the socket.
+    pub async fn follow_change(&mut self) -> bool {
+        let status = self.status.borrow().clone();
         match status {
             RoomStatus::Running(handle) => {
                 self.notify(ServerMessage::RoomRecovered {
@@ -124,10 +127,22 @@ impl Session {
         }
     }
 
+    /// [`wait_change`](Session::wait_change) then [`follow_change`](Session::follow_change).
+    pub async fn changed(&mut self) -> bool {
+        self.wait_change().await && self.follow_change().await
+    }
+
     fn notify(&self, message: ServerMessage) {
         let _queued = self.tx.try_send(Outbound {
             req_id: None,
             message,
         });
+    }
+}
+
+impl Drop for Session {
+    /// A dropped session (task ended, panicked or was cancelled) always tells the room.
+    fn drop(&mut self) {
+        self.detach();
     }
 }

@@ -35,7 +35,21 @@ Also done: `room/actor.rs` + `room/handle.rs` (one task per room; every change i
 
 Also done: `supervisor.rs` (awaits each room task; on panic rebuilds from snapshot plus journal, marks a journal entry poisoned if replay itself panics, freezes the room at 3 panics within 60 s or when there is no data folder), `registry.rs` (`create_room`, `join_room`, `resume_room`, `restore_all`, `shutdown`, `max_rooms`, unique codes), `room/session.rs` (a connection's link that re-attaches to the restarted room: `ROOM_RECOVERED` then `SNAPSHOT`, or `ROOM_CRASHED` when frozen), `ConnSender`/`ConnReceiver` (the actor can close a connection even though the socket task keeps a sender for re-attach). Panic tests use the `test-hooks` cargo feature (enabled only through the crate's own dev-dependency; verified absent from the `poker_server` feature tree). `tests/supervision.rs` (9 tests).
 
-Still to do: the 30 s turn grace on disconnect (Resilience 3.6; not implemented yet), `net/{ws,http,guards}.rs`, `start()`/`ServerHandle`, `server/` binary, socket-level integration tests (`resume`, `races`, `slow_consumer`, `rate_limit`). Not tested: a replay panic that gets poisoned (no way to make the reducer panic on demand).
+Also done (Phase 2 complete, pending owner review):
+- **Disconnect rules** (`room/absence.rs`, journaled as `Op::DisconnectTimeout` / `Op::SetSittingOut`): a player on turn with no connection is checked or folded for after 30 s (counted from the later of the disconnect and the turn start); a seat with no connection for 10 minutes is sat out. After a server restart everybody counts as disconnected until they resume.
+- **One live connection per participant**: a newer one gets the seat, the older one receives `SUPERSEDED` and is closed, with no disconnect notice.
+- **Network layer** (`net/`): `GET /v1/ws`, `/health`, `/v1/info`, `/v1/room/{code}` (rate limited per IP). First message must be `CREATE_ROOM`, `JOIN_ROOM` or `RESUME` within 10 s (`PING` is allowed); fixable join errors keep the socket open. 16 KiB frames, idle timeout reset only by inbound frames, token bucket with 3 strikes, per-IP connection cap with a drop guard, write timeout, and a `Session` drop guard that always tells the room.
+- **`start()` / `ServerHandle` / `ServerEvent`** in `lib.rs`, `event.rs`; `server/` binary reads `POKER_BIND` (default `0.0.0.0:7878`), `POKER_DATA_DIR` (default `./data`), `POKER_SERVER_NAME`, `RUST_LOG`; stops cleanly on Ctrl-C or SIGTERM.
+- **Tests:** `tests/net.rs` (20, real sockets with a hand-written minimal WebSocket client in `tests/support/ws_client.rs`, so no new dependency): HTTP endpoints, framing, auth, idle and auth timeouts, rate limit, per-IP cap, a hand with duplicate action, concurrent joins (never more than 10 seats, one winner per seat), resume, wrong tokens, superseding, kick, server restart, crash recovery under connected sockets. Verified: fmt, clippy `-D warnings`, `cargo test --workspace`, binary smoke run with curl and SIGTERM.
+
+Deviations from the guide, for review:
+- `ServerConfig.data_dir` is `Option<PathBuf>` (tests run in memory) and `events` is an optional bounded sender; `ServerEvent` is minimal (`Listening`, `RoomsRestored`, `Stopped`).
+- No `SeatReservationGuard`: a join is one atomic step inside the room actor, so nothing is reserved across an `.await`. A join whose connection dies before `JOINED` is delivered leaves a seated, disconnected player; the grace, 10 minute and presence rules clean that up.
+- Behind a reverse proxy every client appears as the proxy's IP (per-IP caps would hit all players together). A `trust_proxy` option reading `X-Forwarded-For` is not implemented; decide before deploying behind one.
+- Not tested over real sockets: a slow reader filling the outbound queue (needs megabytes of unread data). The policy itself (queue full means the room drops the connection) is tested at actor level in `tests/actor.rs`, and a room-side close ending the socket is tested through the kick test.
+- Not tested: a journal replay that panics (poisoning path).
+
+Still to do: Phase 3 (protocol package and bridge), plus open owner questions below. Update `docs/API_AND_EVENTS.md` section 6 error list if the exhaustive `PokerError` mapping gained codes (check against `protocol.rs`).
 
 `main` was fast-forwarded locally (not pushed) to the store commit `056923d` on 2026-11-03; the actor work is on `feature/server-core` only.
 
