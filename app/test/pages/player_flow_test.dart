@@ -490,6 +490,9 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(harness.network.uris.last.toString(), 'ws://192.168.1.23:7878/v1/ws');
     expect(harness.network.opened.length, greaterThan(opened));
+    expect(find.byType(PlayerPage), findsOneWidget, reason: 'the table stays on screen while the new address connects');
+    expect(find.text('940'), findsOneWidget, reason: 'with the last known chips, not a blank screen');
+    expect(find.text('RECONNECTING'), findsWidgets);
     expect(harness.network.last.sent.single, isA<Resume>());
     expect((await tokens.read())!.serverUri, 'ws://192.168.1.23:7878/v1/ws');
     await _close(tester);

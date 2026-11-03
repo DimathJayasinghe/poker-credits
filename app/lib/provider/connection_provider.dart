@@ -86,13 +86,22 @@ class SessionNotifier extends Notifier<SessionState> {
   SessionState init() => const SessionState();
 
   /// Connects to [uri] and sends [first] (`RESUME` to re-attach, `JOIN_ROOM` to join).
-  /// [playerId] is known when re-attaching from a stored session.
-  void attach({required Uri uri, required ClientMessage first, required bool host, String? playerId}) {
+  /// [playerId] is known when re-attaching from a stored session. [keepRoom] keeps showing the
+  /// last room view while the new connection comes up (the host moved to another address): the
+  /// next `SNAPSHOT` replaces it, so nothing stale survives.
+  void attach({required Uri uri, required ClientMessage first, required bool host, String? playerId, bool keepRoom = false}) {
     unawaited(_detach());
     final client = ref.read(roomClientFactoryProvider)(uri, first);
     _client = client;
     _established = first is Resume;
-    state = SessionState(serverUri: uri.toString(), isHost: host, playerId: playerId);
+    final previous = state;
+    state = SessionState(
+      room: keepRoom ? previous.room : const RoomState(),
+      serverUri: uri.toString(),
+      isHost: host,
+      playerId: playerId,
+      role: keepRoom ? previous.role : null,
+    );
     _subscriptions
       ..add(client.states.listen(_onLink))
       ..add(client.messages.listen(_onMessage))
@@ -191,6 +200,7 @@ class SessionNotifier extends Notifier<SessionState> {
       first: Resume(roomCode: stored.roomCode, sessionToken: stored.sessionToken),
       host: false,
       playerId: stored.playerId,
+      keepRoom: true,
     );
   }
 
