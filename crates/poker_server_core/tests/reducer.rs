@@ -541,3 +541,55 @@ fn end_game_closes_the_room_to_new_joins() {
         ErrorCode::RoomNotFound
     );
 }
+
+#[test]
+fn rc005_a_top_up_during_a_hand_applies_to_the_following_hand() {
+    let (mut room, _) = table_of_three();
+    let t = Timings::default();
+    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    room.apply(
+        Op::RequestRebuy {
+            player_id: "p_2".into(),
+            amount: 500,
+            at_ms: 1001,
+        },
+        &t,
+    )
+    .unwrap();
+    room.apply(
+        host(
+            HostCommand::ApproveRebuy {
+                player_id: "p_2".into(),
+                amount: 500,
+            },
+            1002,
+        ),
+        &t,
+    )
+    .unwrap();
+    // Mid-hand: approved but not applied, and the table total is untouched.
+    assert_eq!(total_chips(&room), 3000);
+    assert_eq!(room.pending_rebuys.len(), 1);
+    assert!(room.pending_rebuys[0].approved);
+
+    // Everyone folds to the last player: the hand ends and the top-up lands before the next one.
+    let mut at = 1100;
+    while room.game.legal_actions().is_some() {
+        act(&mut room, PlayerAction::Fold, at).unwrap();
+        at += 10;
+    }
+    assert!(
+        room.pending_rebuys.is_empty(),
+        "applied once the hand was over"
+    );
+    assert_eq!(total_chips(&room), 3500);
+    let stack = room
+        .game
+        .table
+        .seat_of(&poker_engine::PlayerId::new("p_2"))
+        .unwrap();
+    assert!(
+        stack.chips.get() >= 500,
+        "p_2 got the 500 on top of what the hand left them"
+    );
+}

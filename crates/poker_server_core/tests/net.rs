@@ -617,3 +617,135 @@ async fn a_crashed_room_recovers_under_connected_players() {
     assert_eq!(update["view"]["handNumber"], 1);
     server.stop().await;
 }
+
+// -------------------------------------------------------------------------------------------
+// Abuse
+// -------------------------------------------------------------------------------------------
+
+#[tokio::test]
+async fn scanning_for_rooms_is_stopped_across_reconnects() {
+    let limits = Limits {
+        join_failures: 4,
+        ..Limits::default()
+    };
+    let server = boot_with(limits, None).await;
+    let addr = server.local_addr();
+    let host = create(addr).await;
+    // Every probe uses a brand new socket, so no per-connection budget can help.
+    for n in 0..4 {
+        let mut probe = WsClient::connect(addr).await;
+        probe
+            .send(json!({"v": 1, "type": "JOIN_ROOM", "roomCode": format!("AAA{n}"), "name": "X", "spectator": false}))
+            .await;
+        assert_eq!(error_code(&probe.recv().await.unwrap()), "ROOM_NOT_FOUND");
+    }
+    // The address is now blocked, even for a real room and for resumes.
+    for message in [
+        json!({"v": 1, "type": "JOIN_ROOM", "roomCode": host.code, "name": "Real", "spectator": false}),
+        json!({"v": 1, "type": "RESUME", "roomCode": host.code, "sessionToken": "x"}),
+    ] {
+        let mut blocked = WsClient::connect(addr).await;
+        blocked.send(message).await;
+        assert_eq!(error_code(&blocked.recv().await.unwrap()), "RATE_LIMITED");
+        assert!(blocked.closed().await);
+    }
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn successful_joins_do_not_count_against_the_failure_budget() {
+    let limits = Limits {
+        join_failures: 3,
+        ..Limits::default()
+    };
+    let server = boot_with(limits, None).await;
+    let addr = server.local_addr();
+    let host = create(addr).await;
+    let mut seats = Vec::new();
+    for n in 0..6 {
+        seats.push(join_as(addr, &host.code, &format!("Guest{n}"), None).await);
+    }
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn room_creation_is_limited_per_ip() {
+    let limits = Limits {
+        create_per_minute: 1,
+        create_burst: 2,
+        ..Limits::default()
+    };
+    let server = boot_with(limits, None).await;
+    let addr = server.local_addr();
+    let _a = create(addr).await;
+    let _b = create(addr).await;
+    let mut third = WsClient::connect(addr).await;
+    third
+        .send(json!({"v": 1, "type": "CREATE_ROOM", "hostName": "Host", "config": config_json()}))
+        .await;
+    assert_eq!(error_code(&third.recv().await.unwrap()), "RATE_LIMITED");
+    assert!(third.closed().await);
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn garbage_costs_as_much_as_requests() {
+    let limits = Limits {
+        rate_per_second: 1,
+        rate_burst: 3,
+        rate_strikes: 3,
+        ..Limits::default()
+    };
+    let server = boot_with(limits, None).await;
+    let mut ws = WsClient::connect(server.local_addr()).await;
+    for _ in 0..30 {
+        ws.send_text("{garbage").await;
+    }
+    let mut replies = 0;
+    while ws.recv().await.is_some() {
+        replies += 1;
+    }
+    // Three free frames get a BAD_REQUEST, then three strikes, then the socket closes.
+    assert!(replies <= 3 + 3, "the server answered {replies} frames");
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn garbage_does_not_keep_an_idle_connection_alive() {
+    let limits = Limits {
+        idle_timeout: Duration::from_millis(400),
+        ..Limits::default()
+    };
+    let server = boot_with(limits, None).await;
+    let mut host = create(server.local_addr()).await;
+    for _ in 0..8 {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        host.ws.send_text("{garbage").await;
+    }
+    assert!(host.ws.closed().await);
+    server.stop().await;
+}
+
+// -------------------------------------------------------------------------------------------
+// The last word
+// -------------------------------------------------------------------------------------------
+
+#[tokio::test]
+async fn everyone_hears_room_expired_before_the_socket_closes() {
+    let limits = Limits {
+        create_per_minute: 600,
+        create_burst: 100,
+        ..Limits::default()
+    };
+    let server = boot_with(limits, None).await;
+    let addr = server.local_addr();
+    // The order in which the room's last message and its end are noticed varies, so repeat.
+    for _ in 0..30 {
+        let mut host = create(addr).await;
+        let mut bob = join_as(addr, &host.code, "Bob", None).await;
+        host.ws.send(json!({"v": 1, "type": "END_GAME"})).await;
+        host.ws.expect("ROOM_EXPIRED").await;
+        bob.ws.expect("ROOM_EXPIRED").await;
+    }
+    server.stop().await;
+}

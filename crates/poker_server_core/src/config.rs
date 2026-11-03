@@ -38,6 +38,17 @@ pub struct Limits {
     pub http_rate_per_second: u32,
     /// HTTP burst size per IP.
     pub http_burst: u32,
+    /// Failed `JOIN_ROOM` / `RESUME` attempts per IP within [`Limits::join_failure_window`]
+    /// before the address is blocked for [`Limits::join_block`].
+    pub join_failures: u32,
+    /// Window for counting failed joins.
+    pub join_failure_window: Duration,
+    /// How long an address stays blocked after too many failed joins.
+    pub join_block: Duration,
+    /// `CREATE_ROOM` per minute per IP.
+    pub create_per_minute: u32,
+    /// `CREATE_ROOM` burst per IP.
+    pub create_burst: u32,
     /// Delete a room after this long without activity.
     pub room_ttl: Duration,
     /// A room that panics this many times within [`Limits::crash_window`] is frozen.
@@ -64,6 +75,11 @@ impl Default for Limits {
             auth_timeout: Duration::from_secs(10),
             http_rate_per_second: 2,
             http_burst: 10,
+            join_failures: 20,
+            join_failure_window: Duration::from_mins(1),
+            join_block: Duration::from_mins(15),
+            create_per_minute: 6,
+            create_burst: 3,
             room_ttl: Duration::from_hours(1),
             crash_limit: 3,
             crash_window: Duration::from_mins(1),

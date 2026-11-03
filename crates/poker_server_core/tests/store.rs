@@ -160,3 +160,28 @@ fn missing_snapshot_is_an_error() {
         Err(StoreError::Io(_))
     ));
 }
+
+#[test]
+fn a_poisoned_sequence_number_is_never_handed_out_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut live = room();
+    snapshot::write(dir.path(), &live, 0).unwrap();
+    let mut journal = Journal::open(dir.path(), 0).unwrap();
+    run(&mut live, &mut journal, join("p_2", "Bob"));
+    // The last entry is the poisoned one: this used to lose its number.
+    let bad = journal.append(&join("p_3", "Cy")).unwrap();
+    journal.mark_poisoned(bad).unwrap();
+    drop(journal);
+
+    let restored = store::restore(dir.path(), &Timings::default()).unwrap();
+    assert_eq!(restored.last_seq, bad, "the poisoned number counts as used");
+    let mut journal = Journal::open(dir.path(), restored.last_seq).unwrap();
+    let mut state = restored.state;
+    let fresh = run(&mut state, &mut journal, join("p_3", "Dee"));
+    assert!(fresh > bad);
+
+    let again = store::restore(dir.path(), &Timings::default()).unwrap();
+    assert_eq!(again.state, state, "the new op survives the next replay");
+    assert!(again.state.players.contains_key("p_3"));
+    assert_eq!(again.state.players["p_3"].name, "Dee");
+}

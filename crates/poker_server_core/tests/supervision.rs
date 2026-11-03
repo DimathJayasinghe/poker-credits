@@ -325,3 +325,44 @@ async fn a_closed_sender_ends_the_receiver_after_the_queue_is_read() {
     assert_eq!(rx.recv().await, Some(msg));
     assert_eq!(rx.recv().await, None);
 }
+
+#[tokio::test(start_paused = true)]
+async fn rc008_a_crash_in_one_room_leaves_the_other_room_playing() {
+    let dir = tempfile::tempdir().unwrap();
+    let reg = registry(Some(dir.path().to_path_buf()));
+    let (mut doomed_host, doomed) = host(&reg).await;
+    let (mut other_host, other) = host(&reg).await;
+    let mut other_bob = guest(&reg, &other, "Bob").await;
+    other_host.drain().await;
+    other_bob.drain().await;
+
+    crash(&reg, &doomed).await;
+
+    // The healthy room never noticed: it deals a hand while the other one is being rebuilt.
+    other_host
+        .session
+        .send(None, ClientMessage::StartHand)
+        .await
+        .unwrap();
+    let got = other_host.drain().await;
+    assert!(
+        got.iter().any(|m| matches!(
+            m,
+            ServerMessage::StateUpdate { view, .. }
+                if view.phase == poker_server_core::protocol::WirePhase::PreFlop
+        )),
+        "{got:?}"
+    );
+    assert!(
+        !got.iter()
+            .any(|m| matches!(m, ServerMessage::RoomRecovered { .. }))
+    );
+    // The crashed one is back too.
+    assert!(doomed_host.session.changed().await);
+    let back = doomed_host.drain().await;
+    assert!(
+        back.iter()
+            .any(|m| matches!(m, ServerMessage::RoomRecovered { .. })),
+        "{back:?}"
+    );
+}

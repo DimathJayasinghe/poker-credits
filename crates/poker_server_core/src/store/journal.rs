@@ -45,6 +45,10 @@ pub struct Entries {
     pub ops: Vec<Entry>,
     /// How many were removed as poisoned.
     pub skipped_poisoned: u32,
+    /// Highest sequence number on any line, poisoned ones included. New entries must continue
+    /// after this, or a poisoned number would be handed out again and its new op skipped on the
+    /// next replay.
+    pub max_seq: u64,
 }
 
 /// An open journal for appending.
@@ -151,11 +155,18 @@ pub fn read(dir: &Path) -> Result<Entries, StoreError> {
             }
         }
     }
+    let max_seq = ops
+        .iter()
+        .map(|e| e.seq)
+        .chain(poisoned.iter().copied())
+        .max()
+        .unwrap_or(0);
     let before = ops.len();
     ops.retain(|e| !poisoned.contains(&e.seq));
     let skipped_poisoned = u32::try_from(before - ops.len()).unwrap_or(u32::MAX);
     Ok(Entries {
         ops,
         skipped_poisoned,
+        max_seq,
     })
 }

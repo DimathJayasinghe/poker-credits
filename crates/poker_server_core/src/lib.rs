@@ -37,7 +37,7 @@ use config::{Limits, Timings};
 use event::ServerEvent;
 use net::NetState;
 pub use net::ServerMode;
-use net::guards::{IpLimiter, KeyedRateLimiter};
+use net::guards::{FailureLimiter, IpLimiter, KeyedRateLimiter};
 use registry::Registry;
 use room::actor::Clock;
 
@@ -156,8 +156,17 @@ pub async fn start(config: ServerConfig) -> Result<ServerHandle, StartError> {
         registry: registry.clone(),
         ip_limiter: IpLimiter::new(config.limits.max_connections_per_ip),
         http_limiter: KeyedRateLimiter::new(
-            config.limits.http_rate_per_second,
+            config.limits.http_rate_per_second.saturating_mul(60),
             config.limits.http_burst,
+        ),
+        join_failures: FailureLimiter::new(
+            config.limits.join_failures,
+            config.limits.join_failure_window,
+            config.limits.join_block,
+        ),
+        create_limiter: KeyedRateLimiter::new(
+            config.limits.create_per_minute,
+            config.limits.create_burst,
         ),
         limits: config.limits,
         mode: config.mode,

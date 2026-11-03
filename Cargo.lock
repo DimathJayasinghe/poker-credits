@@ -601,6 +601,7 @@ dependencies = [
  "getrandom 0.4.3",
  "poker_engine",
  "poker_server_core",
+ "proptest",
  "serde",
  "serde_json",
  "sha2",

@@ -231,7 +231,8 @@ flowchart LR
 
 ### 6.6. Room Code Guessing
 Room codes have 32^4 (about 1.05 million) values. In cloud mode:
-* `GET /v1/room/{code}` and failed `JOIN_ROOM` attempts are rate limited per IP (default 20 per minute, then 15 minute block).
+* `GET /v1/room/{code}` is rate limited per IP (2 per second, burst 10). Failed `JOIN_ROOM` and `RESUME` attempts are counted per IP across connections (default 20 per minute, then a 15 minute block), so reconnecting does not reset the budget. `CREATE_ROOM` is limited to 6 per minute per IP so one client cannot fill `max_rooms`. Implemented in `net/guards.rs` and `net/ws.rs`.
+* Known limit: behind a reverse proxy all clients share the proxy's address, so these per-IP limits then apply to everybody at once. Reading `X-Forwarded-For` behind a trusted proxy is not implemented; decide before deploying the cloud binary behind one. Attackers with many addresses can still probe slowly; 4 characters is the real limit (see the open owner question about longer codes).
 * Joining still requires the host to seat the player or the room to have open seats; the host can enable "approve joins" (Phase 5 option).
 * Idle rooms expire after 60 minutes.
 In host (LAN) mode the QR payload already carries IP and code; the typed fallback needs both.

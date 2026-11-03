@@ -81,6 +81,11 @@ impl From<mpsc::Sender<Outbound>> for ConnSender {
 }
 
 impl ConnReceiver {
+    /// A message that is already queued, without waiting.
+    pub fn try_recv(&mut self) -> Option<Outbound> {
+        self.rx.try_recv().ok()
+    }
+
     /// Next message; `None` once the sender side closed the connection and the queue is empty.
     pub async fn recv(&mut self) -> Option<Outbound> {
         loop {

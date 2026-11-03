@@ -640,3 +640,159 @@ async fn room_info_reports_players_and_progress() {
         .unwrap();
     assert!(room.handle.info().await.unwrap().in_progress);
 }
+
+// -------------------------------------------------------------------------------------------
+// Race conditions from the plan (RC-001, RC-003, RC-004)
+// -------------------------------------------------------------------------------------------
+
+/// Host plus two players with a hand dealt; returns the clients and who is on turn.
+async fn dealt_table() -> (Created, [Client; 3], usize) {
+    let room = new_room(None);
+    let mut host = attach_host(&room, 1).await;
+    let mut bob = join(&room.handle, 2, "Bob").await;
+    let mut cy = join(&room.handle, 3, "Cy").await;
+    room.handle
+        .send(host.conn, None, ClientMessage::StartHand)
+        .await
+        .unwrap();
+    let mut on_turn = None;
+    for (index, client) in [&mut host, &mut bob, &mut cy].into_iter().enumerate() {
+        let got = client.drain().await;
+        if got
+            .iter()
+            .any(|m| matches!(m, ServerMessage::TurnPrompt { .. }))
+        {
+            on_turn = Some(index);
+        }
+    }
+    (room, [host, bob, cy], on_turn.expect("someone is on turn"))
+}
+
+#[tokio::test(start_paused = true)]
+async fn rc001_two_actions_in_the_same_tick_one_wins_and_one_gets_a_clear_error() {
+    let (room, mut table, on_turn) = dealt_table().await;
+    let other = (on_turn + 1) % 3;
+    let act = |action| ClientMessage::GameAction {
+        action_seq: 0,
+        action,
+    };
+    // The wrong player is queued first, then the right one, with no await point between them
+    // for the room to run in.
+    room.handle
+        .send(table[other].conn, None, act(PlayerAction::Fold))
+        .await
+        .unwrap();
+    room.handle
+        .send(table[on_turn].conn, None, act(PlayerAction::Call))
+        .await
+        .unwrap();
+    let refused = table[other].drain().await;
+    assert!(
+        refused.iter().any(|m| matches!(
+            m,
+            ServerMessage::Error {
+                code: ErrorCode::NotYourTurn,
+                ..
+            }
+        )),
+        "{refused:?}"
+    );
+    let accepted = table[on_turn].drain().await;
+    assert!(
+        accepted.iter().any(|m| matches!(
+            m,
+            ServerMessage::Ack {
+                duplicate: false,
+                ..
+            }
+        )),
+        "{accepted:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn rc003_an_action_just_before_the_deadline_wins_and_one_just_after_loses() {
+    // Just before: accepted.
+    let (room, mut table, on_turn) = dealt_table().await;
+    tokio::time::sleep(Duration::from_millis(29_900)).await;
+    let call = ClientMessage::GameAction {
+        action_seq: 0,
+        action: PlayerAction::Call,
+    };
+    room.handle
+        .send(table[on_turn].conn, None, call.clone())
+        .await
+        .unwrap();
+    let got = table[on_turn].drain().await;
+    assert!(
+        got.iter().any(|m| matches!(
+            m,
+            ServerMessage::Ack {
+                duplicate: false,
+                ..
+            }
+        )),
+        "{got:?}"
+    );
+
+    // Just after: the server already acted, the late action is refused, nothing is applied twice.
+    let (room, mut table, on_turn) = dealt_table().await;
+    tokio::time::sleep(Duration::from_millis(30_100)).await;
+    room.handle
+        .send(table[on_turn].conn, None, call)
+        .await
+        .unwrap();
+    let got = table[on_turn].drain().await;
+    assert!(
+        got.iter().any(|m| matches!(
+            m,
+            ServerMessage::Error {
+                code: ErrorCode::NotYourTurn,
+                ..
+            }
+        )),
+        "{got:?}"
+    );
+    assert!(
+        got.iter()
+            .any(|m| matches!(m, ServerMessage::ActionPerformed { auto: true, .. })),
+        "{got:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn rc004_start_hand_twice_in_a_row_deals_one_hand() {
+    let room = new_room(None);
+    let mut host = attach_host(&room, 1).await;
+    let _bob = join(&room.handle, 2, "Bob").await;
+    host.drain().await;
+    room.handle
+        .send(host.conn, Some("1".into()), ClientMessage::StartHand)
+        .await
+        .unwrap();
+    room.handle
+        .send(host.conn, Some("2".into()), ClientMessage::StartHand)
+        .await
+        .unwrap();
+    let got = host.drain().await;
+    let started = got
+        .iter()
+        .filter(|m| matches!(m, ServerMessage::StateUpdate { view, .. } if view.hand_number == 1))
+        .count();
+    assert!(started >= 1);
+    assert!(
+        !got.iter()
+            .any(|m| matches!(m, ServerMessage::StateUpdate { view, .. } if view.hand_number > 1)),
+        "only one hand was dealt"
+    );
+    assert!(
+        got.iter().any(|m| matches!(
+            m,
+            ServerMessage::Error {
+                code: ErrorCode::HandInProgress,
+                ..
+            }
+        )),
+        "the second request is refused: {got:?}"
+    );
+}

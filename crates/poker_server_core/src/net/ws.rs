@@ -2,10 +2,12 @@
 //! pass messages between the socket and the room.
 //!
 //! Hygiene (`docs/RESILIENCE_AND_CRASH_HANDLING.md` 3.6): 16 KiB frames, an idle timeout that
-//! only inbound frames reset, a deadline for the first message, a token bucket with three
-//! strikes, and a write timeout so a stuck peer cannot hold the task.
+//! only well-formed inbound frames reset, a deadline for the first message, a token bucket that
+//! charges every inbound data frame (garbage included) with three strikes, per-IP limits on
+//! failed joins and on room creation that outlive the connection, and a write timeout so a
+//! stuck peer cannot hold the task.
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -21,7 +23,7 @@ use crate::protocol::{
     ClientMessage, ErrorCode, MAX_MESSAGE_BYTES, ParseError, ServerMessage, encode_server,
     parse_client,
 };
-use crate::room::handle::{ConnReceiver, ConnSender, Outbound};
+use crate::room::handle::{ConnReceiver, ConnSender};
 use crate::room::session::Session;
 use crate::room::state::RoomError;
 
@@ -36,7 +38,7 @@ pub(crate) async fn upgrade(
     };
     ws.max_message_size(MAX_MESSAGE_BYTES)
         .max_frame_size(MAX_MESSAGE_BYTES)
-        .on_upgrade(move |socket| serve(socket, net, guard))
+        .on_upgrade(move |socket| serve(socket, net, addr.ip(), guard))
 }
 
 /// Why a connection ended (only for the log).
@@ -56,6 +58,7 @@ enum End {
 struct Connection {
     socket: WebSocket,
     net: Arc<NetState>,
+    peer: IpAddr,
     tx: ConnSender,
     rx: ConnReceiver,
     conn_id: u64,
@@ -66,11 +69,21 @@ struct Connection {
     _guard: ConnectionGuard,
 }
 
-async fn serve(socket: WebSocket, net: Arc<NetState>, guard: ConnectionGuard) {
+/// What one inbound frame turned out to be.
+enum Inbound {
+    /// A well-formed request (the idle timer restarts).
+    Request(Option<String>, ClientMessage),
+    /// A WebSocket ping or pong (the idle timer restarts, nothing else happens).
+    Control,
+    /// Garbage, already answered with an error (the idle timer does not restart).
+    Rejected,
+}
+
+async fn serve(socket: WebSocket, net: Arc<NetState>, peer: IpAddr, guard: ConnectionGuard) {
     let (tx, rx) = ConnSender::channel(net.limits.outbound_queue);
     let conn_id = net.registry.next_conn_id();
     let bucket = TokenBucket::new(
-        net.limits.rate_per_second,
+        net.limits.rate_per_second.saturating_mul(60),
         net.limits.rate_burst,
         Instant::now(),
     );
@@ -78,6 +91,7 @@ async fn serve(socket: WebSocket, net: Arc<NetState>, guard: ConnectionGuard) {
     let mut connection = Connection {
         socket,
         net,
+        peer,
         tx,
         rx,
         conn_id,
@@ -130,18 +144,54 @@ impl Connection {
         .await;
     }
 
-    /// Takes a token. Returns `Err` after the third strike.
-    async fn rate_check(&mut self, req_id: Option<&str>) -> Result<bool, End> {
+    // -----------------------------------------------------------------------------------------
+    // Reading
+    // -----------------------------------------------------------------------------------------
+
+    /// Charges one token. After the third refusal the connection is closed.
+    async fn charge(&mut self) -> Result<bool, End> {
         if self.bucket.allow(Instant::now()) {
             return Ok(true);
         }
         self.strikes += 1;
         let error = RoomError::new(ErrorCode::RateLimited, "slow down");
-        self.write_error(req_id, &error).await?;
+        self.write_error(None, &error).await?;
         if self.strikes >= self.net.limits.rate_strikes {
             return Err(End::RateLimited);
         }
         Ok(false)
+    }
+
+    /// Classifies a frame. Every text or binary frame is charged *before* it is parsed, so
+    /// garbage costs as much as a real request.
+    async fn read(&mut self, frame: Option<Result<Message, axum::Error>>) -> Result<Inbound, End> {
+        let text = match frame {
+            None | Some(Err(_) | Ok(Message::Close(_))) => return Err(End::Closed),
+            Some(Ok(Message::Ping(_) | Message::Pong(_))) => return Ok(Inbound::Control),
+            Some(Ok(Message::Binary(_))) => {
+                if self.charge().await? {
+                    let error = RoomError::new(ErrorCode::BadRequest, "text frames only");
+                    self.write_error(None, &error).await?;
+                }
+                return Ok(Inbound::Rejected);
+            }
+            Some(Ok(Message::Text(text))) => text,
+        };
+        if !self.charge().await? {
+            return Ok(Inbound::Rejected);
+        }
+        match parse_client(text.as_str()) {
+            Ok(envelope) => Ok(Inbound::Request(envelope.req_id, envelope.body)),
+            Err(failure) => {
+                let message = failure.error.to_message();
+                self.write(failure.req_id.as_deref(), &message).await?;
+                if failure.error == ParseError::VersionMismatch {
+                    Err(End::Version)
+                } else {
+                    Ok(Inbound::Rejected)
+                }
+            }
+        }
     }
 
     // -----------------------------------------------------------------------------------------
@@ -151,43 +201,19 @@ impl Connection {
     async fn authenticate(&mut self) -> Result<Session, End> {
         let deadline = Instant::now() + self.net.limits.auth_timeout;
         loop {
-            let frame = match timeout_at(deadline, self.socket.recv()).await {
-                Err(_) => return Err(End::AuthTimeout),
-                Ok(None | Some(Err(_))) => return Err(End::Closed),
-                Ok(Some(Ok(frame))) => frame,
+            let Ok(frame) = timeout_at(deadline, self.socket.recv()).await else {
+                return Err(End::AuthTimeout);
             };
-            let text = match frame {
-                Message::Text(text) => text,
-                Message::Close(_) => return Err(End::Closed),
-                Message::Ping(_) | Message::Pong(_) => continue,
-                Message::Binary(_) => {
-                    let error = RoomError::new(ErrorCode::BadRequest, "text frames only");
-                    self.write_error(None, &error).await?;
-                    continue;
-                }
-            };
-            let envelope = match parse_client(text.as_str()) {
-                Ok(envelope) => envelope,
-                Err(failure) => {
-                    let message = failure.error.to_message();
-                    self.write(failure.req_id.as_deref(), &message).await?;
-                    if failure.error == ParseError::VersionMismatch {
-                        return Err(End::Version);
-                    }
-                    continue;
-                }
-            };
-            let req_id = envelope.req_id;
-            if !self.rate_check(req_id.as_deref()).await? {
+            let Inbound::Request(req_id, body) = self.read(frame).await? else {
                 continue;
-            }
-            if let ClientMessage::Ping { t } = envelope.body {
+            };
+            if let ClientMessage::Ping { t } = body {
                 // Allowed before joining so a client can test the link.
                 self.write(req_id.as_deref(), &ServerMessage::Pong { t })
                     .await?;
                 continue;
             }
-            match self.try_enter(req_id.clone(), envelope.body).await {
+            match self.try_enter(req_id.clone(), body).await {
                 Entry::Joined(session) => return Ok(session),
                 Entry::Retry(error) => self.write_error(req_id.as_deref(), &error).await?,
                 Entry::Reject(error) => {
@@ -198,12 +224,31 @@ impl Connection {
         }
     }
 
+    /// Tries to attach to a room. Wrong codes and tokens are counted per IP address, so
+    /// reconnecting does not reset the budget of someone scanning for rooms.
     async fn try_enter(&mut self, req_id: Option<String>, message: ClientMessage) -> Entry {
-        let registry = &self.net.registry;
+        let peer = self.peer;
+        let net = Arc::clone(&self.net);
         let (conn, tx) = (self.conn_id, self.tx.clone());
+        let is_join = matches!(
+            message,
+            ClientMessage::JoinRoom { .. } | ClientMessage::Resume { .. }
+        );
+        if is_join && !net.join_failures.allowed(peer) {
+            return Entry::Reject(RoomError::new(
+                ErrorCode::RateLimited,
+                "too many failed attempts, try again later",
+            ));
+        }
         let result = match message {
             ClientMessage::CreateRoom { host_name, config } => {
-                registry
+                if !net.create_limiter.check(peer) {
+                    return Entry::Reject(RoomError::new(
+                        ErrorCode::RateLimited,
+                        "too many rooms created, try again later",
+                    ));
+                }
+                net.registry
                     .create_room(conn, tx, req_id, host_name, config)
                     .await
             }
@@ -213,7 +258,7 @@ impl Connection {
                 seat_index,
                 spectator,
             } => {
-                registry
+                net.registry
                     .join_room(&room_code, conn, tx, req_id, name, spectator, seat_index)
                     .await
             }
@@ -223,7 +268,7 @@ impl Connection {
                 host_token,
                 last_state_version: _,
             } => {
-                registry
+                net.registry
                     .resume_room(&room_code, conn, tx, req_id, session_token, host_token)
                     .await
             }
@@ -236,15 +281,20 @@ impl Connection {
         };
         match result {
             Ok(session) => Entry::Joined(session),
-            Err(error) => match error.code {
-                // A wrong name or a taken seat can be fixed on the same socket.
-                ErrorCode::NameInvalid
-                | ErrorCode::SeatOccupied
-                | ErrorCode::AlreadySeated
-                | ErrorCode::BadRequest
-                | ErrorCode::InvalidAmount => Entry::Retry(error),
-                _ => Entry::Reject(error),
-            },
+            Err(error) => {
+                if is_join {
+                    net.join_failures.record_failure(peer);
+                }
+                match error.code {
+                    // A wrong name or a taken seat can be fixed on the same socket.
+                    ErrorCode::NameInvalid
+                    | ErrorCode::SeatOccupied
+                    | ErrorCode::AlreadySeated
+                    | ErrorCode::BadRequest
+                    | ErrorCode::InvalidAmount => Entry::Retry(error),
+                    _ => Entry::Reject(error),
+                }
+            }
         }
     }
 
@@ -257,16 +307,27 @@ impl Connection {
         loop {
             tokio::select! {
                 frame = self.socket.recv() => {
-                    idle_at = Instant::now() + self.net.limits.idle_timeout;
-                    if let Err(end) = self.on_frame(&session, frame).await {
-                        return end;
+                    match self.read(frame).await {
+                        Ok(Inbound::Request(req_id, body)) => {
+                            idle_at = Instant::now() + self.net.limits.idle_timeout;
+                            if let Err(error) = session.send(req_id.clone(), body).await
+                                && let Err(end) = self.write_error(req_id.as_deref(), &error).await
+                            {
+                                return end;
+                            }
+                        }
+                        Ok(Inbound::Control) => {
+                            idle_at = Instant::now() + self.net.limits.idle_timeout;
+                        }
+                        Ok(Inbound::Rejected) => {}
+                        Err(end) => return end,
                     }
                 }
                 outbound = self.rx.recv() => {
-                    let Some(Outbound { req_id, message }) = outbound else {
+                    let Some(outbound) = outbound else {
                         return End::RoomLost;
                     };
-                    if let Err(end) = self.write(req_id.as_deref(), &message).await {
+                    if let Err(end) = self.write(outbound.req_id.as_deref(), &outbound.message).await {
                         return end;
                     }
                 }
@@ -274,7 +335,9 @@ impl Connection {
                     // Not a select branch future: it runs to completion even if other
                     // events arrive meanwhile.
                     if !alive || !session.follow_change().await {
-                        return End::RoomLost;
+                        // The room is over. Deliver what it said last (for example
+                        // ROOM_EXPIRED) before closing.
+                        return self.flush_queue().await.unwrap_or_else(|end| end);
                     }
                 }
                 () = sleep_until(idle_at) => return End::Idle,
@@ -283,40 +346,13 @@ impl Connection {
         }
     }
 
-    async fn on_frame(
-        &mut self,
-        session: &Session,
-        frame: Option<Result<Message, axum::Error>>,
-    ) -> Result<(), End> {
-        let text = match frame {
-            None | Some(Err(_) | Ok(Message::Close(_))) => return Err(End::Closed),
-            Some(Ok(Message::Ping(_) | Message::Pong(_))) => return Ok(()),
-            Some(Ok(Message::Binary(_))) => {
-                let error = RoomError::new(ErrorCode::BadRequest, "text frames only");
-                return self.write_error(None, &error).await;
-            }
-            Some(Ok(Message::Text(text))) => text,
-        };
-        let envelope = match parse_client(text.as_str()) {
-            Ok(envelope) => envelope,
-            Err(failure) => {
-                let message = failure.error.to_message();
-                self.write(failure.req_id.as_deref(), &message).await?;
-                return if failure.error == ParseError::VersionMismatch {
-                    Err(End::Version)
-                } else {
-                    Ok(())
-                };
-            }
-        };
-        let req_id = envelope.req_id;
-        if !self.rate_check(req_id.as_deref()).await? {
-            return Ok(());
+    /// Writes everything already queued for this connection, then reports the room as lost.
+    async fn flush_queue(&mut self) -> Result<End, End> {
+        while let Some(outbound) = self.rx.try_recv() {
+            self.write(outbound.req_id.as_deref(), &outbound.message)
+                .await?;
         }
-        if let Err(error) = session.send(req_id.clone(), envelope.body).await {
-            self.write_error(req_id.as_deref(), &error).await?;
-        }
-        Ok(())
+        Ok(End::RoomLost)
     }
 }
 

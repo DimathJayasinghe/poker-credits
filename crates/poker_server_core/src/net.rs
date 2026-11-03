@@ -12,7 +12,7 @@ use tokio::sync::watch;
 
 use crate::config::Limits;
 use crate::registry::Registry;
-use guards::{IpLimiter, KeyedRateLimiter};
+use guards::{FailureLimiter, IpLimiter, KeyedRateLimiter};
 
 /// How this server describes itself in `GET /v1/info`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,6 +38,10 @@ pub(crate) struct NetState {
     pub(crate) limits: Limits,
     pub(crate) ip_limiter: IpLimiter,
     pub(crate) http_limiter: KeyedRateLimiter,
+    /// Wrong room codes and tokens: stops scanning for rooms.
+    pub(crate) join_failures: FailureLimiter,
+    /// Room creation per IP: stops one client from filling the server.
+    pub(crate) create_limiter: KeyedRateLimiter,
     pub(crate) mode: ServerMode,
     pub(crate) server_name: String,
     /// Flips to `true` when the server is stopping; sockets then close.

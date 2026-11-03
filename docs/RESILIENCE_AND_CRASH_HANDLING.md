@@ -184,8 +184,9 @@ Detailed in `API_AND_EVENTS.md` section 5. Essence: client sends `RESUME { roomC
 
 ### 4.3 Server grace behaviour
 - On disconnect the seat stays reserved; `isConnected=false` is broadcast.
-- If it is that player's turn: 30 s grace, then auto-check if free else auto-fold (rule unchanged from `SECURITY_AND_EDGE_CASES.md`).
+- If it is that player's turn: 30 s grace (counted from the later of the disconnect and the start of the turn), then auto-check if free else auto-fold (rule unchanged from `SECURITY_AND_EDGE_CASES.md`). Implemented in `room/absence.rs`; the action is journaled as `DISCONNECT_TIMEOUT`.
 - A seat with no connection for 10 minutes is flagged `sitting_out` automatically; it is still reclaimable with the token.
+- After a server restart nobody is connected, so every seat starts its 30 s / 10 min clocks at restart time. Turn deadlines (`turnDeadlineMs`) are absolute times and are **not** moved by downtime: a player whose deadline passed while the server was down is timed out right after the restart. Whether to extend the deadline by the downtime is an open owner question (`docs/STATUS.md`).
 
 ---
 

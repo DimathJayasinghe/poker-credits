@@ -82,7 +82,7 @@ pub fn restore(dir: &Path, timings: &Timings) -> Result<Restored, StoreError> {
     }
     Ok(Restored {
         state,
-        last_seq,
+        last_seq: last_seq.max(entries.max_seq),
         skipped_poisoned: entries.skipped_poisoned,
         failed_replays,
     })

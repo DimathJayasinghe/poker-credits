@@ -215,7 +215,7 @@ Broadcast for the ticker and sound effects.
 | `GAME_RESUMED` | `resumedBy, turnDeadlineMs` | Host resumes; deadline is extended by the paused duration. |
 | `ROOM_RECOVERED` | `reason` | The room actor was restarted after a panic (see resilience doc). A `SNAPSHOT` follows. |
 | `ROOM_CRASHED` | `reason` | Room frozen after repeated panics. |
-| `ROOM_EXPIRED` | none | Room purged after 60 minutes idle. |
+| `ROOM_EXPIRED` | none | Room purged after 60 minutes idle, or closed by the host with `END_GAME`. Always delivered before the socket closes. |
 | `PONG` | `t` | Answer to `PING`. |
 | `PRIVATE_STATE` | reserved | Reserved for a future optional card-input mode. Never part of `RoomView`; sent to one connection only. |
 
@@ -234,7 +234,11 @@ Socket.io's automatic reconnection is gone, so this section is the contract.
 ### 5.2 Server behaviour
 - Token valid and room alive: attach this connection to the seat, close any older connection for the same seat (code `SUPERSEDED`), broadcast `PLAYER_CONNECTION`, send `SNAPSHOT`.
 - Token invalid or room gone: `ERROR INVALID_SESSION` or `ROOM_NOT_FOUND`, then close. Client clears stored tokens and returns to the join screen.
-- If `RESUME` is not the first message after connect (and not `JOIN_ROOM`/`CREATE_ROOM`), reject with `NOT_AUTHENTICATED`.
+- If `RESUME` is not the first message after connect (and not `JOIN_ROOM`/`CREATE_ROOM`), reject with `NOT_AUTHENTICATED` and close. `PING` is the one exception: it is answered before joining so a client can test the link.
+- The first message must arrive within 10 s of the upgrade, or the socket is closed.
+- After `JOIN_ROOM`, errors the user can fix on the same socket (`NAME_INVALID`, `SEAT_OCCUPIED`, `ALREADY_SEATED`, `BAD_REQUEST`, `INVALID_AMOUNT`) leave it open for another try. All other refusals (`ROOM_NOT_FOUND`, `INVALID_SESSION`, `ROOM_FULL`, `ROOM_CRASHED`, `RATE_LIMITED`, ...) are followed by a close.
+- Wrong room codes and tokens are counted **per IP address**, not per connection: 20 failed `JOIN_ROOM`/`RESUME` attempts within a minute block the address for 15 minutes (`RATE_LIMITED` and close). `CREATE_ROOM` is limited to 6 per minute per IP (burst 3). Successful joins are never counted.
+- Every data frame, well-formed or not, costs one token of the connection's bucket (10 per second, burst 20; three refusals close the socket). Only well-formed requests and WebSocket ping/pong frames reset the 45 s idle timer.
 
 ### 5.3 `actionSeq` rules
 - The counter is **monotonic per session** (not reset per hand), so the client never needs a "new hand" signal. The server stores `nextActionSeq: u64`, initial value 0 when the session is created.
@@ -293,13 +297,15 @@ Engine errors map to codes through one `impl From<&PokerError> for ErrorCode` in
 
 All under the same axum router as the WebSocket.
 
+`GET /v1/ws` answers `429` (no upgrade) when the client address already holds 40 connections.
+
 ### `GET /health`
 ```json
 { "status":"healthy", "activeRooms":3, "version":"0.1.0", "protocol":1 }
 ```
 
 ### `GET /v1/info`
-Used by the join screen after scanning a QR code or typing an address, before opening the socket. Works in both modes.
+Used by the join screen after scanning a QR code or typing an address, before opening the socket. Works in both modes. `mode` is `HOST` (embedded in the host's app) or `CLOUD` (standalone binary).
 ```json
 { "protocol":1, "mode":"HOST", "serverName":"Dimath's tablet", "roomCount":1 }
 ```
@@ -309,7 +315,7 @@ Room codes are never listed, in either mode: a player needs the code from the QR
 ```json
 { "exists":true, "playerCount":3, "maxPlayers":10, "isFull":false, "inProgress":true }
 ```
-Rate limited per IP (room codes are guessable: 32^4 ≈ 1M; see security doc).
+An unknown or frozen room answers `200` with `exists:false` and zeros. Rate limited per IP (default 2 per second, burst 10; `429` beyond that). Room codes are guessable (32^4 ≈ 1M), see security doc 6.6 for the matching limits on the WebSocket.
 
 ### `GET /` and static assets (later, Phase 7)
 When `POKER_WEB_DIR` is set (cloud) or web assets are embedded (host mode), the server serves the built Flutter web player at `/`. The web client opens `ws(s)://<same host>/v1/ws` derived from its own URL. No protocol change. Chips and timestamps stay below 2^53-1 so JavaScript clients are exact (ADR-014).
