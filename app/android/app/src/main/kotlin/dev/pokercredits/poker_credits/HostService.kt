@@ -62,7 +62,7 @@ class HostService : Service() {
             Notification.Builder(this)
         }
         return builder
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat_host)
             .setContentTitle("Hosting room $room")
             .setContentText("Players are connected to this phone. Tap to open the table.")
             .setContentIntent(pending)
@@ -78,7 +78,12 @@ class HostService : Service() {
 
         fun start(context: Context, room: String) {
             val intent = Intent(context, HostService::class.java).putExtra(EXTRA_ROOM, room)
-            context.startForegroundService(intent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                // API 24-25 have no startForegroundService; startService plus startForeground works.
+                context.startService(intent)
+            }
         }
 
         fun stop(context: Context) {

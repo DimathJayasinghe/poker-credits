@@ -22,6 +22,7 @@
          cannot hold a certificate, and the host's own screen talks to its server on loopback. -->
     <application
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="true"
         android:label="Poker Credits"
         android:name="${applicationName}"
