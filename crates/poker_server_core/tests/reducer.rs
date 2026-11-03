@@ -438,6 +438,13 @@ fn rebuy_request_waits_for_host_approval() {
     )
     .unwrap();
     assert!(!room.pending_rebuys[0].approved);
+    let shown = room.view(&|_| true).pending_rebuys;
+    assert_eq!(
+        shown.len(),
+        1,
+        "the host can see the request in the public view"
+    );
+    assert!(!shown[0].approved);
     room.apply(
         host(
             HostCommand::ApproveRebuy {

@@ -4,7 +4,7 @@
 use poker_engine::{HandStatus, Phase};
 
 use super::state::RoomState;
-use crate::protocol::{PotView, RoomView, SeatView, WirePhase};
+use crate::protocol::{PendingRebuyView, PotView, RoomView, SeatView, WirePhase};
 
 fn wire_phase(phase: Phase, paused: bool) -> WirePhase {
     if paused {
@@ -84,6 +84,15 @@ impl RoomState {
             paused: table.paused,
             turn_deadline_ms: self.turn_deadline_ms,
             spectator_count: u32::try_from(spectators).unwrap_or(u32::MAX),
+            pending_rebuys: self
+                .pending_rebuys
+                .iter()
+                .map(|r| PendingRebuyView {
+                    player_id: r.player_id.clone(),
+                    amount: r.amount,
+                    approved: r.approved,
+                })
+                .collect(),
         }
     }
 }

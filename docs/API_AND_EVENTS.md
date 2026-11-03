@@ -181,7 +181,8 @@ Sent to all connections after each state change. In v1 this is always the **full
               "streetBet":60, "hasFolded":false, "isAllIn":false, "isSittingOut":false, "isConnected":true } ],
   "paused":false,
   "turnDeadlineMs":1730000030000,
-  "spectatorCount":2
+  "spectatorCount":2,
+  "pendingRebuys":[{"playerId":"p_3","amount":1000,"approved":false}]
 }
 ```
 `phase` is one of: `LOBBY`, `PRE_FLOP`, `FLOP`, `TURN`, `RIVER`, `ALL_IN_RUNOUT`, `SHOWDOWN`, `NEXT_HAND_PREP`, `PAUSED`. `PAUSED` is shown while `paused` is true (the engine keeps the real phase). `STARTING_HAND`, `POSTING_BLINDS`, `HAND_WON_UNCONTESTED` and `PAYOUT` are transient inside one command and never appear. `minRaiseTo` is the smallest legal raise-to total for the next raise (current bet plus the last full raise increment), zero outside a betting street; the per-player cap is in `TURN_PROMPT.legal`. `turnDeadlineMs` is an absolute server time; clients compute the countdown locally using `serverTime` offset, so the old per-second `timer_tick` broadcast is not needed.

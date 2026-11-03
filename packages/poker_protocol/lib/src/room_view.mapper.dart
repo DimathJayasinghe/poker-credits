@@ -480,6 +480,150 @@ class _PotViewCopyWithImpl<$R, $Out>
       _PotViewCopyWithImpl<$R2, $Out2>($value, $cast, t);
 }
 
+class PendingRebuyViewMapper extends ClassMapperBase<PendingRebuyView> {
+  PendingRebuyViewMapper._();
+
+  static PendingRebuyViewMapper? _instance;
+  static PendingRebuyViewMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = PendingRebuyViewMapper._());
+    }
+    return _instance!;
+  }
+
+  @override
+  final String id = 'PendingRebuyView';
+
+  static String _$playerId(PendingRebuyView v) => v.playerId;
+  static const Field<PendingRebuyView, String> _f$playerId = Field(
+    'playerId',
+    _$playerId,
+  );
+  static int _$amount(PendingRebuyView v) => v.amount;
+  static const Field<PendingRebuyView, int> _f$amount = Field(
+    'amount',
+    _$amount,
+  );
+  static bool _$approved(PendingRebuyView v) => v.approved;
+  static const Field<PendingRebuyView, bool> _f$approved = Field(
+    'approved',
+    _$approved,
+  );
+
+  @override
+  final MappableFields<PendingRebuyView> fields = const {
+    #playerId: _f$playerId,
+    #amount: _f$amount,
+    #approved: _f$approved,
+  };
+  @override
+  final bool ignoreNull = true;
+
+  static PendingRebuyView _instantiate(DecodingData data) {
+    return PendingRebuyView(
+      playerId: data.dec(_f$playerId),
+      amount: data.dec(_f$amount),
+      approved: data.dec(_f$approved),
+    );
+  }
+
+  @override
+  final Function instantiate = _instantiate;
+
+  static PendingRebuyView fromMap(Map<String, dynamic> map) {
+    return ensureInitialized().decodeMap<PendingRebuyView>(map);
+  }
+
+  static PendingRebuyView fromJson(String json) {
+    return ensureInitialized().decodeJson<PendingRebuyView>(json);
+  }
+}
+
+mixin PendingRebuyViewMappable {
+  String toJson() {
+    return PendingRebuyViewMapper.ensureInitialized()
+        .encodeJson<PendingRebuyView>(this as PendingRebuyView);
+  }
+
+  Map<String, dynamic> toMap() {
+    return PendingRebuyViewMapper.ensureInitialized()
+        .encodeMap<PendingRebuyView>(this as PendingRebuyView);
+  }
+
+  PendingRebuyViewCopyWith<PendingRebuyView, PendingRebuyView, PendingRebuyView>
+  get copyWith =>
+      _PendingRebuyViewCopyWithImpl<PendingRebuyView, PendingRebuyView>(
+        this as PendingRebuyView,
+        $identity,
+        $identity,
+      );
+  @override
+  String toString() {
+    return PendingRebuyViewMapper.ensureInitialized().stringifyValue(
+      this as PendingRebuyView,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return PendingRebuyViewMapper.ensureInitialized().equalsValue(
+      this as PendingRebuyView,
+      other,
+    );
+  }
+
+  @override
+  int get hashCode {
+    return PendingRebuyViewMapper.ensureInitialized().hashValue(
+      this as PendingRebuyView,
+    );
+  }
+}
+
+extension PendingRebuyViewValueCopy<$R, $Out>
+    on ObjectCopyWith<$R, PendingRebuyView, $Out> {
+  PendingRebuyViewCopyWith<$R, PendingRebuyView, $Out>
+  get $asPendingRebuyView =>
+      $base.as((v, t, t2) => _PendingRebuyViewCopyWithImpl<$R, $Out>(v, t, t2));
+}
+
+abstract class PendingRebuyViewCopyWith<$R, $In extends PendingRebuyView, $Out>
+    implements ClassCopyWith<$R, $In, $Out> {
+  $R call({String? playerId, int? amount, bool? approved});
+  PendingRebuyViewCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(
+    Then<$Out2, $R2> t,
+  );
+}
+
+class _PendingRebuyViewCopyWithImpl<$R, $Out>
+    extends ClassCopyWithBase<$R, PendingRebuyView, $Out>
+    implements PendingRebuyViewCopyWith<$R, PendingRebuyView, $Out> {
+  _PendingRebuyViewCopyWithImpl(super.value, super.then, super.then2);
+
+  @override
+  late final ClassMapperBase<PendingRebuyView> $mapper =
+      PendingRebuyViewMapper.ensureInitialized();
+  @override
+  $R call({String? playerId, int? amount, bool? approved}) => $apply(
+    FieldCopyWithData({
+      if (playerId != null) #playerId: playerId,
+      if (amount != null) #amount: amount,
+      if (approved != null) #approved: approved,
+    }),
+  );
+  @override
+  PendingRebuyView $make(CopyWithData data) => PendingRebuyView(
+    playerId: data.get(#playerId, or: $value.playerId),
+    amount: data.get(#amount, or: $value.amount),
+    approved: data.get(#approved, or: $value.approved),
+  );
+
+  @override
+  PendingRebuyViewCopyWith<$R2, PendingRebuyView, $Out2> $chain<$R2, $Out2>(
+    Then<$Out2, $R2> t,
+  ) => _PendingRebuyViewCopyWithImpl<$R2, $Out2>($value, $cast, t);
+}
+
 class RoomViewMapper extends ClassMapperBase<RoomView> {
   RoomViewMapper._();
 
@@ -490,6 +634,7 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
       WirePhaseMapper.ensureInitialized();
       PotViewMapper.ensureInitialized();
       SeatViewMapper.ensureInitialized();
+      PendingRebuyViewMapper.ensureInitialized();
     }
     return _instance!;
   }
@@ -565,6 +710,13 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
     'spectatorCount',
     _$spectatorCount,
   );
+  static List<PendingRebuyView> _$pendingRebuys(RoomView v) => v.pendingRebuys;
+  static const Field<RoomView, List<PendingRebuyView>> _f$pendingRebuys = Field(
+    'pendingRebuys',
+    _$pendingRebuys,
+    opt: true,
+    def: const <PendingRebuyView>[],
+  );
 
   @override
   final MappableFields<RoomView> fields = const {
@@ -583,6 +735,7 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
     #paused: _f$paused,
     #turnDeadlineMs: _f$turnDeadlineMs,
     #spectatorCount: _f$spectatorCount,
+    #pendingRebuys: _f$pendingRebuys,
   };
   @override
   final bool ignoreNull = true;
@@ -604,6 +757,7 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
       paused: data.dec(_f$paused),
       turnDeadlineMs: data.dec(_f$turnDeadlineMs),
       spectatorCount: data.dec(_f$spectatorCount),
+      pendingRebuys: data.dec(_f$pendingRebuys),
     );
   }
 
@@ -667,6 +821,12 @@ abstract class RoomViewCopyWith<$R, $In extends RoomView, $Out>
   ListCopyWith<$R, PotView, PotViewCopyWith<$R, PotView, PotView>> get pots;
   ListCopyWith<$R, SeatView, SeatViewCopyWith<$R, SeatView, SeatView>>
   get seats;
+  ListCopyWith<
+    $R,
+    PendingRebuyView,
+    PendingRebuyViewCopyWith<$R, PendingRebuyView, PendingRebuyView>
+  >
+  get pendingRebuys;
   $R call({
     String? roomCode,
     int? handNumber,
@@ -683,6 +843,7 @@ abstract class RoomViewCopyWith<$R, $In extends RoomView, $Out>
     bool? paused,
     int? turnDeadlineMs,
     int? spectatorCount,
+    List<PendingRebuyView>? pendingRebuys,
   });
   RoomViewCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -710,6 +871,17 @@ class _RoomViewCopyWithImpl<$R, $Out>
     (v) => call(seats: v),
   );
   @override
+  ListCopyWith<
+    $R,
+    PendingRebuyView,
+    PendingRebuyViewCopyWith<$R, PendingRebuyView, PendingRebuyView>
+  >
+  get pendingRebuys => ListCopyWith(
+    $value.pendingRebuys,
+    (v, t) => v.copyWith.$chain(t),
+    (v) => call(pendingRebuys: v),
+  );
+  @override
   $R call({
     String? roomCode,
     int? handNumber,
@@ -726,6 +898,7 @@ class _RoomViewCopyWithImpl<$R, $Out>
     bool? paused,
     Object? turnDeadlineMs = $none,
     int? spectatorCount,
+    List<PendingRebuyView>? pendingRebuys,
   }) => $apply(
     FieldCopyWithData({
       if (roomCode != null) #roomCode: roomCode,
@@ -743,6 +916,7 @@ class _RoomViewCopyWithImpl<$R, $Out>
       if (paused != null) #paused: paused,
       if (turnDeadlineMs != $none) #turnDeadlineMs: turnDeadlineMs,
       if (spectatorCount != null) #spectatorCount: spectatorCount,
+      if (pendingRebuys != null) #pendingRebuys: pendingRebuys,
     }),
   );
   @override
@@ -762,6 +936,7 @@ class _RoomViewCopyWithImpl<$R, $Out>
     paused: data.get(#paused, or: $value.paused),
     turnDeadlineMs: data.get(#turnDeadlineMs, or: $value.turnDeadlineMs),
     spectatorCount: data.get(#spectatorCount, or: $value.spectatorCount),
+    pendingRebuys: data.get(#pendingRebuys, or: $value.pendingRebuys),
   );
 
   @override

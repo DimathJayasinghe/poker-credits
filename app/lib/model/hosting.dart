@@ -1,0 +1,114 @@
+import 'package:poker_protocol/poker_protocol.dart';
+
+/// Table settings a host starts with. Only a starting point: the server validates every value
+/// (no poker rules in the app).
+const RoomConfig defaultRoomConfig = RoomConfig(
+  startingChips: 1000,
+  smallBlind: 5,
+  bigBlind: 10,
+  ante: 0,
+  isTournament: false,
+  blindLevelMinutes: 10,
+  turnTimeLimitSeconds: 30,
+);
+
+/// A room created by the embedded server, with the host's credentials.
+class HostedRoom {
+  const HostedRoom({
+    required this.roomCode,
+    required this.playerId,
+    required this.sessionToken,
+    required this.hostToken,
+    required this.port,
+  });
+
+  final String roomCode;
+  final String playerId;
+  final String sessionToken;
+
+  /// Proof that this device is the host. Never show it; keep it in the token store.
+  final String hostToken;
+
+  /// Port the embedded server listens on.
+  final int port;
+}
+
+/// Why hosting failed.
+enum HostFailure {
+  /// This platform cannot host (web), or the native library failed to load.
+  unavailable,
+
+  /// The port is in use.
+  portBusy,
+
+  /// The server could not store its files.
+  storage,
+
+  /// The server refused the room; see [HostException.code].
+  refused,
+
+  /// The embedded server hit an internal error and was stopped.
+  crashed,
+
+  /// Anything else.
+  unknown,
+}
+
+/// A failed hosting call. Feature code catches this and nothing platform-specific.
+class HostException implements Exception {
+  const HostException(this.failure, this.message, {this.code});
+
+  final HostFailure failure;
+  final String message;
+
+  /// Wire error code (for example `ROOM_FULL`) when [failure] is [HostFailure.refused].
+  final String? code;
+
+  @override
+  String toString() => 'HostException(${failure.name}): $message';
+}
+
+/// What the app keeps between launches so it can re-attach to a room.
+class StoredSession {
+  const StoredSession({
+    required this.serverUri,
+    required this.roomCode,
+    required this.sessionToken,
+    this.hostToken,
+    this.playerId,
+  });
+
+  /// `ws://host:port/v1/ws` of the server that holds the room.
+  final String serverUri;
+  final String roomCode;
+  final String sessionToken;
+  final String? hostToken;
+  final String? playerId;
+
+  bool get isHost => hostToken != null;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'serverUri': serverUri,
+    'roomCode': roomCode,
+    'sessionToken': sessionToken,
+    if (hostToken != null) 'hostToken': hostToken,
+    if (playerId != null) 'playerId': playerId,
+  };
+
+  static StoredSession? fromJson(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final serverUri = json['serverUri'];
+    final roomCode = json['roomCode'];
+    final sessionToken = json['sessionToken'];
+    if (serverUri is! String || roomCode is! String || sessionToken is! String) return null;
+    final hostToken = json['hostToken'];
+    final playerId = json['playerId'];
+    return StoredSession(
+      serverUri: serverUri,
+      roomCode: roomCode,
+      sessionToken: sessionToken,
+      hostToken: hostToken is String ? hostToken : null,
+      playerId: playerId is String ? playerId : null,
+    );
+  }
+}

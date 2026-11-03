@@ -287,6 +287,20 @@ pub struct RoomView {
     pub turn_deadline_ms: Option<u64>,
     /// People watching.
     pub spectator_count: u32,
+    /// Top-ups waiting for the host (or for the end of the hand once approved).
+    pub pending_rebuys: Vec<PendingRebuyView>,
+}
+
+/// A top-up request, public so the host can approve it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingRebuyView {
+    /// Player asking.
+    pub player_id: String,
+    /// Chips requested.
+    pub amount: u64,
+    /// The host already approved it; it applies between hands.
+    pub approved: bool,
 }
 
 /// Wire error codes (`docs/API_AND_EVENTS.md` section 6).

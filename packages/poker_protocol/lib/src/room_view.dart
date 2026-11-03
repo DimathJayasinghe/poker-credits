@@ -48,6 +48,18 @@ class PotView with PotViewMappable {
   final List<String> eligiblePlayerIds;
 }
 
+/// A top-up request, public so the host can approve it (`APPROVE_REBUY`).
+@MappableClass()
+class PendingRebuyView with PendingRebuyViewMappable {
+  const PendingRebuyView({required this.playerId, required this.amount, required this.approved});
+
+  final String playerId;
+  final int amount;
+
+  /// The host already approved it; it applies between hands.
+  final bool approved;
+}
+
 /// The public state of a room, as sent in `SNAPSHOT` and `STATE_UPDATE`.
 @MappableClass()
 class RoomView with RoomViewMappable {
@@ -67,6 +79,7 @@ class RoomView with RoomViewMappable {
     required this.paused,
     this.turnDeadlineMs,
     required this.spectatorCount,
+    this.pendingRebuys = const <PendingRebuyView>[],
   });
 
   final String roomCode;
@@ -86,4 +99,7 @@ class RoomView with RoomViewMappable {
   /// Absolute server time in milliseconds; use the `serverTime` offset for the countdown.
   final int? turnDeadlineMs;
   final int spectatorCount;
+
+  /// Top-ups waiting for the host.
+  final List<PendingRebuyView> pendingRebuys;
 }

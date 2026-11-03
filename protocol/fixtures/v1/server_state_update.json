@@ -47,6 +47,9 @@
     ],
     "paused": false,
     "turnDeadlineMs": 1730000030000,
-    "spectatorCount": 2
+    "spectatorCount": 2,
+    "pendingRebuys": [
+      { "playerId": "p_3", "amount": 1000, "approved": false }
+    ]
   }
 }
