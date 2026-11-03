@@ -61,15 +61,18 @@ class BrutalBanner extends StatelessWidget {
                       onTap: onAction,
                       child: Container(
                         constraints: const BoxConstraints(minHeight: BrutalMetrics.tap),
-                        alignment: Alignment.center,
                         padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
                         decoration: BoxDecoration(
                           color: c.paper,
                           border: Border.all(color: c.ink, width: BrutalMetrics.border),
                         ),
-                        child: Text(
-                          actionLabel!.toUpperCase(),
-                          style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 14, color: c.ink),
+                        child: Center(
+                          widthFactor: 1,
+                          heightFactor: 1,
+                          child: Text(
+                            actionLabel!.toUpperCase(),
+                            style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 14, color: c.ink),
+                          ),
                         ),
                       ),
                     ),

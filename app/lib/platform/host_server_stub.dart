@@ -15,6 +15,9 @@ final class _UnsupportedHostServer implements HostServer {
   int? get port => null;
 
   @override
+  Future<int> startServer() => Future<int>.error(const HostException(HostFailure.unavailable, 'Hosting is not available on this platform'));
+
+  @override
   Future<HostedRoom> hostGame({required String hostName, required RoomConfig config}) =>
       Future<HostedRoom>.error(const HostException(HostFailure.unavailable, 'Hosting is not available on this platform'));
 

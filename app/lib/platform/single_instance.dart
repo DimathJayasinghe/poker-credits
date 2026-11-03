@@ -12,4 +12,7 @@ abstract interface class InstanceClaim {
   void listen(void Function() onSecondLaunch);
 
   Future<void> release();
+
+  /// Ends this process (used by a second launch after it told the first one to show itself).
+  void exitProcess();
 }

@@ -37,24 +37,31 @@ final class NativeHostServer implements HostServer {
   int? get port => _controller.port;
 
   @override
-  Future<HostedRoom> hostGame({required String hostName, required RoomConfig config}) async {
+  Future<int> startServer() async {
     return _guard(() async {
       await _init();
-      final server = await _configFor(port: defaultHostPort);
       try {
-        await _controller.start(server);
+        await _controller.start(await _configFor(port: defaultHostPort));
       } on BridgeException catch (error) {
         if (error.kind != BridgeFailureKind.bind) rethrow;
         _log.warning('port $defaultHostPort is busy, taking a free one');
         await _controller.start(await _configFor(port: 0));
       }
+      return _controller.port ?? 0;
+    });
+  }
+
+  @override
+  Future<HostedRoom> hostGame({required String hostName, required RoomConfig config}) async {
+    final port = await startServer();
+    return _guard(() async {
       final created = await _controller.createRoom(hostName, _toBridge(config));
       return HostedRoom(
         roomCode: created.roomCode,
         playerId: created.playerId,
         sessionToken: created.sessionToken,
         hostToken: created.hostToken,
-        port: _controller.port ?? 0,
+        port: port,
       );
     });
   }

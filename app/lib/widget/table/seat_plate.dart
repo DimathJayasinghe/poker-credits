@@ -1,0 +1,145 @@
+import 'package:flutter/material.dart';
+import 'package:poker_credits/theme/brutal_theme.dart';
+import 'package:poker_credits/theme/tokens.dart';
+import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/widget/brutal/brutal_tag.dart';
+import 'package:poker_protocol/poker_protocol.dart';
+
+/// A rectangular name plate for one seat. The player who must act is the only `signal` fill;
+/// state is always spelled out in a tag (never colour alone).
+class SeatPlate extends StatelessWidget {
+  const SeatPlate({
+    super.key,
+    required this.seat,
+    this.isActive = false,
+    this.isDealer = false,
+    this.isSmallBlind = false,
+    this.isBigBlind = false,
+    this.turnFraction,
+    this.onTap,
+  });
+
+  final SeatView seat;
+  final bool isActive;
+  final bool isDealer;
+  final bool isSmallBlind;
+  final bool isBigBlind;
+
+  /// Fraction of the turn clock left (1 = full), drawn as a bar under the plate.
+  final double? turnFraction;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = BrutalTheme.of(context).colors;
+    final Color fill = isActive ? c.signal : c.paper;
+    final Color text = isActive ? BrutalColors.light.ink : c.ink;
+    final dim = seat.hasFolded || seat.isSittingOut;
+    final nameStyle = TextStyle(
+      fontFamily: BrutalFonts.display,
+      fontSize: 18,
+      color: dim && !isActive ? c.muted : text,
+      decoration: seat.hasFolded ? TextDecoration.lineThrough : null,
+      decorationThickness: 3,
+    );
+    final tags = <Widget>[
+      if (isDealer) const BrutalTag(Strings.dealer),
+      if (isSmallBlind) const BrutalTag(Strings.smallBlindTag, kind: BrutalTagKind.info),
+      if (isBigBlind) const BrutalTag(Strings.bigBlindTag, kind: BrutalTagKind.info),
+      if (seat.isAllIn) const BrutalTag(Strings.allIn, kind: BrutalTagKind.danger),
+      if (seat.hasFolded) const BrutalTag(Strings.folded),
+      if (seat.isSittingOut) const BrutalTag(Strings.sittingOut),
+      if (!seat.isConnected) const BrutalTag(Strings.offline),
+    ];
+    return Semantics(
+      container: true,
+      label: _semantics(),
+      excludeSemantics: true,
+      onTap: onTap,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.only(right: BrutalMetrics.shadow, bottom: BrutalMetrics.shadow),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: fill,
+              border: Border.all(color: c.ink, width: BrutalMetrics.border),
+              boxShadow: <BoxShadow>[BoxShadow(color: c.ink, offset: const Offset(BrutalMetrics.shadow, BrutalMetrics.shadow))],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapS, BrutalMetrics.gapS, BrutalMetrics.gapS, BrutalMetrics.gapXs),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(seat.name.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: nameStyle),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: <Widget>[
+                          Flexible(
+                            child: Text(
+                              '${seat.chips}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: BrutalFonts.display,
+                                fontSize: 28,
+                                height: 1.1,
+                                color: dim && !isActive ? c.muted : text,
+                                fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ),
+                          if (seat.streetBet > 0) ...<Widget>[
+                            const SizedBox(width: BrutalMetrics.gapS),
+                            Text(
+                              '${Strings.bet.toUpperCase()} ${seat.streetBet}',
+                              style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, color: text),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (tags.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: BrutalMetrics.gapXs),
+                        Wrap(spacing: BrutalMetrics.gapXs, runSpacing: BrutalMetrics.gapXs, children: tags),
+                      ],
+                    ],
+                  ),
+                ),
+                if (isActive && turnFraction != null)
+                  Container(
+                    height: 10,
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: c.ink, width: 2)),
+                    ),
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: turnFraction!.clamp(0.0, 1.0),
+                      child: ColoredBox(color: c.ink, child: const SizedBox.expand()),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _semantics() {
+    final parts = <String>[seat.name, '${seat.chips} chips'];
+    if (seat.streetBet > 0) parts.add('bet ${seat.streetBet}');
+    if (isActive) parts.add('acting');
+    if (seat.hasFolded) parts.add('folded');
+    if (seat.isAllIn) parts.add('all in');
+    if (seat.isSittingOut) parts.add('away');
+    if (!seat.isConnected) parts.add('offline');
+    return parts.join(', ');
+  }
+}

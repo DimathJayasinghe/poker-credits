@@ -51,6 +51,9 @@ final class _Claim implements InstanceClaim {
     await _subscription?.cancel();
     await _server?.close();
   }
+
+  @override
+  void exitProcess() => exit(0);
 }
 
 final class _Secondary implements InstanceClaim {
@@ -64,4 +67,7 @@ final class _Secondary implements InstanceClaim {
 
   @override
   Future<void> release() async {}
+
+  @override
+  void exitProcess() => exit(0);
 }

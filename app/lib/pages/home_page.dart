@@ -1,21 +1,58 @@
 import 'package:flutter/material.dart';
-import 'package:poker_credits/platform/host_server.dart';
+import 'package:poker_credits/model/hosting.dart';
+import 'package:poker_credits/pages/host_page.dart';
+import 'package:poker_credits/pages/table_page.dart';
+import 'package:poker_credits/provider/host_provider.dart';
+import 'package:poker_credits/provider/services.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/widget/brutal/brutal_banner.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
-import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_protocol/poker_protocol.dart';
+import 'package:refena_flutter/refena_flutter.dart';
 
-/// Placeholder landing screen that proves the theme, the platform seam and the protocol package.
-class HomePage extends StatelessWidget {
-  HomePage({super.key, HostServer? hostServer}) : hostServer = hostServer ?? createHostServer();
+/// Landing screen: host a game, or go back to the game this device was hosting.
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
-  final HostServer hostServer;
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> with Refena {
+  StoredSession? _hosted;
+  bool _resuming = false;
+  String? _resumeError;
+
+  @override
+  void initState() {
+    super.initState();
+    ensureRef((ref) async {
+      final stored = await ref.read(tokenStoreProvider).read();
+      if (mounted && stored != null && stored.isHost) setState(() => _hosted = stored);
+    });
+  }
+
+  Future<void> _resume() async {
+    setState(() {
+      _resuming = true;
+      _resumeError = null;
+    });
+    final ok = await ref.notifier(hostProvider).restore();
+    if (!mounted) return;
+    if (ok) {
+      await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TablePage()));
+    } else {
+      setState(() => _resumeError = Strings.hostingUnavailable);
+    }
+    if (mounted) setState(() => _resuming = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
+    final supported = context.ref.watch(hostServerProvider).isSupported;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -34,21 +71,32 @@ class HomePage extends StatelessWidget {
                   const SizedBox(height: BrutalMetrics.gapS),
                   Text(Strings.tagline.toUpperCase(), style: TextStyle(letterSpacing: 0.5, color: c.muted)),
                   const SizedBox(height: BrutalMetrics.gapL),
-                  const BrutalCard(
-                    header: 'Status',
-                    child: Text('${Strings.comingSoon}\nPROTOCOL V$protocolVersion'),
-                  ),
-                  const SizedBox(height: BrutalMetrics.gapL),
+                  if (_resumeError != null) ...<Widget>[
+                    BrutalBanner(message: _resumeError!, kind: BrutalBannerKind.error),
+                    const SizedBox(height: BrutalMetrics.gapM),
+                  ],
+                  if (_hosted != null && supported) ...<Widget>[
+                    BrutalButton(
+                      label: '${Strings.resumeHosting} ${_hosted!.roomCode}',
+                      kind: BrutalButtonKind.info,
+                      minHeight: BrutalMetrics.tapPlayer,
+                      onPressed: _resuming ? null : _resume,
+                    ),
+                    const SizedBox(height: BrutalMetrics.gapM),
+                  ],
                   BrutalButton(
                     label: Strings.hostGame,
-                    onPressed: hostServer.isSupported ? () {} : null,
+                    onPressed: supported ? () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const HostPage())) : null,
                     kind: BrutalButtonKind.primary,
                     heavy: true,
+                    minHeight: BrutalMetrics.tapPlayer,
                   ),
-                  if (!hostServer.isSupported) ...<Widget>[
+                  if (!supported) ...<Widget>[
                     const SizedBox(height: BrutalMetrics.gapS),
                     Text(Strings.hostUnsupported, style: TextStyle(color: c.muted)),
                   ],
+                  const SizedBox(height: BrutalMetrics.gapL),
+                  Text('PROTOCOL V$protocolVersion', style: TextStyle(color: c.muted, fontSize: 12)),
                 ],
               ),
             ),

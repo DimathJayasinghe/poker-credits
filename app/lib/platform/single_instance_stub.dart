@@ -14,4 +14,7 @@ final class _Always implements InstanceClaim {
 
   @override
   Future<void> release() async {}
+
+  @override
+  void exitProcess() {}
 }

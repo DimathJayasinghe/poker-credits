@@ -17,6 +17,12 @@ abstract interface class HostServer {
   /// Port of the running server, or `null` when none runs.
   int? get port;
 
+  /// Starts the embedded server (rooms found on disk come back) and returns its port. Does
+  /// nothing when it already runs. Used to re-attach to a room after the app was killed.
+  ///
+  /// Throws [HostException].
+  Future<int> startServer();
+
   /// Starts the embedded server if needed and creates a room.
   ///
   /// Throws [HostException].

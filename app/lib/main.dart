@@ -8,6 +8,7 @@ import 'package:poker_credits/pages/home_page.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:refena_flutter/refena_flutter.dart';
 
 Future<void> main(List<String> args) async {
   // runZonedGuarded is the last net for async errors (docs/RESILIENCE_AND_CRASH_HANDLING.md 2.2).
@@ -18,7 +19,7 @@ Future<void> main(List<String> args) async {
       showInitErrorApp(error: e, stackTrace: st);
       return;
     }
-    runApp(const PokerCreditsApp());
+    runApp(RefenaScope(child: const PokerCreditsApp()));
   }, onZoneError);
 }
 
@@ -32,7 +33,7 @@ class PokerCreditsApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildBrutalTheme(BrutalColors.light, Brightness.light),
       darkTheme: buildBrutalTheme(BrutalColors.dark, Brightness.dark),
-      home: HomePage(),
+      home: const HomePage(),
     );
   }
 }
