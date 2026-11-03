@@ -242,6 +242,12 @@ impl Connection {
         }
         let result = match message {
             ClientMessage::CreateRoom { host_name, config } => {
+                if net.mode == crate::ServerMode::Host {
+                    return Entry::Reject(RoomError::new(
+                        ErrorCode::BadRequest,
+                        "rooms are created by the host app, not over the network",
+                    ));
+                }
                 if !net.create_limiter.check(peer) {
                     return Entry::Reject(RoomError::new(
                         ErrorCode::RateLimited,

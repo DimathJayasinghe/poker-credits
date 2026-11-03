@@ -39,6 +39,19 @@ class _FakeServer implements NativeServer {
     running = false;
   }
 
+  @override
+  Future<RsCreatedRoom> createRoom(String hostName, RsRoomConfig config) async {
+    if (hostName.isEmpty) {
+      throw const RsRoomError(code: 'INVALID_NAME', message: 'name');
+    }
+    return const RsCreatedRoom(
+      roomCode: 'KQ7M',
+      playerId: 'p1',
+      sessionToken: 's',
+      hostToken: 'h',
+    );
+  }
+
   void emit(RsServerEvent event) => _controller.add(event);
 }
 
@@ -121,6 +134,35 @@ void main() {
     // The controller is usable again after the failure.
     await expectLater(failing.start(_config), throwsA(isA<BridgeException>()));
   });
+
+  test(
+    'createRoom passes through and maps refusals to a coded exception',
+    () async {
+      const room = RsRoomConfig(
+        startingChips: 0,
+        smallBlind: 0,
+        bigBlind: 0,
+        ante: 0,
+        isTournament: false,
+        blindLevelMinutes: 10,
+        turnTimeLimitSeconds: 30,
+      );
+      await expectLater(
+        controller.createRoom('Host', room),
+        throwsA(isA<BridgeException>()),
+      );
+      await controller.start(_config);
+      expect((await controller.createRoom('Host', room)).roomCode, 'KQ7M');
+      await expectLater(
+        controller.createRoom('', room),
+        throwsA(
+          isA<BridgeException>()
+              .having((e) => e.kind, 'kind', BridgeFailureKind.room)
+              .having((e) => e.code, 'code', 'INVALID_NAME'),
+        ),
+      );
+    },
+  );
 
   test('a busy port maps to BridgeFailureKind.bind', () async {
     final failing = ServerController(

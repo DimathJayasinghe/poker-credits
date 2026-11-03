@@ -15,6 +15,7 @@ abstract interface class NativeServer {
   Stream<RsServerEvent> events();
   Future<bool> isRunning();
   Future<void> stop();
+  Future<RsCreatedRoom> createRoom(String hostName, RsRoomConfig config);
 }
 
 /// Starts a native server.
@@ -36,6 +37,10 @@ class _RustServer implements NativeServer {
 
   @override
   Future<void> stop() => _handle.stop();
+
+  @override
+  Future<RsCreatedRoom> createRoom(String hostName, RsRoomConfig config) =>
+      _handle.createRoom(hostName: hostName, config: config);
 }
 
 Future<NativeServer> _startRust(RsServerConfig config) async =>
@@ -100,6 +105,21 @@ class ServerController {
       await _forget();
     }
     await start(config);
+  }
+
+  /// Creates a room on the running server and returns the host's credentials.
+  ///
+  /// Throws [BridgeException] (`room`) when the server refuses, or (`unknown`) when no server
+  /// is running.
+  Future<RsCreatedRoom> createRoom(String hostName, RsRoomConfig config) async {
+    final server = _server;
+    if (server == null) {
+      throw const BridgeException(
+        BridgeFailureKind.unknown,
+        'the server is not running',
+      );
+    }
+    return await guardBridge(() => server.createRoom(hostName, config));
   }
 
   /// Stops the server. Harmless when none is running.

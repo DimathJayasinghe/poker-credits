@@ -94,7 +94,7 @@ sequenceDiagram
   "config": { "startingChips":1000, "smallBlind":10, "bigBlind":20, "ante":0,
               "isTournament":false, "blindLevelMinutes":15, "turnTimeLimitSeconds":30 } }
 ```
-Cloud mode only. In host mode the app creates the room through the bridge call `create_room(config)`, which returns `roomCode`, `playerId`, `sessionToken` and `hostToken`. The host UI then connects over loopback and sends `RESUME` with both `sessionToken` and `hostToken`, exactly like a reconnecting host.
+Cloud mode only: a host-mode server answers `CREATE_ROOM` with `BAD_REQUEST`, so nobody else on the Wi-Fi can open rooms on the host's phone. In host mode the app creates the room through the bridge call `create_room(config)`, which returns `roomCode`, `playerId`, `sessionToken` and `hostToken`. The host UI then connects over loopback and sends `RESUME` with both `sessionToken` and `hostToken`, exactly like a reconnecting host.
 
 ### 3.2 `JOIN_ROOM`
 ```json

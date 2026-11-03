@@ -20,6 +20,27 @@ use crate::util::room_code;
 
 type Slot = Arc<watch::Sender<RoomStatus>>;
 
+/// What a creator gets back from a freshly started room (the task is already supervised).
+struct Parts {
+    handle: crate::room::handle::RoomHandle,
+    host_token: String,
+    session_token: String,
+    player_id: String,
+}
+
+/// A room made by [`Registry::create_room_detached`], with the secrets for its host.
+#[derive(Clone, Debug)]
+pub struct CreatedRoom {
+    /// Room code to share with players.
+    pub room_code: String,
+    /// The host's player id.
+    pub player_id: String,
+    /// The host's session token.
+    pub session_token: String,
+    /// Proof that the holder is the host.
+    pub host_token: String,
+}
+
 struct Inner {
     rooms: Mutex<BTreeMap<String, Slot>>,
     limits: Limits,
@@ -132,6 +153,25 @@ impl Registry {
         }
     }
 
+    /// Creates a room without attaching anyone. The host app uses this in host mode and then
+    /// connects like a reconnecting host (`RESUME` with both tokens).
+    ///
+    /// # Errors
+    /// Bad settings or name, or `ROOM_FULL` when the server holds `max_rooms` already.
+    pub fn create_room_detached(
+        &self,
+        host_name: String,
+        config: RoomConfig,
+    ) -> Result<CreatedRoom, RoomError> {
+        self.create_inner(host_name, config)
+            .map(|(created, _)| CreatedRoom {
+                room_code: created.handle.code().to_owned(),
+                player_id: created.player_id,
+                session_token: created.session_token,
+                host_token: created.host_token,
+            })
+    }
+
     /// Creates a room and attaches the creator as host. `ROOM_CREATED` and then `SNAPSHOT`
     /// arrive on `tx`.
     ///
@@ -145,6 +185,43 @@ impl Registry {
         host_name: String,
         config: RoomConfig,
     ) -> Result<Session, RoomError> {
+        let (created, status) = self.create_inner(host_name, config)?;
+        let code = created.handle.code().to_owned();
+        let _queued = tx.try_send(Outbound {
+            req_id: req_id.clone(),
+            message: ServerMessage::RoomCreated {
+                room_code: code,
+                host_token: created.host_token.clone(),
+                session_token: created.session_token.clone(),
+                player_id: created.player_id.clone(),
+            },
+        });
+        let player_id = created
+            .handle
+            .resume(
+                conn,
+                tx.clone(),
+                req_id,
+                created.session_token.clone(),
+                Some(created.host_token.clone()),
+            )
+            .await?;
+        Ok(Session::new(
+            conn,
+            tx,
+            status,
+            player_id,
+            created.session_token,
+            Some(created.host_token),
+        ))
+    }
+
+    /// Allocates a free code, creates the room and starts supervising it.
+    fn create_inner(
+        &self,
+        host_name: String,
+        config: RoomConfig,
+    ) -> Result<(Parts, watch::Receiver<RoomStatus>), RoomError> {
         let (created, slot) = {
             let mut rooms = self.rooms();
             if rooms.len() >= self.inner.limits.max_rooms {
@@ -189,39 +266,19 @@ impl Registry {
             .map(|root| store::room_dir(root, &code));
         tokio::spawn(supervisor::supervise(
             self.clone(),
-            code.clone(),
+            code,
             dir,
             created.task,
             Arc::clone(&slot),
         ));
         let status = slot.subscribe();
-        let _queued = tx.try_send(Outbound {
-            req_id: req_id.clone(),
-            message: ServerMessage::RoomCreated {
-                room_code: code,
-                host_token: created.host_token.clone(),
-                session_token: created.session_token.clone(),
-                player_id: created.player_id.clone(),
-            },
-        });
-        let player_id = created
-            .handle
-            .resume(
-                conn,
-                tx.clone(),
-                req_id,
-                created.session_token.clone(),
-                Some(created.host_token.clone()),
-            )
-            .await?;
-        Ok(Session::new(
-            conn,
-            tx,
-            status,
-            player_id,
-            created.session_token,
-            Some(created.host_token),
-        ))
+        let parts = Parts {
+            handle: created.handle,
+            host_token: created.host_token,
+            session_token: created.session_token,
+            player_id: created.player_id,
+        };
+        Ok((parts, status))
     }
 
     /// Joins a room. `JOINED` and `SNAPSHOT` arrive on `tx`.

@@ -56,13 +56,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  RsRoomConfig dco_decode_box_autoadd_rs_room_config(dynamic raw);
+
+  @protected
   RsServerConfig dco_decode_box_autoadd_rs_server_config(dynamic raw);
 
   @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  RsCreatedRoom dco_decode_rs_created_room(dynamic raw);
+
+  @protected
+  RsRoomConfig dco_decode_rs_room_config(dynamic raw);
+
+  @protected
+  RsRoomError dco_decode_rs_room_error(dynamic raw);
 
   @protected
   RsServerConfig dco_decode_rs_server_config(dynamic raw);
@@ -127,6 +142,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  RsRoomConfig sse_decode_box_autoadd_rs_room_config(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RsServerConfig sse_decode_box_autoadd_rs_server_config(
     SseDeserializer deserializer,
   );
@@ -135,7 +155,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  RsCreatedRoom sse_decode_rs_created_room(SseDeserializer deserializer);
+
+  @protected
+  RsRoomConfig sse_decode_rs_room_config(SseDeserializer deserializer);
+
+  @protected
+  RsRoomError sse_decode_rs_room_error(SseDeserializer deserializer);
 
   @protected
   RsServerConfig sse_decode_rs_server_config(SseDeserializer deserializer);
@@ -211,6 +243,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_rs_room_config(
+    RsRoomConfig self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_rs_server_config(
     RsServerConfig self,
     SseSerializer serializer,
@@ -220,10 +258,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_rs_created_room(RsCreatedRoom self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_rs_room_config(RsRoomConfig self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_rs_room_error(RsRoomError self, SseSerializer serializer);
 
   @protected
   void sse_encode_rs_server_config(

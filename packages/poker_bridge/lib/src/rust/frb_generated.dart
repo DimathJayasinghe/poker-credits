@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1606477730;
+  int get rustContentHash => -203656737;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -79,6 +79,12 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
+  Future<RsCreatedRoom> crateApiServerRsServerHandleCreateRoom({
+    required RsServerHandle that,
+    required String hostName,
+    required RsRoomConfig config,
+  });
+
   Future<bool> crateApiServerRsServerHandleIsRunning({
     required RsServerHandle that,
   });
@@ -118,6 +124,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   });
 
   @override
+  Future<RsCreatedRoom> crateApiServerRsServerHandleCreateRoom({
+    required RsServerHandle that,
+    required String hostName,
+    required RsRoomConfig config,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRsServerHandle(
+            that,
+            serializer,
+          );
+          sse_encode_String(hostName, serializer);
+          sse_encode_box_autoadd_rs_room_config(config, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 1,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_rs_created_room,
+          decodeErrorData: sse_decode_rs_room_error,
+        ),
+        constMeta: kCrateApiServerRsServerHandleCreateRoomConstMeta,
+        argValues: [that, hostName, config],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiServerRsServerHandleCreateRoomConstMeta =>
+      const TaskConstMeta(
+        debugName: "RsServerHandle_create_room",
+        argNames: ["that", "hostName", "config"],
+      );
+
+  @override
   Future<bool> crateApiServerRsServerHandleIsRunning({
     required RsServerHandle that,
   }) {
@@ -132,7 +178,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 1,
+            funcId: 2,
             port: port_,
           );
         },
@@ -163,7 +209,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_u_16,
@@ -194,7 +240,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 3,
+            funcId: 4,
             port: port_,
           );
         },
@@ -230,7 +276,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 4,
+              funcId: 5,
               port: port_,
             );
           },
@@ -262,7 +308,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 6,
             port: port_,
           );
         },
@@ -287,7 +333,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(filter, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -315,7 +361,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 8,
             port: port_,
           );
         },
@@ -396,6 +442,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RsRoomConfig dco_decode_box_autoadd_rs_room_config(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_rs_room_config(raw);
+  }
+
+  @protected
   RsServerConfig dco_decode_box_autoadd_rs_server_config(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_rs_server_config(raw);
@@ -408,9 +460,58 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dcoDecodeI64(raw);
+  }
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
+  }
+
+  @protected
+  RsCreatedRoom dco_decode_rs_created_room(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return RsCreatedRoom(
+      roomCode: dco_decode_String(arr[0]),
+      playerId: dco_decode_String(arr[1]),
+      sessionToken: dco_decode_String(arr[2]),
+      hostToken: dco_decode_String(arr[3]),
+    );
+  }
+
+  @protected
+  RsRoomConfig dco_decode_rs_room_config(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return RsRoomConfig(
+      startingChips: dco_decode_i_64(arr[0]),
+      smallBlind: dco_decode_i_64(arr[1]),
+      bigBlind: dco_decode_i_64(arr[2]),
+      ante: dco_decode_i_64(arr[3]),
+      isTournament: dco_decode_bool(arr[4]),
+      blindLevelMinutes: dco_decode_u_32(arr[5]),
+      turnTimeLimitSeconds: dco_decode_u_32(arr[6]),
+    );
+  }
+
+  @protected
+  RsRoomError dco_decode_rs_room_error(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return RsRoomError(
+      code: dco_decode_String(arr[0]),
+      message: dco_decode_String(arr[1]),
+    );
   }
 
   @protected
@@ -559,6 +660,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RsRoomConfig sse_decode_box_autoadd_rs_room_config(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_rs_room_config(deserializer));
+  }
+
+  @protected
   RsServerConfig sse_decode_box_autoadd_rs_server_config(
     SseDeserializer deserializer,
   ) {
@@ -573,10 +682,60 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getPlatformInt64();
+  }
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
     return deserializer.buffer.getUint8List(len_);
+  }
+
+  @protected
+  RsCreatedRoom sse_decode_rs_created_room(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_roomCode = sse_decode_String(deserializer);
+    var var_playerId = sse_decode_String(deserializer);
+    var var_sessionToken = sse_decode_String(deserializer);
+    var var_hostToken = sse_decode_String(deserializer);
+    return RsCreatedRoom(
+      roomCode: var_roomCode,
+      playerId: var_playerId,
+      sessionToken: var_sessionToken,
+      hostToken: var_hostToken,
+    );
+  }
+
+  @protected
+  RsRoomConfig sse_decode_rs_room_config(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_startingChips = sse_decode_i_64(deserializer);
+    var var_smallBlind = sse_decode_i_64(deserializer);
+    var var_bigBlind = sse_decode_i_64(deserializer);
+    var var_ante = sse_decode_i_64(deserializer);
+    var var_isTournament = sse_decode_bool(deserializer);
+    var var_blindLevelMinutes = sse_decode_u_32(deserializer);
+    var var_turnTimeLimitSeconds = sse_decode_u_32(deserializer);
+    return RsRoomConfig(
+      startingChips: var_startingChips,
+      smallBlind: var_smallBlind,
+      bigBlind: var_bigBlind,
+      ante: var_ante,
+      isTournament: var_isTournament,
+      blindLevelMinutes: var_blindLevelMinutes,
+      turnTimeLimitSeconds: var_turnTimeLimitSeconds,
+    );
+  }
+
+  @protected
+  RsRoomError sse_decode_rs_room_error(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_code = sse_decode_String(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    return RsRoomError(code: var_code, message: var_message);
   }
 
   @protected
@@ -740,6 +899,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_rs_room_config(
+    RsRoomConfig self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_rs_room_config(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_rs_server_config(
     RsServerConfig self,
     SseSerializer serializer,
@@ -755,6 +923,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putPlatformInt64(self);
+  }
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -762,6 +936,37 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     serializer.buffer.putUint8List(self);
+  }
+
+  @protected
+  void sse_encode_rs_created_room(
+    RsCreatedRoom self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.roomCode, serializer);
+    sse_encode_String(self.playerId, serializer);
+    sse_encode_String(self.sessionToken, serializer);
+    sse_encode_String(self.hostToken, serializer);
+  }
+
+  @protected
+  void sse_encode_rs_room_config(RsRoomConfig self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_64(self.startingChips, serializer);
+    sse_encode_i_64(self.smallBlind, serializer);
+    sse_encode_i_64(self.bigBlind, serializer);
+    sse_encode_i_64(self.ante, serializer);
+    sse_encode_bool(self.isTournament, serializer);
+    sse_encode_u_32(self.blindLevelMinutes, serializer);
+    sse_encode_u_32(self.turnTimeLimitSeconds, serializer);
+  }
+
+  @protected
+  void sse_encode_rs_room_error(RsRoomError self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.code, serializer);
+    sse_encode_String(self.message, serializer);
   }
 
   @protected
@@ -862,6 +1067,20 @@ class RsServerHandleImpl extends RustOpaque implements RsServerHandle {
         RustLib.instance.api.rust_arc_decrement_strong_count_RsServerHandle,
     rustArcDecrementStrongCountPtr:
         RustLib.instance.api.rust_arc_decrement_strong_count_RsServerHandlePtr,
+  );
+
+  /// Creates a room and returns the host's credentials (host mode does not accept
+  /// `CREATE_ROOM` over the network).
+  ///
+  /// # Errors
+  /// [`RsRoomError`] for bad settings or a bad name, or when the server is stopped.
+  Future<RsCreatedRoom> createRoom({
+    required String hostName,
+    required RsRoomConfig config,
+  }) => RustLib.instance.api.crateApiServerRsServerHandleCreateRoom(
+    that: this,
+    hostName: hostName,
+    config: config,
   );
 
   /// Whether [`RsServerHandle::stop`] has not been called yet.

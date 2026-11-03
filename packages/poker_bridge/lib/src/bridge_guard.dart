@@ -26,6 +26,12 @@ Future<T> guardBridge<T>(Future<T> Function() call) async {
       RsServerErrorKind.bind => BridgeFailureKind.bind,
       RsServerErrorKind.dataDir => BridgeFailureKind.dataDir,
     }, error.toString());
+  } on RsRoomError catch (error) {
+    throw BridgeException(
+      BridgeFailureKind.room,
+      error.message,
+      code: error.code,
+    );
   } on Object catch (error) {
     _log.warning('bridge call failed', error);
     throw BridgeException(BridgeFailureKind.unknown, error.toString());

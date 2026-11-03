@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use flutter_rust_bridge::frb;
 use poker_server_core::config::{Limits, Timings};
 use poker_server_core::event::ServerEvent;
+use poker_server_core::protocol::RoomConfig;
 use poker_server_core::{ServerConfig, ServerHandle, ServerMode, StartError};
 use tokio::sync::{Mutex, mpsc};
 
@@ -117,6 +118,56 @@ impl From<StartError> for RsServerError {
     }
 }
 
+/// Table settings the host picks before the first hand.
+#[derive(Clone, Debug)]
+pub struct RsRoomConfig {
+    /// Stack every player starts with.
+    pub starting_chips: i64,
+    /// Small blind (first level for tournaments).
+    pub small_blind: i64,
+    /// Big blind (first level for tournaments).
+    pub big_blind: i64,
+    /// Ante, zero for none.
+    pub ante: i64,
+    /// Escalating blinds instead of fixed ones.
+    pub is_tournament: bool,
+    /// Minutes per tournament level.
+    pub blind_level_minutes: u32,
+    /// Seconds a player has to act, zero for no timer.
+    pub turn_time_limit_seconds: u32,
+}
+
+/// A new room and the secrets of its host. The host UI connects with these like a reconnecting
+/// host (`RESUME` with `session_token` and `host_token`).
+#[derive(Clone, Debug)]
+pub struct RsCreatedRoom {
+    /// Code to share with players.
+    pub room_code: String,
+    /// The host's player id.
+    pub player_id: String,
+    /// The host's session token.
+    pub session_token: String,
+    /// Proof that the holder is the host. Keep it in secure storage.
+    pub host_token: String,
+}
+
+/// The room was refused.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RsRoomError {
+    /// Wire error code, for example `ROOM_FULL` or `BAD_REQUEST`.
+    pub code: String,
+    /// Human-readable text.
+    pub message: String,
+}
+
+impl std::fmt::Display for RsRoomError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.code, self.message)
+    }
+}
+
+impl std::error::Error for RsRoomError {}
+
 /// A running embedded server. Opaque to Dart.
 #[frb(opaque)]
 pub struct RsServerHandle {
@@ -132,6 +183,39 @@ impl RsServerHandle {
     #[must_use]
     pub fn port(&self) -> u16 {
         self.port
+    }
+
+    /// Creates a room and returns the host's credentials (host mode does not accept
+    /// `CREATE_ROOM` over the network).
+    ///
+    /// # Errors
+    /// [`RsRoomError`] for bad settings or a bad name, or when the server is stopped.
+    pub async fn create_room(
+        &self,
+        host_name: String,
+        config: RsRoomConfig,
+    ) -> Result<RsCreatedRoom, RsRoomError> {
+        let guard = self.inner.lock().await;
+        let server = guard.as_ref().ok_or_else(|| RsRoomError {
+            code: "INTERNAL_ERROR".to_owned(),
+            message: "the server is stopped".to_owned(),
+        })?;
+        let created = server
+            .registry()
+            .create_room_detached(host_name, config.try_into()?)
+            .map_err(|error| RsRoomError {
+                code: serde_json::to_value(error.code)
+                    .ok()
+                    .and_then(|value| value.as_str().map(str::to_owned))
+                    .unwrap_or_else(|| "INTERNAL_ERROR".to_owned()),
+                message: error.message,
+            })?;
+        Ok(RsCreatedRoom {
+            room_code: created.room_code,
+            player_id: created.player_id,
+            session_token: created.session_token,
+            host_token: created.host_token,
+        })
     }
 
     /// Whether [`RsServerHandle::stop`] has not been called yet.
@@ -194,6 +278,29 @@ pub(crate) async fn start_with_events(
         inner: Mutex::new(Some(server)),
         pending_events: std::sync::Mutex::new(Some(receiver)),
     })
+}
+
+impl TryFrom<RsRoomConfig> for RoomConfig {
+    type Error = RsRoomError;
+
+    /// Chips are `i64` on the bridge because Dart integers are signed; negatives are refused.
+    fn try_from(config: RsRoomConfig) -> Result<Self, RsRoomError> {
+        let chips = |value: i64| {
+            u64::try_from(value).map_err(|_| RsRoomError {
+                code: "INVALID_AMOUNT".to_owned(),
+                message: "chip amounts cannot be negative".to_owned(),
+            })
+        };
+        Ok(RoomConfig {
+            starting_chips: chips(config.starting_chips)?,
+            small_blind: chips(config.small_blind)?,
+            big_blind: chips(config.big_blind)?,
+            ante: chips(config.ante)?,
+            is_tournament: config.is_tournament,
+            blind_level_minutes: config.blind_level_minutes,
+            turn_time_limit_seconds: config.turn_time_limit_seconds,
+        })
+    }
 }
 
 fn to_core(config: &RsServerConfig, events: mpsc::Sender<ServerEvent>) -> ServerConfig {
@@ -284,6 +391,43 @@ mod tests {
         assert!(!handle.is_running().await);
         let stopped = rx.recv().await.map(|e| to_wire(&e)).map(|e| e.kind);
         assert_eq!(stopped, Some(RsServerEventKind::Stopped));
+    }
+
+    fn room_config() -> RsRoomConfig {
+        RsRoomConfig {
+            starting_chips: 1000,
+            small_blind: 5,
+            big_blind: 10,
+            ante: 0,
+            is_tournament: false,
+            blind_level_minutes: 10,
+            turn_time_limit_seconds: 30,
+        }
+    }
+
+    #[tokio::test]
+    async fn create_room_returns_credentials_and_reports_wire_codes() {
+        let (tx, rx) = mpsc::channel(8);
+        let handle = start_with_events(&config(false), tx, rx)
+            .await
+            .expect("starts");
+        let room = handle
+            .create_room("Host".to_owned(), room_config())
+            .await
+            .expect("room");
+        assert_eq!(room.room_code.len(), 4);
+        assert!(!room.host_token.is_empty() && !room.session_token.is_empty());
+
+        let bad = RsRoomConfig {
+            big_blind: 1,
+            ..room_config()
+        };
+        let error = handle.create_room("Host".to_owned(), bad).await.err();
+        assert_eq!(error.map(|e| e.code), Some("INVALID_AMOUNT".to_owned()));
+
+        handle.stop().await;
+        let stopped = handle.create_room("Host".to_owned(), room_config()).await;
+        assert!(stopped.is_err());
     }
 
     #[tokio::test]

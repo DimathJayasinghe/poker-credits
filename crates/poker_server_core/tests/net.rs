@@ -749,3 +749,49 @@ async fn everyone_hears_room_expired_before_the_socket_closes() {
     }
     server.stop().await;
 }
+
+#[tokio::test]
+async fn host_mode_refuses_room_creation_over_the_network_and_resumes_a_detached_room() {
+    let server = poker_server_core::start(ServerConfig {
+        bind: "127.0.0.1:0".parse().unwrap(),
+        data_dir: None,
+        limits: Limits::default(),
+        timings: Timings::default(),
+        mode: ServerMode::Host,
+        server_name: "Host".into(),
+        events: None,
+    })
+    .await
+    .unwrap();
+    let addr = server.local_addr();
+
+    let mut stranger = WsClient::connect(addr).await;
+    stranger
+        .send(
+            json!({"v": 1, "type": "CREATE_ROOM", "hostName": "Mallory", "config": config_json()}),
+        )
+        .await;
+    let refused = stranger.recv().await.unwrap();
+    assert_eq!(error_code(&refused), "BAD_REQUEST");
+    assert_eq!(server.registry().room_count(), 0);
+
+    let config: serde_json::Value = config_json();
+    let config = serde_json::from_value(config).unwrap();
+    let room = server
+        .registry()
+        .create_room_detached("Host".into(), config)
+        .unwrap();
+    assert_eq!(server.registry().room_count(), 1);
+
+    let mut host = WsClient::connect(addr).await;
+    host.send(json!({"v": 1, "type": "RESUME", "roomCode": room.room_code,
+                     "sessionToken": room.session_token, "hostToken": room.host_token}))
+        .await;
+    let snapshot = host.expect("SNAPSHOT").await;
+    assert_eq!(snapshot["view"]["roomCode"], room.room_code.as_str());
+
+    // Players still join normally.
+    let player = join_as(addr, &room.room_code, "Alice", None).await;
+    assert!(!player.player_id.is_empty());
+    server.stop().await;
+}

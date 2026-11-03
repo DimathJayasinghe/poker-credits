@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `start_with_events`, `to_core`, `to_wire`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `try_from`
 
 /// Starts the server and returns its handle. Call [`RsServerHandle::subscribe`] to watch it.
 ///
@@ -18,6 +18,16 @@ Future<RsServerHandle> startServer({required RsServerConfig config}) =>
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RsServerHandle>>
 abstract class RsServerHandle implements RustOpaqueInterface {
+  /// Creates a room and returns the host's credentials (host mode does not accept
+  /// `CREATE_ROOM` over the network).
+  ///
+  /// # Errors
+  /// [`RsRoomError`] for bad settings or a bad name, or when the server is stopped.
+  Future<RsCreatedRoom> createRoom({
+    required String hostName,
+    required RsRoomConfig config,
+  });
+
   /// Whether [`RsServerHandle::stop`] has not been called yet.
   Future<bool> isRunning();
 
@@ -31,6 +41,125 @@ abstract class RsServerHandle implements RustOpaqueInterface {
   /// Streams [`RsServerEvent`]s into `events` until the server stops. Only the first call
   /// gets the stream; later calls end immediately.
   Stream<RsServerEvent> subscribe();
+}
+
+/// A new room and the secrets of its host. The host UI connects with these like a reconnecting
+/// host (`RESUME` with `session_token` and `host_token`).
+class RsCreatedRoom {
+  /// Code to share with players.
+  final String roomCode;
+
+  /// The host's player id.
+  final String playerId;
+
+  /// The host's session token.
+  final String sessionToken;
+
+  /// Proof that the holder is the host. Keep it in secure storage.
+  final String hostToken;
+
+  const RsCreatedRoom({
+    required this.roomCode,
+    required this.playerId,
+    required this.sessionToken,
+    required this.hostToken,
+  });
+
+  @override
+  int get hashCode =>
+      roomCode.hashCode ^
+      playerId.hashCode ^
+      sessionToken.hashCode ^
+      hostToken.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RsCreatedRoom &&
+          runtimeType == other.runtimeType &&
+          roomCode == other.roomCode &&
+          playerId == other.playerId &&
+          sessionToken == other.sessionToken &&
+          hostToken == other.hostToken;
+}
+
+/// Table settings the host picks before the first hand.
+class RsRoomConfig {
+  /// Stack every player starts with.
+  final PlatformInt64 startingChips;
+
+  /// Small blind (first level for tournaments).
+  final PlatformInt64 smallBlind;
+
+  /// Big blind (first level for tournaments).
+  final PlatformInt64 bigBlind;
+
+  /// Ante, zero for none.
+  final PlatformInt64 ante;
+
+  /// Escalating blinds instead of fixed ones.
+  final bool isTournament;
+
+  /// Minutes per tournament level.
+  final int blindLevelMinutes;
+
+  /// Seconds a player has to act, zero for no timer.
+  final int turnTimeLimitSeconds;
+
+  const RsRoomConfig({
+    required this.startingChips,
+    required this.smallBlind,
+    required this.bigBlind,
+    required this.ante,
+    required this.isTournament,
+    required this.blindLevelMinutes,
+    required this.turnTimeLimitSeconds,
+  });
+
+  @override
+  int get hashCode =>
+      startingChips.hashCode ^
+      smallBlind.hashCode ^
+      bigBlind.hashCode ^
+      ante.hashCode ^
+      isTournament.hashCode ^
+      blindLevelMinutes.hashCode ^
+      turnTimeLimitSeconds.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RsRoomConfig &&
+          runtimeType == other.runtimeType &&
+          startingChips == other.startingChips &&
+          smallBlind == other.smallBlind &&
+          bigBlind == other.bigBlind &&
+          ante == other.ante &&
+          isTournament == other.isTournament &&
+          blindLevelMinutes == other.blindLevelMinutes &&
+          turnTimeLimitSeconds == other.turnTimeLimitSeconds;
+}
+
+/// The room was refused.
+class RsRoomError implements FrbException {
+  /// Wire error code, for example `ROOM_FULL` or `BAD_REQUEST`.
+  final String code;
+
+  /// Human-readable text.
+  final String message;
+
+  const RsRoomError({required this.code, required this.message});
+
+  @override
+  int get hashCode => code.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RsRoomError &&
+          runtimeType == other.runtimeType &&
+          code == other.code &&
+          message == other.message;
 }
 
 /// What the app asks for when it hosts a game.

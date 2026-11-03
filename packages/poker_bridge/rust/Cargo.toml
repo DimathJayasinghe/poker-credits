@@ -13,6 +13,7 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 # Pinned to the codegen version (docs/SPIKE_BRIDGE_FINDINGS.md).
 flutter_rust_bridge = "=2.13.0"
 poker_server_core = { path = "../../../crates/poker_server_core" }
+serde_json = "1.0.149"
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "sync", "time"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
