@@ -178,6 +178,8 @@ Exact versions are chosen in Phase 0 and recorded here before use. Anything not 
 
 **Dart/Flutter:** `refena_flutter`, bundled fonts (Archivo Black, Space Mono; SIL OFL files in `app/assets/fonts/`, **no** `google_fonts` runtime download), `dart_mappable` (+builder), `web_socket_channel`, `wakelock_plus`, `pretty_qr_code`, a QR scanner plugin, `window_manager` (desktop), `path_provider`, `package_info_plus`, `device_info_plus`, `logging`, `flutter_secure_storage` (or equivalent), an audio plugin, `network_info_plus` is **not** needed (use `NetworkInterface.list()`), `build_runner`, `flutter_lints`, `mockito` or `mocktail` (pick one in Phase 0).
 
+Versions in use (app, as of Phase 4): `refena_flutter ^3.7.0`, `web_socket_channel ^3.0.3`, `wakelock_plus ^1.7.0`, `pretty_qr_code ^3.6.0`, `path_provider ^2.1.6`, `fake_async ^1.3.3` (dev). Token storage is a plain file for now (see `docs/STATUS.md`, Phase 4 deviations); `flutter_secure_storage` is not added.
+
 ## 7. Starting a task
 1. Read section 0 files.
 2. `git checkout main && git pull` (if a remote exists), then create the phase branch.

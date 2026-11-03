@@ -1,6 +1,6 @@
 # Project Status & Handoff
 
-Last updated: 2026-11-03 (branch `feature/protocol-dart-models`, stacked on `feature/server-core`).
+Last updated: 2026-11-03 (branch `feature/app-shell`, stacked on `feature/protocol-dart-models`).
 
 ## Where we are
 **Phase 0 (bootstrap) is done and Phase 1 (engine) is implemented for review.** The old TypeScript scaffold was deleted (owner approved 2026-11-01). The stack was changed to **Flutter (app) + Rust (engine and server)**, and the docs were rewritten to match, using LocalSend (`~/Documents/dev_projects/localsend`) as the model for repo layout, Flutter-Rust bridging and crash handling.
@@ -61,9 +61,38 @@ Phase 3b done: `packages/poker_bridge` (FRB 2.13.0 + cargokit, added to the Carg
 - Codegen: `cd packages/poker_bridge && flutter_rust_bridge_codegen generate`. It rewrites `.fvmrc` and `.gitignore` as a side effect (`git checkout .fvmrc .gitignore` afterwards) and leaves `frb_generated.rs` unformatted (run `cargo fmt --all`, the pre-commit hook checks it). Generated Rust and Dart files are committed.
 - Not verified: Android/iOS/macOS/Windows builds of the bridge in this repo (the spike built Android), running the bridge inside `app/` (Phase 4).
 
+## Phase 4 status (app shell and Table screen), on `feature/app-shell`
+Done:
+- **Brutal widgets** (`widget/brutal/`): tag, banner, text field, slider with ticks, keypad, dialog, sheet, plus the Phase 0 button and card; widget tests and light/dark gallery goldens.
+- **Net layer** (`net/`): backoff, `LinkState`, a transport seam and `RoomClient` (RESUME with tokens on every connect, ping, jittered backoff, a version gap triggers a reconnect). `model/room_state.dart` folds server messages into an immutable `RoomState` (a `SNAPSHOT` replaces the view, `STATE_UPDATE` only applies if newer).
+- **Platform seams** (`platform/`, conditional exports with a stub for web): host server (wraps `ServerController`, port 7878 with a free-port fallback), local addresses ranked for the LAN, wake lock, token store, desktop single instance (loopback port 47878), rotating file log.
+- **Refena providers** (`provider/`): services, `SessionNotifier` (the one socket), `HostNotifier` (start, restore, foreground recovery via `ensureRunning`, stop).
+- **Pages**: `HostPage` (name and chips, then start), `TablePage` (felt with seat plates, pot, action ticker, turn countdown, QR and typed addresses in the lobby, host controls: start hand, undo, pause or resume, begin showdown and pick winners from the server's eligible players, approve top-ups, kick by tapping a seat, presence votes, end game; link banner, lost-room panel; wake lock held while open), and the home page's "resume hosted game". A bridge that fails to load shows "hosting unavailable" and never the init error app.
+- **Goldens** of the Table at phone portrait 390x844, tablet landscape 1280x800 and TV 1920x1080 (betting and lobby views). Narrow screens (under 600 px) stack the pot above a two-column seat list instead of the oval, which cannot fit ten plates.
+
+Verified locally: `cargo fmt/clippy -D warnings/test --workspace`, `fvm flutter analyze` (clean), `fvm flutter test` (86 tests), `bash tool/check_web_safe.sh`, `fvm flutter build web --no-web-resources-cdn` (the conditional export keeps FFI out), `fvm flutter build linux` (cargokit builds the Rust; `librust_lib_poker_bridge.so` is in the bundle), and the Linux release binary starts, claims the single-instance port and shows no init error.
+
+Protocol and server changes made for the app, for review:
+- `RoomView.pendingRebuys` (`PendingRebuyView{playerId, amount, approved}`), always serialized, so the host can approve top-ups from the table (Rust, fixtures, Dart models, `API_AND_EVENTS.md`).
+- A host-mode server refuses `CREATE_ROOM` over the network (`BAD_REQUEST`); the host's room is created through the bridge (`ServerHandle::create_room`, `create_room_detached` in the registry) and the host UI resumes it over loopback with both tokens.
+
+Deviations from the guide:
+- **Token store is a file** (`FileTokenStore` in the app support folder), not `flutter_secure_storage`: its Linux plugin needs `libsecret`, which is not installed here and would break the Linux build. The interface is `TokenStore`, so a secure implementation can replace it. Tokens are bearer secrets; revisit before release.
+- No window-manager seam yet (`window_manager` not added); desktop shows the plain window.
+- The turn bar's "full" length is inferred from the first deadline seen for a turn (the view carries only a deadline, not the limit).
+- Local-network discovery of the host address is a best guess (private, non-virtual interfaces first); the QR carries the first, the screen lists up to three.
+
+Not verified:
+- Hosting end to end inside the real app (Host button, `ROOM_CREATED`, table renders): no UI automation here. The pieces are covered separately: fake-backed widget tests for the whole flow, and the bridge smoke test against the real native library.
+- Android, iOS, macOS and Windows builds of `app/`.
+- GitHub CI has never run on any pushed branch (no workflow runs are listed although Actions looks enabled). Check Settings, Actions. Also check that the Linux job installs Rust now that `app` depends on the bridge.
+- On this machine `flutter build linux` needs `ld` and `ar` next to llvm-21's `clang` (the Dart native-assets step looks there): put wrapper scripts in a directory on `PATH`, or install `lld`.
+- `the_room_survives_a_restart_from_disk` (`tests/actor.rs`, not touched by this phase) failed once in about eight full runs under load and passed on rerun; it leans on `settle()` yields. Not reproduced.
+
 Local `main` was fast-forwarded (not pushed) to the end of Phase 2 (`2173d0f`) on 2026-11-03; `feature/server-core` holds the same commits.
 
 ## Next step
+0. **Phase 4 is complete on `feature/app-shell`, awaiting owner review.** Next is Phase 5 (Player and Spectator controller: join by QR or code, hole-card-free action pad, bet slider); do not start it before review.
 1. Owner reviews Phase 0 (`chore/bootstrap`) and Phase 1 (`feature/engine-core`, which contains Phase 0) and merges to `main`.
 2. Start **Phase 2** (server core and cloud binary) after approval. The engine's `PokerError` variants `NothingToCall`, `BettingNotReopened`, `NotPaused`, `NotEnoughPlayers`, `UnknownPlayer`, `PlayerExists`, `InvalidSeat`, `InvalidAmount`, `Overflow`, `IllegalTransition`, `NothingToUndo` and `InvalidAllocation` have no wire code yet in `API_AND_EVENTS.md` section 6; add them when writing the exhaustive `From<PokerError> for ErrorCode`.
 3. Open owner questions from the engine work: when busted players are removed (decision 19; the policy below proposes a 2-minute rebuy window first). Inactive-player policy approved 2026-11-02 and recorded in `RESILIENCE_AND_CRASH_HANDLING.md` section 3.8 (engine layer done; presence check with 90 s vote and the busted-player rebuy window are Phase 2). Answered 2026-11-02: no missed-blind catch-up (decision 10); several short all-ins that add up reopen betting per TDA rule 47 (decision 4).
