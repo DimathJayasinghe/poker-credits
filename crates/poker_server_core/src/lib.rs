@@ -5,6 +5,7 @@
 pub mod config;
 pub mod protocol;
 pub mod room;
+pub mod store;
 pub mod util;
 
 /// Wire protocol version spoken by this build (`v` field of every message).
