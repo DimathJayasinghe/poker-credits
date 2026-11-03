@@ -385,15 +385,24 @@ async fn the_room_survives_a_restart_from_disk() {
     else {
         panic!("expected a snapshot");
     };
-    assert_eq!(state_version, before.1);
+    // Restoring restarts the turn clock (downtime never costs a turn). That is journaled as one
+    // more version when the clock value changed, which depends on whether the wall clock moved
+    // by a millisecond since the turn began, so both outcomes are correct.
+    assert!(
+        (before.1..=before.1 + 1).contains(&state_version),
+        "restored version {state_version}, before the crash {}",
+        before.1
+    );
     let mut expected = before.0;
     for seat in &mut expected.seats {
         seat.is_connected = false;
     }
+    expected.turn_deadline_ms = None;
     let mut got = view;
     for seat in &mut got.seats {
         seat.is_connected = false;
     }
+    got.turn_deadline_ms = None;
     assert_eq!(got, expected);
 }
 
