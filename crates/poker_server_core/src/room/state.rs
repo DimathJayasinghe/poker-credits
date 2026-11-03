@@ -260,6 +260,13 @@ pub enum Op {
         /// Server time.
         at_ms: u64,
     },
+    /// The room was loaded from disk after the server (or the room's task) was down. Gives the
+    /// player on turn, and a running presence check, a full fresh clock, so downtime is never
+    /// held against anybody.
+    Recover {
+        /// Server time.
+        at_ms: u64,
+    },
     /// Time passed: expire presence checks, start new ones.
     Tick {
         /// Server time.
@@ -527,6 +534,7 @@ impl Op {
             | Op::RequestRebuy { at_ms, .. }
             | Op::PresenceVote { at_ms, .. }
             | Op::PresenceAck { at_ms, .. }
+            | Op::Recover { at_ms }
             | Op::Tick { at_ms } => *at_ms,
         }
     }

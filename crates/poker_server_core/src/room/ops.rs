@@ -87,6 +87,10 @@ impl RoomState {
                 at_ms,
             } => self.op_presence_vote(&voter, &subject, still_playing, at_ms, out),
             Op::PresenceAck { player_id, at_ms } => self.op_presence_ack(&player_id, at_ms, out),
+            Op::Recover { at_ms } => {
+                self.op_recover(at_ms, timings, out);
+                Ok(())
+            }
             Op::Tick { at_ms } => self.op_tick(at_ms, timings, out),
         }
     }
@@ -511,6 +515,28 @@ impl RoomState {
         )?;
         self.finish(at_ms, out);
         Ok(())
+    }
+
+    /// Restarts the clocks that were running when the room went down. A clock is only ever
+    /// moved later, never earlier, and a paused game has none to restart.
+    fn op_recover(&mut self, at_ms: u64, timings: &Timings, out: &mut Outcome) {
+        let limit_ms = u64::from(self.config.turn_time_limit_seconds) * 1000;
+        if let Some(deadline) = self.turn_deadline_ms {
+            let fresh = deadline.max(at_ms.saturating_add(limit_ms));
+            if fresh != deadline {
+                self.turn_deadline_ms = Some(fresh);
+                out.changed = true;
+            }
+        }
+        if let Some(presence) = self.presence.as_mut() {
+            let fresh = presence
+                .deadline_ms
+                .max(at_ms.saturating_add(timings.presence_check_ms));
+            if fresh != presence.deadline_ms {
+                presence.deadline_ms = fresh;
+                out.changed = true;
+            }
+        }
     }
 
     fn op_timeout(&mut self, at_ms: u64, out: &mut Outcome) -> Done {

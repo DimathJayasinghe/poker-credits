@@ -48,7 +48,7 @@ Also done (Phase 2 complete, pending owner review):
 Deviations from the guide, for review:
 - `ServerConfig.data_dir` is `Option<PathBuf>` (tests run in memory) and `events` is an optional bounded sender; `ServerEvent` is minimal (`Listening`, `RoomsRestored`, `Stopped`).
 - No `SeatReservationGuard`: a join is one atomic step inside the room actor, so nothing is reserved across an `.await`. A join whose connection dies before `JOINED` is delivered leaves a seated, disconnected player; the grace, 10 minute and presence rules clean that up.
-- Behind a reverse proxy every client appears as the proxy's IP (per-IP caps would hit all players together). A `trust_proxy` option reading `X-Forwarded-For` is not implemented; decide before deploying behind one.
+- Behind a reverse proxy every client appears as the proxy's IP (per-IP caps would hit all players together). A `trust_proxy` option reading `X-Forwarded-For` is not implemented; deferred (see open question 0).
 - `everyone_hears_room_expired_before_the_socket_closes` passes with and without the flush fix in a local mutation check (the race is too narrow to trigger from outside); it guards the behaviour, it does not prove the race fixed.
 - Not tested over real sockets: a slow reader filling the outbound queue (needs megabytes of unread data). The policy itself (queue full means the room drops the connection) is tested at actor level in `tests/actor.rs`, and a room-side close ending the socket is tested through the kick test.
 - Not tested: a journal replay that panics (poisoning path).
@@ -79,7 +79,7 @@ Please confirm or change; each is recorded in the docs.
 | 11 | `actionSeq` is monotonic per session, server-owned (`nextActionSeq`), advances only on applied actions. | API 5.3 |
 
 ## Open questions for the owner
-0. **Downtime and turn deadlines** (new): deadlines are absolute, so a player on turn when the server went down is timed out right after a restart, before anyone can reconnect. Extend deadlines by the downtime on restore, or keep it? Also: 4-character room codes (about 1 million) are the weak point of cloud mode even with per-IP limits; consider 6 characters. And: behind a reverse proxy the per-IP limits need `X-Forwarded-For` support, which does not exist yet.
+0. ~~Downtime, room code length, proxy~~ **Decided (owner: take the standard choice that matches the plan):** (a) downtime never costs a turn: `Op::Recover` restarts the turn clock and any presence-check clock when a room is loaded (journaled; a clock only moves later). (b) Room codes stay 4 characters: the plan, QR payload and ADRs fix them, and the per-IP limits and a one-hour idle expiry are the mitigation; revisit only if cloud mode sees real probing. (c) `X-Forwarded-For` / `trust_proxy` stays out until a cloud deployment sits behind a proxy; deploy the cloud binary with a platform that exposes the client address (or add `trust_proxy` then).
 1. ~~Browser guests~~ **Answered:** web later (Phase 7), codebase kept web-ready (ADR-014). Still open: should the web build also be able to **host**? Plan says no (host mode is native only).
 2. Is iOS hosting required to work in the background? Plain iOS does not allow it; the plan says "keep the app in the foreground while hosting". If background hosting is a must, the cloud mode is the answer on iOS.
 3. Cloud hosting target and budget (Fly.io, Render, your own VPS)? Affects the Dockerfile and data-volume docs only.

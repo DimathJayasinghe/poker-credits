@@ -11,21 +11,32 @@ use tokio::time::Instant;
 
 type Counts = Arc<Mutex<HashMap<IpAddr, usize>>>;
 
-/// The identity limits are counted against. One IPv6 customer normally owns a whole `/64`
-/// (billions of addresses), so counting single addresses would give a scanner a fresh budget
-/// per request. IPv6 addresses are therefore reduced to their `/64` prefix, and IPv4-mapped
-/// IPv6 addresses (`::ffff:a.b.c.d`) are treated as the IPv4 address they carry.
+/// The identity limits are counted against.
+///
+/// One IPv6 customer normally owns a whole `/64` (billions of addresses), so counting single
+/// addresses would give a scanner a fresh budget per request. Global unicast addresses
+/// (`2000::/3`) are therefore reduced to their `/64` prefix, and IPv4-mapped IPv6 addresses
+/// (`::ffff:a.b.c.d`) are treated as the IPv4 address they carry.
+///
+/// Addresses that only exist on a local network (loopback, link-local `fe80::/10`, unique-local
+/// `fc00::/7`) stay exact: every phone on one Wi-Fi or hotspot shares such a prefix, and in LAN
+/// host mode they must not use up each other's budgets.
 #[must_use]
 pub fn limiter_key(ip: IpAddr) -> IpAddr {
     match ip {
         IpAddr::V4(_) => ip,
-        IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or_else(
-            || {
-                let [a, b, c, d, ..] = v6.segments();
+        IpAddr::V6(v6) => {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return IpAddr::V4(v4);
+            }
+            let [a, b, c, d, ..] = v6.segments();
+            let global_unicast = a & 0xe000 == 0x2000;
+            if global_unicast {
                 IpAddr::V6(Ipv6Addr::new(a, b, c, d, 0, 0, 0, 0))
-            },
-            IpAddr::V4,
-        ),
+            } else {
+                ip
+            }
+        }
     }
 }
 
@@ -338,6 +349,20 @@ mod tests {
         assert_ne!(limiter_key(in_prefix(1)), limiter_key(other_prefix));
         let high_bits: IpAddr = "2001:db8:1:2:aaaa:bbbb:cccc:dddd".parse().unwrap();
         assert_eq!(limiter_key(high_bits), limiter_key(in_prefix(1)));
+    }
+
+    #[test]
+    fn local_network_ipv6_addresses_stay_exact() {
+        for text in [
+            "fe80::1",
+            "fe80::2",
+            "fd12:3456:789a:1::5",
+            "fd12:3456:789a:1::6",
+            "::1",
+        ] {
+            let ip: IpAddr = text.parse().unwrap();
+            assert_eq!(limiter_key(ip), ip, "{text} must keep its own budget");
+        }
     }
 
     #[test]

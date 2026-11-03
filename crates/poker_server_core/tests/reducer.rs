@@ -226,6 +226,43 @@ fn timeout_waits_for_the_deadline_then_acts() {
 }
 
 #[test]
+fn recover_gives_the_player_on_turn_a_fresh_clock() {
+    let (mut room, _) = table_of_three();
+    let t = Timings::default();
+    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    assert_eq!(room.turn_deadline_ms, Some(31_000));
+    let actor = active_id(&room);
+    // The server was down for an hour: without recovery the turn would time out at once.
+    let out = room.apply(Op::Recover { at_ms: 3_600_000 }, &t).unwrap();
+    assert!(out.changed);
+    assert_eq!(room.turn_deadline_ms, Some(3_630_000));
+    let early = room
+        .apply(Op::Timeout { at_ms: 3_600_001 }, &t)
+        .unwrap_err();
+    assert_eq!(early.code, ErrorCode::BadRequest);
+    assert_eq!(active_id(&room), actor, "nobody was timed out");
+}
+
+#[test]
+fn recover_never_shortens_a_clock_and_changes_nothing_without_one() {
+    let (mut room, _) = table_of_three();
+    let t = Timings::default();
+    let version = room.state_version;
+    assert!(
+        !room.apply(Op::Recover { at_ms: 500 }, &t).unwrap().changed,
+        "lobby: no clock"
+    );
+    assert_eq!(room.state_version, version);
+    room.apply(host(HostCommand::StartHand, 10_000), &t)
+        .unwrap();
+    // A recovery time earlier than the turn start (clock skew) would give a shorter clock
+    // than the one running: the existing deadline (40 s) stays.
+    let out = room.apply(Op::Recover { at_ms: 9_000 }, &t).unwrap();
+    assert!(!out.changed);
+    assert_eq!(room.turn_deadline_ms, Some(40_000));
+}
+
+#[test]
 fn pause_freezes_the_clock_and_resume_gives_back_the_remaining_time() {
     let (mut room, _) = table_of_three();
     let t = Timings::default();

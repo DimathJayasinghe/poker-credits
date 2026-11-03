@@ -170,7 +170,12 @@ async fn a_crashed_room_is_rebuilt_and_connections_are_reattached() {
         "{after:?}"
     );
     let (version_after, mut view_after) = snapshot_of(&after).unwrap();
-    assert_eq!(version_after, version_before);
+    // Loading the room restarts the turn clock (`Op::Recover`), which is one state change at
+    // most; everything else must be identical.
+    assert!(
+        (version_before..=version_before + 1).contains(&version_after),
+        "{version_before} -> {version_after}"
+    );
     let mut view_before = view_before;
     for seat in view_before
         .seats
@@ -179,6 +184,11 @@ async fn a_crashed_room_is_rebuilt_and_connections_are_reattached() {
     {
         seat.is_connected = false;
     }
+    assert!(
+        view_after.turn_deadline_ms >= view_before.turn_deadline_ms,
+        "a restart never shortens the turn clock"
+    );
+    view_after.turn_deadline_ms = view_before.turn_deadline_ms;
     assert_eq!(view_after, view_before, "same hand, same chips, same turn");
 
     // And the room accepts play again.

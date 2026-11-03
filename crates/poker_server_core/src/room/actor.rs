@@ -187,8 +187,19 @@ pub fn restore(
     clock: Clock,
 ) -> Result<(RoomHandle, JoinHandle<ExitReason>), store::StoreError> {
     let restored = store::restore(&dir, timings)?;
-    let journal = Journal::open(&dir, restored.last_seq)?;
-    let state = restored.state;
+    let mut journal = Journal::open(&dir, restored.last_seq)?;
+    let mut state = restored.state;
+    // Downtime must not cost the player on turn their clock. Journaled, so replay agrees.
+    let recover = Op::Recover {
+        at_ms: clock.now_ms(),
+    };
+    let mut recovered = state.clone();
+    if let Ok(outcome) = recovered.apply(recover.clone(), timings)
+        && outcome.changed
+    {
+        journal.append(&recover)?;
+        state = recovered;
+    }
     Ok(spawn(
         state,
         Some(Store { dir, journal }),
