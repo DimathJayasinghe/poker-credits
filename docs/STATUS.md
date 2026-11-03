@@ -1,6 +1,6 @@
 # Project Status & Handoff
 
-Last updated: 2026-11-03 (branch `feature/app-shell`, stacked on `feature/protocol-dart-models`).
+Last updated: 2026-11-03 (branch `feature/player-screens`, stacked on `feature/app-shell`).
 
 ## Where we are
 **Phase 0 (bootstrap) is done and Phase 1 (engine) is implemented for review.** The old TypeScript scaffold was deleted (owner approved 2026-11-01). The stack was changed to **Flutter (app) + Rust (engine and server)**, and the docs were rewritten to match, using LocalSend (`~/Documents/dev_projects/localsend`) as the model for repo layout, Flutter-Rust bridging and crash handling.
@@ -90,10 +90,28 @@ Not verified:
 - `flutter build linux` needs `ld` and `ar` next to llvm's `clang` (the Dart native-assets step looks there); installing `lld` fixed it here.
 - `the_room_survives_a_restart_from_disk` (`tests/actor.rs`, not touched by this phase) failed once in about eight full runs under load and passed on rerun; it leans on `settle()` yields. Not reproduced.
 
+## Phase 5 status (Player and Spectator screens), on `feature/player-screens`
+Done:
+- **Join** (`join_page.dart`, `scan_page.dart`): scan the host's QR code (Android, iOS, macOS) or type room code, host address (`192.168.1.5` or with port; default 7878) and name; "Watch only" joins as a spectator. A rejected join (bad name, full table, wrong code) stays on the page with a plain message and can be retried; "full" offers watching. Leaving the page cancels an unfinished attempt.
+- **Player controller** (`player_page.dart`, `widget/player/`): chips in large type, a `signal` YOUR TURN block (calm `paper` block otherwise) with the server-deadline countdown, and on your turn only the buttons `TURN_PROMPT.legal` allows: FOLD, CHECK or CALL n, RAISE (sheet with a slider bounded by the server's min and max, MIN and ALL-IN ticks; the maximum sends `ALL_IN`). `actionSeq` is the server's `nextActionSeq`; a second tap before the answer is ignored. Buttons never appear unless the prompt's `playerId` is yours. Secondary: top-up request (keypad), sit out or "I'm back", leave table (asks first), presence vote for other players' checks, link banner, removed-from-seat and lost-room panels.
+- **Turn alert** fires once per turn: vibration (`HapticFeedback`) plus a system sound, keyed on hand, seat and `nextActionSeq`, so the repeated `TURN_PROMPT` after a reconnect does not buzz again.
+- **Spectator** (`spectator_page.dart`): the Table display with a WATCHING tag and no controls (`TablePage(watching: true)`).
+- **Resume**: the home page offers "Back to my game" for a stored guest session (`RESUME` with the token to the stored server address); after any drop or app resume the client sends `RESUME`, never a second `JOIN_ROOM`.
+- **Session fixes**: the session now knows this device's player id and role; a failed join no longer clears the stored session of another room; `leave()` forgets the session without waiting for the socket to close.
+- **Goldens** of the Player screen (waiting, your turn, raise sheet) at phone portrait, tablet landscape and TV (the controller stays phone-wide in the middle on big screens).
+
+Dependency choice: `mobile_scanner ^7.5.0` for the "QR scanner plugin" in the approved list (Android, iOS, macOS, web; no Linux or Windows, where the button is hidden and the typed address is the way). Sound is Flutter's `SystemSound`, not an audio plugin: iOS and desktop play the alert beep, Android only a click, so on Android the vibration is the real cue. A proper audio plugin is deferred (the usual choices pull GStreamer into the Linux build); `util/sound.dart` is the one place to change.
+
+Verified: `fvm flutter analyze` clean, 118 Flutter tests, `tool/check_web_safe.sh`, `flutter build web`, `flutter build linux`. **Cross-device on the Android emulator:** a real `poker_server` (cloud mode, `0.0.0.0:7878`) with a scripted host and bot player; the emulator app joined by typing `10.0.2.2:7878` and the room code (plain `ws://` works, so `usesCleartextTraffic` is right), saw the lobby, a hand start, the bot's turn with a countdown and the server auto-folding the dropped bot, got YOUR TURN with CHECK/RAISE/FOLD, raised with the slider (425, applied by the server), got the next turn on the flop, was force-stopped mid-turn and came back through "Back to my game" with the same seat, chips and turn clock, then folded and saw the hand end. No crash in logcat.
+
+Not verified: a real second phone and a real LAN (the emulator reaches the host machine through its virtual network only); the QR camera path (the emulator has no real camera: scanning is untested outside unit seams); iOS, macOS and Windows; the sound on a physical device. The host's own embedded server was not used in this run (hosting was proven in Phase 4); joining a phone-hosted game from another phone needs two devices.
+
+Possible follow-ups: if the connection dies after the server seated a player but before `JOINED` arrives, the retry sends `JOIN_ROOM` again and the user may see "name taken" (the server keeps the first seat as a disconnected player until its 10 minute rule). Rare; a fix needs a server-side "join token" idea.
+
 Local `main` was fast-forwarded (not pushed) to the end of Phase 2 (`2173d0f`) on 2026-11-03; `feature/server-core` holds the same commits.
 
 ## Next step
-0. **Phase 4 is complete on `feature/app-shell`, awaiting owner review.** Next is Phase 5 (Player and Spectator controller: join by QR or code, hole-card-free action pad, bet slider); do not start it before review.
+0. **Phases 4 and 5 are complete (`feature/app-shell`, `feature/player-screens`), awaiting owner review.** Next is Phase 6 (hardening and distribution); do not start it before review.
 1. Owner reviews Phase 0 (`chore/bootstrap`) and Phase 1 (`feature/engine-core`, which contains Phase 0) and merges to `main`.
 2. Start **Phase 2** (server core and cloud binary) after approval. The engine's `PokerError` variants `NothingToCall`, `BettingNotReopened`, `NotPaused`, `NotEnoughPlayers`, `UnknownPlayer`, `PlayerExists`, `InvalidSeat`, `InvalidAmount`, `Overflow`, `IllegalTransition`, `NothingToUndo` and `InvalidAllocation` have no wire code yet in `API_AND_EVENTS.md` section 6; add them when writing the exhaustive `From<PokerError> for ErrorCode`.
 3. Open owner questions from the engine work: when busted players are removed (decision 19; the policy below proposes a 2-minute rebuy window first). Inactive-player policy approved 2026-11-02 and recorded in `RESILIENCE_AND_CRASH_HANDLING.md` section 3.8 (engine layer done; presence check with 90 s vote and the busted-player rebuy window are Phase 2). Answered 2026-11-02: no missed-blind catch-up (decision 10); several short all-ins that add up reopen betting per TDA rule 47 (decision 4).
