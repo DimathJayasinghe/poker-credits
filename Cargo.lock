@@ -557,6 +557,7 @@ dependencies = [
  "axum",
  "getrandom 0.4.3",
  "poker_engine",
+ "poker_server_core",
  "serde",
  "serde_json",
  "sha2",

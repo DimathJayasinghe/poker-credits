@@ -19,6 +19,12 @@ pub enum StoreError {
     /// Disk problem.
     #[error("store I/O: {0}")]
     Io(#[from] io::Error),
+    /// Applying journal entry `seq` made the reducer panic.
+    #[error("journal entry {seq} panicked during replay")]
+    ReplayPanic {
+        /// The entry that must be marked poisoned.
+        seq: u64,
+    },
     /// A file exists but is not valid JSON of the expected shape.
     #[error("corrupt store file {path}: {reason}")]
     Corrupt {
@@ -60,9 +66,14 @@ pub fn restore(dir: &Path, timings: &Timings) -> Result<Restored, StoreError> {
     let mut failed_replays = 0;
     let entries = journal::read(dir)?;
     for entry in entries.ops.into_iter().filter(|e| e.seq > snap.journal_seq) {
-        match state.apply(entry.op, timings) {
-            Ok(_) => {}
-            Err(error) => {
+        let seq = entry.seq;
+        let applied = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            state.apply(entry.op, timings)
+        }));
+        match applied {
+            Err(_) => return Err(StoreError::ReplayPanic { seq }),
+            Ok(Ok(_)) => {}
+            Ok(Err(error)) => {
                 failed_replays += 1;
                 tracing::warn!(seq = entry.seq, code = ?error.code, "journal entry no longer applies");
             }

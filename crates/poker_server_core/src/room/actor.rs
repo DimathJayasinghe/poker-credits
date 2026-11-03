@@ -13,7 +13,7 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
-use super::handle::{ConnId, ConnSender, Outbound, RoomHandle, RoomMsg};
+use super::handle::{ConnId, ConnSender, JoinOk, Outbound, RoomHandle, RoomMsg};
 use super::state::{Broadcast, HostCommand, Op, Outcome, RoomError, RoomState};
 use crate::config::{Limits, Timings};
 use crate::protocol::{ClientMessage, ErrorCode, Role, RoomConfig, ServerMessage};
@@ -328,7 +328,7 @@ impl RoomActor {
             .collect();
         for id in removed {
             if let Some(conn) = self.conns.remove(&id) {
-                let _ = conn.tx.try_send(Outbound {
+                let _sent = conn.tx.try_send(Outbound {
                     req_id: None,
                     message: RoomError::new(
                         ErrorCode::InvalidSession,
@@ -336,6 +336,7 @@ impl RoomActor {
                     )
                     .to_message(),
                 });
+                conn.tx.close();
             }
         }
     }
@@ -407,7 +408,7 @@ impl RoomActor {
                 },
                 _ => continue,
             };
-            if conn.tx.try_send(outbound).is_err() {
+            if !conn.tx.try_send(outbound) {
                 tracing::warn!(conn = id, player = %conn.player_id, "dropping slow or closed connection");
                 dead.push(*id);
             }
@@ -418,6 +419,7 @@ impl RoomActor {
     /// Forgets a connection. Returns the `PLAYER_CONNECTION` notice if it was the player's last.
     fn remove_conn(&mut self, conn: ConnId) -> Option<Target> {
         let removed = self.conns.remove(&conn)?;
+        removed.tx.close();
         if self
             .conns
             .values()
@@ -486,6 +488,9 @@ impl RoomActor {
                 }
             }
             RoomMsg::Close => {}
+            #[cfg(feature = "test-hooks")]
+            #[allow(clippy::panic, reason = "deliberate crash for supervision tests")]
+            RoomMsg::Panic => panic!("test-hooks: deliberate room panic"),
         }
     }
 
@@ -497,7 +502,7 @@ impl RoomActor {
         name: String,
         spectator: bool,
         seat: Option<u8>,
-    ) -> Result<String, RoomError> {
+    ) -> Result<JoinOk, RoomError> {
         let session = token::generate().map_err(|_| internal("no randomness"))?;
         let player_id = self.state.peek_id(spectator);
         let op = Op::Join {
@@ -522,14 +527,17 @@ impl RoomActor {
                 player_id: player_id.clone(),
                 role,
                 seat_index,
-                session_token: session,
+                session_token: session.clone(),
             },
         );
         self.send_snapshot(conn, req_id, &player_id);
         if let Some(notice) = notice {
             self.broadcast(notice);
         }
-        Ok(player_id)
+        Ok(JoinOk {
+            player_id,
+            session_token: session,
+        })
     }
 
     fn on_resume(

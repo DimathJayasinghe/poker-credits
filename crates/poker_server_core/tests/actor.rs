@@ -97,7 +97,7 @@ async fn join(handle: &RoomHandle, conn: ConnId, name: &str) -> Client {
     Client {
         conn,
         rx,
-        id,
+        id: id.player_id,
         token,
     }
 }
@@ -143,7 +143,7 @@ async fn join_sends_joined_then_snapshot_and_tells_the_others() {
         .join(2, tx, Some("r1".into()), "Bob".into(), false, None)
         .await
         .unwrap();
-    assert_eq!(id, "p_2");
+    assert_eq!(id.player_id, "p_2");
     settle().await;
     let first = rx.try_recv().unwrap();
     assert_eq!(first.req_id.as_deref(), Some("r1"));

@@ -4,8 +4,10 @@
 
 pub mod config;
 pub mod protocol;
+pub mod registry;
 pub mod room;
 pub mod store;
+mod supervisor;
 pub mod util;
 
 /// Wire protocol version spoken by this build (`v` field of every message).

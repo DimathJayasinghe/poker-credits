@@ -4,5 +4,6 @@
 pub mod actor;
 pub mod handle;
 mod ops;
+pub mod session;
 pub mod state;
 pub mod view;

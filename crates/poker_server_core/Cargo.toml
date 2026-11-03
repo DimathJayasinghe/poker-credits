@@ -17,9 +17,14 @@ thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "fs"] }
 tracing = "0.1.44"
 
+[features]
+# Adds message types that crash a room on purpose. For tests only; never enable in a release.
+test-hooks = []
+
 [lints]
 workspace = true
 
 [dev-dependencies]
+poker_server_core = { path = ".", features = ["test-hooks"] }
 tempfile = "3.27.0"
 tokio = { version = "1.54.1", features = ["test-util"] }

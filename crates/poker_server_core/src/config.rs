@@ -32,6 +32,10 @@ pub struct Limits {
     pub rate_strikes: u32,
     /// Delete a room after this long without activity.
     pub room_ttl: Duration,
+    /// A room that panics this many times within [`Limits::crash_window`] is frozen.
+    pub crash_limit: usize,
+    /// Window for counting room panics.
+    pub crash_window: Duration,
 }
 
 impl Default for Limits {
@@ -49,6 +53,8 @@ impl Default for Limits {
             rate_burst: 20,
             rate_strikes: 3,
             room_ttl: Duration::from_hours(1),
+            crash_limit: 3,
+            crash_window: Duration::from_mins(1),
         }
     }
 }
