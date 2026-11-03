@@ -43,6 +43,9 @@ impl RoomState {
                 self.op_host(command, at_ms, out)
             }
             Op::Timeout { at_ms } => self.op_timeout(at_ms, out),
+            Op::DisconnectTimeout { player_id, at_ms } => {
+                self.op_disconnect_timeout(&player_id, at_ms, out)
+            }
             Op::SetSittingOut {
                 player_id,
                 sitting_out,
@@ -481,6 +484,31 @@ impl RoomState {
         if let Some(player) = self.players.get_mut(id) {
             player.next_action_seq = player.next_action_seq.saturating_add(1);
         }
+        self.finish(at_ms, out);
+        Ok(())
+    }
+
+    fn op_disconnect_timeout(&mut self, id: &str, at_ms: u64, out: &mut Outcome) -> Done {
+        if self.game.table.paused {
+            return Err(RoomError::new(ErrorCode::GamePaused, "the game is paused"));
+        }
+        let (seat, _) = self
+            .game
+            .legal_actions()
+            .ok_or_else(|| RoomError::new(ErrorCode::HandNotInProgress, "no turn is running"))?;
+        if self.player_at_seat(seat).map(|p| p.id.as_str()) != Some(id) {
+            return Err(RoomError::new(
+                ErrorCode::NotYourTurn,
+                "it is not that player's turn",
+            ));
+        }
+        self.engine_step(
+            Command::Timeout {
+                player_id: engine_id(id),
+            },
+            at_ms,
+            out,
+        )?;
         self.finish(at_ms, out);
         Ok(())
     }

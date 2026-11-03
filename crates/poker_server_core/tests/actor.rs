@@ -475,3 +475,168 @@ async fn a_kicked_player_is_cut_off_and_cannot_resume() {
             .any(|m| matches!(m, ServerMessage::StateUpdate { .. }))
     );
 }
+
+fn untimed_config() -> RoomConfig {
+    RoomConfig {
+        turn_time_limit_seconds: 0,
+        ..config()
+    }
+}
+
+fn new_room_with(config: RoomConfig) -> Created {
+    let new = NewRoom {
+        code: "ABCD".into(),
+        config,
+        host_name: "Host".into(),
+        data_dir: None,
+    };
+    actor::create(new, &Limits::default(), &Timings::default(), Clock::new()).unwrap()
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_disconnected_player_on_turn_is_acted_for_after_the_grace_period() {
+    let room = new_room_with(untimed_config());
+    let mut host = attach_host(&room, 1).await;
+    let mut bob = join(&room.handle, 2, "Bob").await;
+    let mut cy = join(&room.handle, 3, "Cy").await;
+    room.handle
+        .send(host.conn, None, ClientMessage::StartHand)
+        .await
+        .unwrap();
+    let mut prompted = None;
+    for client in [&mut host, &mut bob, &mut cy] {
+        let got = client.drain().await;
+        if got
+            .iter()
+            .any(|m| matches!(m, ServerMessage::TurnPrompt { .. }))
+        {
+            prompted = Some(client.conn);
+        }
+    }
+    let actor_conn = prompted.expect("someone is on turn");
+    let (observer, gone) = if actor_conn == host.conn {
+        (&mut bob, &host)
+    } else {
+        (&mut host, &bob)
+    };
+    let gone_conn = if actor_conn == cy.conn {
+        cy.conn
+    } else {
+        gone.conn
+    };
+    room.handle.detach(gone_conn);
+    tokio::time::sleep(Duration::from_secs(29)).await;
+    let early = observer.drain().await;
+    assert!(
+        !early
+            .iter()
+            .any(|m| matches!(m, ServerMessage::ActionPerformed { auto: true, .. })),
+        "still inside the grace period: {early:?}"
+    );
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let later = observer.drain().await;
+    assert!(
+        later
+            .iter()
+            .any(|m| matches!(m, ServerMessage::ActionPerformed { auto: true, .. })),
+        "grace over, the server acted: {later:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_connected_player_on_turn_is_not_acted_for() {
+    let room = new_room_with(untimed_config());
+    let mut host = attach_host(&room, 1).await;
+    let _bob = join(&room.handle, 2, "Bob").await;
+    room.handle
+        .send(host.conn, None, ClientMessage::StartHand)
+        .await
+        .unwrap();
+    host.drain().await;
+    tokio::time::sleep(Duration::from_mins(2)).await;
+    let got = host.drain().await;
+    assert!(
+        !got.iter()
+            .any(|m| matches!(m, ServerMessage::ActionPerformed { .. })),
+        "{got:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_seat_with_no_connection_for_ten_minutes_is_sat_out() {
+    let room = new_room(None);
+    let mut host = attach_host(&room, 1).await;
+    let bob = join(&room.handle, 2, "Bob").await;
+    host.drain().await;
+    room.handle.detach(bob.conn);
+    tokio::time::sleep(Duration::from_mins(9)).await;
+    let before = host.drain().await;
+    assert!(!before.iter().any(|m| matches!(
+        m,
+        ServerMessage::StateUpdate { view, .. } if view.seats.iter().any(|s| s.is_sitting_out)
+    )));
+    tokio::time::sleep(Duration::from_secs(61)).await;
+    let after = host.drain().await;
+    assert!(
+        after.iter().any(|m| matches!(
+            m,
+            ServerMessage::StateUpdate { view, .. }
+                if view.seats.iter().any(|s| s.player_id == "p_2" && s.is_sitting_out)
+        )),
+        "{after:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_second_connection_supersedes_the_first_without_a_disconnect_notice() {
+    let room = new_room(None);
+    let mut host = attach_host(&room, 1).await;
+    let mut bob = join(&room.handle, 2, "Bob").await;
+    host.drain().await;
+    bob.drain().await;
+    let (tx, mut rx) = mpsc::channel(16);
+    room.handle
+        .resume(7, tx, None, bob.token.clone(), None)
+        .await
+        .unwrap();
+    let old = bob.drain().await;
+    assert!(
+        old.iter().any(|m| matches!(
+            m,
+            ServerMessage::Error {
+                code: ErrorCode::Superseded,
+                ..
+            }
+        )),
+        "{old:?}"
+    );
+    settle().await;
+    assert!(matches!(
+        rx.try_recv().unwrap().message,
+        ServerMessage::Snapshot { .. }
+    ));
+    let seen = host.drain().await;
+    assert!(
+        !seen
+            .iter()
+            .any(|m| matches!(m, ServerMessage::PlayerConnection { .. })),
+        "Bob never went offline: {seen:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn room_info_reports_players_and_progress() {
+    let room = new_room(None);
+    let host = attach_host(&room, 1).await;
+    let _bob = join(&room.handle, 2, "Bob").await;
+    let info = room.handle.info().await.unwrap();
+    assert_eq!(
+        (info.player_count, info.max_players, info.in_progress),
+        (2, 10, false)
+    );
+    room.handle
+        .send(host.conn, None, ClientMessage::StartHand)
+        .await
+        .unwrap();
+    assert!(room.handle.info().await.unwrap().in_progress);
+}

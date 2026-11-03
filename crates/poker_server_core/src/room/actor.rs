@@ -8,12 +8,13 @@ use std::collections::{BTreeMap, VecDeque};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use poker_engine::Event;
+use poker_engine::{Event, MAX_SEATS, Phase};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
-use super::handle::{ConnId, ConnSender, JoinOk, Outbound, RoomHandle, RoomMsg};
+use super::absence::Absence;
+use super::handle::{ConnId, ConnSender, JoinOk, Outbound, RoomHandle, RoomInfo, RoomMsg};
 use super::state::{Broadcast, HostCommand, Op, Outcome, RoomError, RoomState};
 use crate::config::{Limits, Timings};
 use crate::protocol::{ClientMessage, ErrorCode, Role, RoomConfig, ServerMessage};
@@ -128,6 +129,7 @@ pub struct RoomActor {
     inbox: mpsc::Receiver<RoomMsg>,
     /// Earliest time an internal op may run again; stops a spin if one keeps failing.
     internal_floor_ms: u64,
+    absence: Absence,
 }
 
 fn internal(text: &str) -> RoomError {
@@ -205,6 +207,7 @@ fn spawn(
 ) -> (RoomHandle, JoinHandle<ExitReason>) {
     let (tx, inbox) = mpsc::channel(limits.room_inbox);
     let handle = RoomHandle::new(state.code.clone(), tx);
+    let absence = Absence::new(&state, clock.now_ms());
     let actor = RoomActor {
         state,
         limits: limits.clone(),
@@ -214,6 +217,7 @@ fn spawn(
         conns: BTreeMap::new(),
         inbox,
         internal_floor_ms: 0,
+        absence,
     };
     (handle, tokio::spawn(actor.run()))
 }
@@ -246,7 +250,14 @@ impl RoomActor {
     }
 
     fn next_wake_ms(&self) -> u64 {
-        let due = self.state.next_wakeup_ms(&self.timings).unwrap_or(u64::MAX);
+        let due = [
+            self.state.next_wakeup_ms(&self.timings),
+            self.absence.next_due_ms(&self.state, &self.timings),
+        ]
+        .into_iter()
+        .flatten()
+        .min()
+        .unwrap_or(u64::MAX);
         due.max(self.internal_floor_ms).min(self.expiry_ms())
     }
 
@@ -278,6 +289,11 @@ impl RoomActor {
             if let Err(error) = self.submit(&Op::Timeout { at_ms: now }) {
                 tracing::warn!(code = ?error.code, "turn timeout was refused");
             }
+        } else if let Some(op) = self.absence.due_op(&self.state, &self.timings, now) {
+            self.internal_floor_ms = now.saturating_add(250);
+            if let Err(error) = self.submit(&op) {
+                tracing::warn!(code = ?error.code, "absence action was refused");
+            }
         } else if tick_due {
             self.internal_floor_ms = now.saturating_add(250);
             let _ = self.submit(&Op::Tick { at_ms: now });
@@ -308,6 +324,9 @@ impl RoomActor {
             return Err(internal("could not persist the change"));
         }
         self.state = next;
+        self.absence
+            .note_events(&outcome.engine_events, self.clock.now_ms());
+        self.absence.prune(&self.state);
         self.revoke_removed();
         self.publish(&outcome);
         if outcome.engine_events.iter().any(snapshot_worthy) {
@@ -427,6 +446,7 @@ impl RoomActor {
         {
             return None;
         }
+        self.absence.gone(&removed.player_id, self.clock.now_ms());
         self.connection_notice(&removed.player_id, false)
     }
 
@@ -450,6 +470,14 @@ impl RoomActor {
     // -----------------------------------------------------------------------------------------
     // Inbox
     // -----------------------------------------------------------------------------------------
+
+    fn info(&self) -> RoomInfo {
+        RoomInfo {
+            player_count: self.state.game.table.seats.len(),
+            max_players: usize::from(MAX_SEATS),
+            in_progress: self.state.game.table.phase != Phase::Lobby,
+        }
+    }
 
     fn on_msg(&mut self, msg: RoomMsg) {
         match msg {
@@ -486,6 +514,9 @@ impl RoomActor {
                 if let Some(notice) = self.remove_conn(conn) {
                     self.broadcast(notice);
                 }
+            }
+            RoomMsg::Info { reply } => {
+                let _sent = reply.send(self.info());
             }
             RoomMsg::Close => {}
             #[cfg(feature = "test-hooks")]
@@ -568,6 +599,8 @@ impl RoomActor {
     /// connection has its own `JOINED`/`SNAPSHOT` (so it never sees the notice first).
     fn attach(&mut self, conn: ConnId, player_id: &str, tx: ConnSender) -> Option<Target> {
         let first = !self.conns.values().any(|c| c.player_id == player_id);
+        self.supersede(conn, player_id);
+        self.absence.present(player_id);
         self.conns.insert(
             conn,
             Conn {
@@ -579,6 +612,26 @@ impl RoomActor {
             self.connection_notice(player_id, true)
         } else {
             None
+        }
+    }
+
+    /// One live connection per participant: older ones are told `SUPERSEDED` and closed.
+    fn supersede(&mut self, keep: ConnId, player_id: &str) {
+        let stale: Vec<ConnId> = self
+            .conns
+            .iter()
+            .filter(|(id, c)| **id != keep && c.player_id == player_id)
+            .map(|(id, _)| *id)
+            .collect();
+        for id in stale {
+            if let Some(old) = self.conns.remove(&id) {
+                let error = RoomError::new(ErrorCode::Superseded, "connected from another device");
+                let _sent = old.tx.try_send(Outbound {
+                    req_id: None,
+                    message: error.to_message(),
+                });
+                old.tx.close();
+            }
         }
     }
 

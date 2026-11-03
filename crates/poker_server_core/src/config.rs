@@ -30,6 +30,12 @@ pub struct Limits {
     pub rate_burst: u32,
     /// Strikes before a rate-limited connection is closed.
     pub rate_strikes: u32,
+    /// Close a socket that has not sent `CREATE_ROOM`, `JOIN_ROOM` or `RESUME` by then.
+    pub auth_timeout: Duration,
+    /// Sustained HTTP requests per second per IP (room lookups are guessable, so limited).
+    pub http_rate_per_second: u32,
+    /// HTTP burst size per IP.
+    pub http_burst: u32,
     /// Delete a room after this long without activity.
     pub room_ttl: Duration,
     /// A room that panics this many times within [`Limits::crash_window`] is frozen.
@@ -52,6 +58,9 @@ impl Default for Limits {
             rate_per_second: 10,
             rate_burst: 20,
             rate_strikes: 3,
+            auth_timeout: Duration::from_secs(10),
+            http_rate_per_second: 2,
+            http_burst: 10,
             room_ttl: Duration::from_hours(1),
             crash_limit: 3,
             crash_window: Duration::from_mins(1),
@@ -70,6 +79,10 @@ pub struct Timings {
     pub presence_check_ms: u64,
     /// How long a busted player has to ask for a rebuy.
     pub rebuy_window_ms: u64,
+    /// A player on turn who has no connection for this long is acted for (check or fold).
+    pub disconnect_grace_ms: u64,
+    /// A seat without any connection for this long is sat out.
+    pub absent_sit_out_ms: u64,
 }
 
 impl Default for Timings {
@@ -79,6 +92,8 @@ impl Default for Timings {
             away_after_hands: 5,
             presence_check_ms: 90 * 1000,
             rebuy_window_ms: 2 * 60 * 1000,
+            disconnect_grace_ms: 30 * 1000,
+            absent_sit_out_ms: 10 * 60 * 1000,
         }
     }
 }

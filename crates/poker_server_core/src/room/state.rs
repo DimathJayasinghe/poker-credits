@@ -209,6 +209,14 @@ pub enum Op {
         /// Server time.
         at_ms: u64,
     },
+    /// The player on turn has been disconnected for the whole grace period: act for them
+    /// (check if free, else fold), exactly like a turn timeout.
+    DisconnectTimeout {
+        /// The player on turn.
+        player_id: String,
+        /// Server time.
+        at_ms: u64,
+    },
     /// A player skips or rejoins from the next hand.
     SetSittingOut {
         /// Player.
@@ -513,6 +521,7 @@ impl Op {
             | Op::Act { at_ms, .. }
             | Op::Host { at_ms, .. }
             | Op::Timeout { at_ms }
+            | Op::DisconnectTimeout { at_ms, .. }
             | Op::SetSittingOut { at_ms, .. }
             | Op::LeaveTable { at_ms, .. }
             | Op::RequestRebuy { at_ms, .. }

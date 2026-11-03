@@ -109,6 +109,17 @@ pub struct JoinOk {
     pub session_token: String,
 }
 
+/// Public facts about a room, for `GET /v1/room/{code}`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RoomInfo {
+    /// Seated players.
+    pub player_count: usize,
+    /// Seats at the table.
+    pub max_players: usize,
+    /// A hand has been dealt (the room is past the lobby).
+    pub in_progress: bool,
+}
+
 /// What the supervisor tells connections about their room.
 #[derive(Clone, Debug)]
 pub enum RoomStatus {
@@ -169,6 +180,11 @@ pub enum RoomMsg {
         /// Connection.
         conn: ConnId,
     },
+    /// Public facts about the room.
+    Info {
+        /// Answer.
+        reply: oneshot::Sender<RoomInfo>,
+    },
     /// Shut the room down.
     Close,
     /// Makes the actor panic, to test supervision. Not reachable from the network.
@@ -196,6 +212,19 @@ impl RoomHandle {
     #[must_use]
     pub fn code(&self) -> &str {
         &self.code
+    }
+
+    /// Public facts about the room.
+    ///
+    /// # Errors
+    /// `ROOM_NOT_FOUND` if the room stopped.
+    pub async fn info(&self) -> Result<RoomInfo, RoomError> {
+        let (reply, answer) = oneshot::channel();
+        self.tx
+            .send(RoomMsg::Info { reply })
+            .await
+            .map_err(|_| gone())?;
+        answer.await.map_err(|_| gone())
     }
 
     /// Whether the actor is gone.
