@@ -236,7 +236,11 @@ Room codes have 32^4 (about 1.05 million) values. In cloud mode:
 * Known limit: behind a reverse proxy all clients share the proxy's address, so these per-IP limits then apply to everybody at once. Reading `X-Forwarded-For` behind a trusted proxy is not implemented; decide before deploying the cloud binary behind one. Attackers with many addresses can still probe slowly; 4 characters is the real limit (see the open owner question about longer codes).
 * Joining still requires the host to seat the player or the room to have open seats; the host can enable "approve joins" (Phase 5 option).
 * Idle rooms expire after 60 minutes.
-In host (LAN) mode the QR payload already carries IP and code; the typed fallback needs both.
+In host (LAN) mode players find the host by code (ADR-012): the app probes `GET /v1/room/{code}` on every other address of its /24 networks. Properties and limits:
+* A probe only ever reveals whether the asked code exists, plus counts that are already public to the asker. Nothing is listed, so a prober learns nothing about rooms it does not already know the code of; the existing per-IP HTTP and wrong-code limiters apply to probing hosts.
+* The code travels in plain HTTP/WS on the LAN (already true for the join itself, see ADR-012 transport security). A rogue device on the LAN that answers `exists: true` for every code can capture the code asked for and the player's chosen name, and can then serve a fake room; it cannot obtain a session token for a real room. A hostile peer on the LAN is outside the threat model (see 6.6 above); the QR code and the typed address avoid the search entirely.
+* Search is cancellable, bounded (48 concurrent probes, 700 ms per probe, 12 s overall), accepts only HTTP 200 with a JSON body under 2 KiB and ignores everything else.
+* Re-discovery after a lost connection only changes the address; the room and the session token are still checked by the server, and a wrong host just refuses the `RESUME`. The stored session is rewritten with the new address only after a host answered for that exact code.
 
 ### 6.7. Data at Rest and Crash Behaviour
 * Snapshots and journals contain names, chip counts and **token hashes only**, never raw tokens or hostTokens. They live in the app support directory (host mode, app-private storage on mobile) or `POKER_DATA_DIR` (cloud).

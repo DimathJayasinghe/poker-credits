@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/net/socket_client.dart';
 import 'package:poker_credits/net/transport.dart';
+import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/platform/host_server.dart';
 import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/platform/wake_lock.dart';
@@ -43,11 +44,15 @@ class FakeTransport implements Transport {
 /// Hands out [FakeTransport]s and records every connect.
 class FakeNetwork {
   final List<FakeTransport> opened = <FakeTransport>[];
+
+  /// Every address a connection was attempted to, including refused ones.
+  final List<Uri> uris = <Uri>[];
   bool refuseConnections = false;
 
   FakeTransport get last => opened.last;
 
   Future<Transport> connect(Uri uri) async {
+    uris.add(uri);
     if (refuseConnections) throw StateError('connection refused');
     final transport = FakeTransport();
     opened.add(transport);
@@ -135,6 +140,7 @@ class TestHarness {
   final FakeWakeLock wakeLock = FakeWakeLock();
   final FakeHaptics haptics = FakeHaptics();
   final FakeSound sound = FakeSound();
+  final FakeHostFinder finder = FakeHostFinder();
   DateTime clock = DateTime.fromMillisecondsSinceEpoch(1730000000000);
 
   /// Wraps [child] in a Refena scope with every service replaced by a fake.
@@ -145,12 +151,56 @@ class TestHarness {
       wakeLockProvider.overrideWithValue(wakeLock),
       hapticsProvider.overrideWithValue(haptics),
       soundProvider.overrideWithValue(sound),
+      hostFinderProvider.overrideWithValue(finder),
       localAddressesProvider.overrideWithValue(() async => addresses),
       clockProvider.overrideWithValue(() => clock),
       roomClientFactoryProvider.overrideWithValue((uri, first) => RoomClient(uri: uri, firstMessage: first, transport: network.connect)),
     ],
     child: child,
   );
+}
+
+/// Answers every search at once with [found]; set it to `null` for "nobody answered", or set
+/// [manual] to complete searches by hand through [pending].
+class FakeHostFinder implements HostFinder {
+  DiscoveredHost? found = const DiscoveredHost('192.168.1.5:7878');
+  bool manual = false;
+  bool supported = true;
+  final List<String> searched = <String>[];
+  final List<FakeSearch> pending = <FakeSearch>[];
+
+  @override
+  bool get isSupported => supported;
+
+  @override
+  HostSearch search(String roomCode) {
+    searched.add(roomCode);
+    final search = FakeSearch();
+    if (manual) {
+      pending.add(search);
+    } else {
+      search.complete(found);
+    }
+    return search;
+  }
+}
+
+class FakeSearch implements HostSearch {
+  final Completer<DiscoveredHost?> _done = Completer<DiscoveredHost?>();
+  bool cancelled = false;
+
+  void complete(DiscoveredHost? host) {
+    if (!_done.isCompleted) _done.complete(host);
+  }
+
+  @override
+  Future<DiscoveredHost?> get result => _done.future;
+
+  @override
+  void cancel() {
+    cancelled = true;
+    complete(null);
+  }
 }
 
 class FakeHaptics extends Haptics {

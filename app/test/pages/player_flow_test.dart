@@ -5,6 +5,7 @@ import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/pages/join_page.dart';
 import 'package:poker_credits/pages/player_page.dart';
 import 'package:poker_credits/pages/table_page.dart';
+import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
@@ -50,16 +51,15 @@ Future<void> _openJoin(WidgetTester tester, TestHarness harness) async {
 Future<void> _fillAndJoin(
   WidgetTester tester, {
   String code = 'kq7m',
-  String address = '192.168.1.5',
   String name = 'Alice',
   String button = 'JOIN',
 }) async {
   final fields = find.byType(TextField);
   await tester.enterText(fields.at(0), code);
-  await tester.enterText(fields.at(1), address);
-  await tester.enterText(fields.at(2), name);
+  await tester.enterText(fields.at(1), name);
   await tester.ensureVisible(find.text(button));
   await tester.tap(find.text(button));
+  await tester.pump();
   await tester.pump();
   await tester.pump();
 }
@@ -84,12 +84,14 @@ Future<void> _close(WidgetTester tester) => tester.pumpWidget(const SizedBox());
 void main() {
   setUpAll(loadFonts);
 
-  testWidgets('joining sends JOIN_ROOM to the typed address, then shows the controller', (tester) async {
+  testWidgets('joining by code alone finds the host, sends JOIN_ROOM there, then shows the controller', (tester) async {
     _phone(tester);
     final harness = TestHarness();
     await _openJoin(tester, harness);
     await _fillAndJoin(tester);
 
+    expect(harness.finder.searched, <String>['KQ7M']);
+    expect(harness.network.uris.last.toString(), 'ws://192.168.1.5:7878/v1/ws');
     final join = harness.network.last.sent.single as JoinRoom;
     expect((join.roomCode, join.name, join.spectator), ('KQ7M', 'Alice', false));
     expect(find.text('CONNECTING'), findsOneWidget);
@@ -126,7 +128,7 @@ void main() {
     expect(find.byType(JoinPage), findsOneWidget);
     expect(find.textContaining('USE 1 TO 20 LETTERS'), findsWidgets);
 
-    await tester.enterText(find.byType(TextField).at(2), 'Alice B');
+    await tester.enterText(find.byType(TextField).at(1), 'Alice B');
     await tester.ensureVisible(find.text('JOIN'));
     await tester.tap(find.text('JOIN'));
     await tester.pump();
@@ -410,6 +412,86 @@ void main() {
     expect(find.text('PAUSE'), findsNothing);
     expect(find.text('START HAND'), findsNothing);
     expect(find.text('END GAME'), findsNothing);
+    await _close(tester);
+  });
+
+  testWidgets('no host answers: says so, offers the address field, and joins by the typed address', (tester) async {
+    _phone(tester);
+    final harness = TestHarness();
+    harness.finder.found = null;
+    await _openJoin(tester, harness);
+    expect(find.byType(TextField), findsNWidgets(2), reason: 'code and name; the address is not asked for up front');
+    await _fillAndJoin(tester);
+
+    expect(harness.network.opened, isEmpty);
+    expect(find.textContaining('NO GAME WITH THAT CODE FOUND ON THIS WI-FI'), findsOneWidget);
+    expect(find.byType(TextField), findsNWidgets(3), reason: 'the address field appears');
+
+    await tester.enterText(find.byType(TextField).at(1), '192.168.1.9');
+    await tester.ensureVisible(find.text('JOIN'));
+    await tester.tap(find.text('JOIN'));
+    await tester.pump();
+    await tester.pump();
+    expect(harness.network.uris.last.toString(), 'ws://192.168.1.9:7878/v1/ws');
+    expect(harness.finder.searched, hasLength(1), reason: 'a typed address skips the search');
+    await _close(tester);
+  });
+
+  testWidgets('the search can be cancelled, and leaving the page cancels it too', (tester) async {
+    _phone(tester);
+    final harness = TestHarness();
+    harness.finder.manual = true;
+    await _openJoin(tester, harness);
+    await _fillAndJoin(tester);
+    expect(find.text('LOOKING FOR THE GAME ON THIS WI-FI'), findsOneWidget);
+    expect(harness.network.opened, isEmpty);
+
+    await tester.tap(find.text('CANCEL'));
+    await tester.pump();
+    expect(harness.finder.pending.single.cancelled, isTrue);
+    expect(find.text('LOOKING FOR THE GAME ON THIS WI-FI'), findsNothing);
+    expect(harness.network.opened, isEmpty, reason: 'a cancelled search joins nothing');
+
+    await tester.ensureVisible(find.text('JOIN'));
+    await tester.tap(find.text('JOIN'));
+    await tester.pump();
+    await _close(tester);
+    expect(harness.finder.pending.last.cancelled, isTrue);
+  });
+
+  testWidgets('a guest whose host moved finds it again by the room code and resumes there', (tester) async {
+    _phone(tester);
+    final tokens = MemoryTokenStore();
+    await tokens.write(const StoredSession(serverUri: 'ws://192.168.1.5:7878/v1/ws', roomCode: 'KQ7M', sessionToken: 'alice-token', playerId: 'p_1'));
+    final harness = TestHarness(tokens: tokens);
+    harness.finder.found = const DiscoveredHost('192.168.1.23:7878');
+    await tester.pumpWidget(harness.scope(const PokerCreditsApp()));
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(find.text('BACK TO MY GAME KQ7M'));
+    await tester.pump();
+    await tester.pump();
+    harness.network.last.serverSends(snapshot(version: 8, serverTime: harness.clock.millisecondsSinceEpoch, view: _betting(active: 2)));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    final opened = harness.network.opened.length;
+
+    // The host disappears from its old address; attempts fail until the search kicks in.
+    harness.network.refuseConnections = true;
+    harness.network.last.drop();
+    for (var t = 0; t < 120 && harness.finder.searched.isEmpty; t++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+    expect(harness.finder.searched, <String>['KQ7M']);
+    harness.network.refuseConnections = false;
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(harness.network.uris.last.toString(), 'ws://192.168.1.23:7878/v1/ws');
+    expect(harness.network.opened.length, greaterThan(opened));
+    expect(harness.network.last.sent.single, isA<Resume>());
+    expect((await tokens.read())!.serverUri, 'ws://192.168.1.23:7878/v1/ws');
     await _close(tester);
   });
 }

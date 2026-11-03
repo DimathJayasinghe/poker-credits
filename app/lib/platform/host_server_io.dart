@@ -40,12 +40,16 @@ final class NativeHostServer implements HostServer {
   Future<int> startServer() async {
     return _guard(() async {
       await _init();
-      try {
-        await _controller.start(await _configFor(port: defaultHostPort));
-      } on BridgeException catch (error) {
-        if (error.kind != BridgeFailureKind.bind) rethrow;
-        _log.warning('port $defaultHostPort is busy, taking a free one');
-        await _controller.start(await _configFor(port: 0));
+      // The default port, then one fixed fallback (players probe exactly these two), and only then
+      // any free port: players cannot find that one by code, they need the typed address.
+      for (final port in <int>[defaultHostPort, defaultHostPort + 1, 0]) {
+        try {
+          await _controller.start(await _configFor(port: port));
+          break;
+        } on BridgeException catch (error) {
+          if (error.kind != BridgeFailureKind.bind || port == 0) rethrow;
+          _log.warning('port $port is busy, trying the next one');
+        }
       }
       return _controller.port ?? 0;
     });

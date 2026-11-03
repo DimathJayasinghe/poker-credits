@@ -51,6 +51,16 @@ class JoinLink {
     return _roomCode.hasMatch(code) ? code : null;
   }
 
+  /// Whether [host] is a private IPv4 address (a LAN host that a code search can find again).
+  static bool isLanAddress(String host) {
+    final parts = host.split('.');
+    if (parts.length != 4) return false;
+    final octets = parts.map(int.tryParse).toList();
+    if (octets.any((o) => o == null || o < 0 || o > 255)) return false;
+    final a = octets[0]!, b = octets[1]!;
+    return a == 10 || (a == 172 && b >= 16 && b <= 31) || (a == 192 && b == 168);
+  }
+
   static final RegExp _hostAndPort = RegExp(r'^[A-Za-z0-9.\-]{1,253}:\d{1,5}$');
   static final RegExp _roomCode = RegExp(r'^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$');
 

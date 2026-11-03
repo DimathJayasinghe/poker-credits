@@ -37,7 +37,8 @@ abstract final class Strings {
   static const String acting = 'Acting';
   static const String waitingForPlayers = 'Waiting for players';
   static const String joinWith = 'Join with the app';
-  static const String orType = 'or type';
+  static const String orType = 'or type the address';
+  static const String joinByCode = 'Others: tap JOIN, type this code';
   static const String roomCode = 'Room code';
   static const String players = 'Players';
   static const String watching = 'Watching';
@@ -101,6 +102,11 @@ abstract final class Strings {
   static const String joinGame = 'Join a game';
   static const String joinTitle = 'Join a game';
   static const String joinCode = 'Room code';
+  static const String searchingHost = 'Looking for the game on this Wi-Fi';
+  static const String hostNotFound =
+      'No game with that code found on this Wi-Fi. Check the code, and that you are on the same Wi-Fi as the host (not a guest network). Or enter the host address';
+  static const String useAddress = 'Enter host address instead';
+  static const String useCode = 'Find by code instead';
   static const String joinAddress = 'Host address (192.168.1.5 or 192.168.1.5:7878)';
   static const String joinName = 'Your name';
   static const String joinButton = 'Join';

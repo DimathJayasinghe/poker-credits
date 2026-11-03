@@ -110,6 +110,12 @@ Possible follow-ups: if the connection dies after the server seated a player but
 
 Local `main` was fast-forwarded (not pushed) to the end of Phase 2 (`2173d0f`) on 2026-11-03; `feature/server-core` holds the same commits.
 
+## Join by room code (on `feature/player-screens`, owner feedback 2026-11-03)
+- Joining no longer needs the host IP: JOIN asks for **room code + name**; the app scans the device's /24 networks for `GET /v1/room/{code}` (ports 7878, 7879) and joins the host that has it (ADR-012 amended, `platform/host_finder*.dart`). Address field behind "Enter host address instead", shown automatically when nothing is found; QR scan unchanged; web uses the address field. Lobby QR panel now reads "Others: tap JOIN, type this code".
+- Host server tries 7878, then 7879, then a random port. Guests re-run the search after 3 failed reconnects and resume on the new address.
+- Verified: unit tests (real loopback HTTP servers: found, second port, wrong code, junk/oversized answers, bounded time, cancel), widget tests (search, not found, cancel, re-discovery), Android emulator joined `JPR4` on a host machine's `10.0.2.2:7878` by code alone.
+- **Not verified:** real two-device Wi-Fi (router/AP client isolation, guest networks, /23 or larger subnets are not covered), iOS Local Network permission prompt on the scan, scan duration on a busy network.
+
 ## Next step
 0. **Phases 4 and 5 are complete (`feature/app-shell`, `feature/player-screens`), awaiting owner review.** Next is Phase 6 (hardening and distribution); do not start it before review.
 1. Owner reviews Phase 0 (`chore/bootstrap`) and Phase 1 (`feature/engine-core`, which contains Phase 0) and merges to `main`.

@@ -3,6 +3,7 @@ import 'package:poker_credits/model/join_link.dart';
 import 'package:poker_credits/pages/player_page.dart';
 import 'package:poker_credits/pages/scan_page.dart';
 import 'package:poker_credits/pages/spectator_page.dart';
+import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/platform/qr_scanner.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/join_provider.dart';
@@ -19,8 +20,10 @@ import 'package:refena_flutter/refena_flutter.dart';
 
 final RegExp _nameRule = RegExp(r'^[A-Za-z0-9 _-]{1,20}$');
 
-/// Join a game: scan the host's QR code or type the room code and address, pick a name.
-/// A rejected join (bad name, full table) stays on this page so it can be fixed and retried.
+/// Join a game: type the room code and a name; the app finds the host on the Wi-Fi by the code.
+/// Scanning the host's QR code skips the search, and the host address can still be typed when the
+/// network does not let the search through. A rejected join (bad name, full table) stays on this
+/// page so it can be fixed and retried.
 class JoinPage extends StatefulWidget {
   const JoinPage({super.key, this.initial});
 
@@ -33,15 +36,25 @@ class JoinPage extends StatefulWidget {
 
 class _JoinPageState extends State<JoinPage> with Refena {
   late final TextEditingController _code = TextEditingController(text: widget.initial?.roomCode ?? '');
-  late final TextEditingController _address = TextEditingController(text: widget.initial?.hostAndPort ?? '');
+  final TextEditingController _address = TextEditingController();
   final TextEditingController _name = TextEditingController();
+
+  /// Address from a scanned code or link; used while the room code still matches it.
+  late JoinLink? _known = widget.initial;
   bool _submitted = false;
   bool _attempting = false;
   bool _spectator = false;
   bool _handedOff = false;
 
+  /// The address field is shown: by choice, after a search found nothing, or where searching is
+  /// impossible (web).
+  bool _showAddress = false;
+  bool _notFound = false;
+  HostSearch? _search;
+
   @override
   void dispose() {
+    _search?.cancel();
     for (final controller in <TextEditingController>[_code, _address, _name]) {
       controller.dispose();
     }
@@ -56,29 +69,71 @@ class _JoinPageState extends State<JoinPage> with Refena {
     if (link == null || !mounted) return;
     setState(() {
       _code.text = link.roomCode;
-      _address.text = link.hostAndPort;
+      _known = link;
+      _notFound = false;
     });
   }
 
   void _join({required bool spectator}) {
-    setState(() => _submitted = true);
+    setState(() {
+      _submitted = true;
+      _notFound = false;
+    });
     final code = JoinLink.normalizeRoomCode(_code.text);
-    final address = JoinLink.normalizeAddress(_address.text);
-    if (code == null || address == null || !_nameRule.hasMatch(_name.text.trim())) return;
+    if (code == null || !_nameRule.hasMatch(_name.text.trim())) return;
+    final known = _known;
+    final typed = _showAddress ? JoinLink.normalizeAddress(_address.text) : null;
+    if (_showAddress && typed == null && _address.text.trim().isNotEmpty) return;
+    final String? address = typed ?? (known != null && known.roomCode == code ? known.hostAndPort : null);
+    if (address != null) {
+      _connect(
+        JoinLink(hostAndPort: address, roomCode: code),
+        spectator: spectator,
+      );
+      return;
+    }
+    final join = ref.read(joinProvider);
+    if (!join.canFind) {
+      setState(() => _showAddress = true);
+      return;
+    }
+    setState(() {
+      _spectator = spectator;
+      _search = join.find(code);
+    });
+    final search = _search!;
+    search.result.then((found) {
+      if (!mounted || _search != search) return;
+      setState(() => _search = null);
+      if (found == null) {
+        setState(() {
+          _notFound = true;
+          _showAddress = true;
+        });
+        return;
+      }
+      _connect(
+        JoinLink(hostAndPort: found.hostAndPort, roomCode: code),
+        spectator: spectator,
+      );
+    });
+  }
+
+  void _connect(JoinLink link, {required bool spectator}) {
     setState(() {
       _attempting = true;
       _spectator = spectator;
     });
-    ref
-        .read(joinProvider)
-        .join(
-          link: JoinLink(hostAndPort: address, roomCode: code),
-          name: _name.text,
-          spectator: spectator,
-        );
+    ref.read(joinProvider).join(link: link, name: _name.text, spectator: spectator);
   }
 
   Future<void> _cancel() async {
+    final search = _search;
+    if (search != null) {
+      search.cancel();
+      setState(() => _search = null);
+      return;
+    }
     await ref.read(joinProvider).leave();
     if (mounted) setState(() => _attempting = false);
   }
@@ -115,7 +170,11 @@ class _JoinPageState extends State<JoinPage> with Refena {
         if (session.link.attempt >= 2) problem = Strings.cannotReach;
       }
     }
-    final busy = _attempting && problem == null || connecting;
+    final searching = _search != null;
+    if (_notFound && problem == null) problem = Strings.hostNotFound;
+    final busy = searching || _attempting && problem == null || connecting;
+    final canFind = ref.read(joinProvider).canFind;
+    final showAddress = _showAddress || !canFind;
 
     return Scaffold(
       body: SafeArea(
@@ -132,7 +191,10 @@ class _JoinPageState extends State<JoinPage> with Refena {
                     style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 40, height: 1, color: c.ink),
                   ),
                   const SizedBox(height: BrutalMetrics.gapL),
-                  if (problem != null) ...<Widget>[
+                  if (searching) ...<Widget>[
+                    const BrutalBanner(message: Strings.searchingHost),
+                    const SizedBox(height: BrutalMetrics.gapM),
+                  ] else if (problem != null) ...<Widget>[
                     BrutalBanner(message: problem, kind: connecting ? BrutalBannerKind.warning : BrutalBannerKind.error),
                     const SizedBox(height: BrutalMetrics.gapM),
                   ] else if (connecting) ...<Widget>[
@@ -161,13 +223,17 @@ class _JoinPageState extends State<JoinPage> with Refena {
                           errorText: _submitted && JoinLink.normalizeRoomCode(_code.text) == null ? Strings.codeInvalid : null,
                         ),
                         const SizedBox(height: BrutalMetrics.gapM),
-                        BrutalTextField(
-                          label: Strings.joinAddress,
-                          controller: _address,
-                          keyboardType: TextInputType.url,
-                          errorText: _submitted && JoinLink.normalizeAddress(_address.text) == null ? Strings.addressInvalid : null,
-                        ),
-                        const SizedBox(height: BrutalMetrics.gapM),
+                        if (showAddress) ...<Widget>[
+                          BrutalTextField(
+                            label: Strings.joinAddress,
+                            controller: _address,
+                            keyboardType: TextInputType.url,
+                            errorText: _submitted && _address.text.trim().isNotEmpty && JoinLink.normalizeAddress(_address.text) == null
+                                ? Strings.addressInvalid
+                                : null,
+                          ),
+                          const SizedBox(height: BrutalMetrics.gapM),
+                        ],
                         BrutalTextField(
                           label: Strings.joinName,
                           controller: _name,
@@ -187,6 +253,13 @@ class _JoinPageState extends State<JoinPage> with Refena {
                   ),
                   const SizedBox(height: BrutalMetrics.gapM),
                   BrutalButton(label: Strings.watchButton, minHeight: BrutalMetrics.tapPlayer, onPressed: busy ? null : () => _join(spectator: true)),
+                  if (canFind) ...<Widget>[
+                    const SizedBox(height: BrutalMetrics.gapM),
+                    BrutalButton(
+                      label: showAddress ? Strings.useCode : Strings.useAddress,
+                      onPressed: busy ? null : () => setState(() => _showAddress = !showAddress),
+                    ),
+                  ],
                   if (busy) ...<Widget>[
                     const SizedBox(height: BrutalMetrics.gapM),
                     BrutalButton(label: Strings.cancel, kind: BrutalButtonKind.danger, onPressed: _cancel),

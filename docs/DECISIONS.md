@@ -17,7 +17,7 @@ This document captures the key architectural decisions, their context, trade-off
 | 009 | Rust workspace: engine, server core, cloud binary, FRB bridge | Accepted |
 | 010 | Plain WebSocket + JSON protocol with explicit versioning | Accepted |
 | 011 | Crash and resilience strategy (adopted from LocalSend) | Accepted |
-| 012 | LAN join: QR first, optional multicast discovery later | Accepted |
+| 012 | LAN join: room code finds the host (unicast subnet scan); QR and typed address as fallbacks | Accepted, **amended 2026-11-03** |
 | 013 | Neo-brutalist UI | Accepted |
 | 014 | Web-ready codebase (web build itself deferred) | Accepted |
 
@@ -161,13 +161,15 @@ Full detail in `docs/RESILIENCE_AND_CRASH_HANDLING.md`. Summary of what is copie
 5. Resume handshake with `stateVersion` and full snapshot, client-side exponential backoff with jitter.
 6. Slow-consumer policy: bounded per-connection outbound queue; overflow disconnects that client (it resumes with a snapshot) rather than blocking the room.
 
-## ADR-012: LAN joining: QR first, multicast later
+## ADR-012: LAN joining: the room code finds the host
 
-**Status:** Accepted. **Date:** 2026-11-01.
+**Status:** Accepted, amended 2026-11-03 (owner feedback: typing the host IP is confusing). **Date:** 2026-11-01.
 
-**Decision:** The host shows a QR code containing `pokercredits://join?h=<ip>:<port>&r=<ROOM>&v=1`. Players scan, or type IP and code. Optional UDP multicast announce (LocalSend's design: announce-only, answers over unicast, one socket per interface, own messages filtered) is Phase 6 and never required for play.
+**Decision:** A player types the **room code and a name** and taps JOIN. The app finds the host by asking every other address of the device's own /24 networks (at most three, best-ranked first) `GET /v1/room/{code}` on port 7878, then 7879 (the host's fixed fallback). The first host that answers `exists: true` is joined. This is LocalSend's HTTP subnet-scan fallback, used as the only method: plain unicast TCP, so it needs no multicast permission, no Apple multicast entitlement and no Android multicast lock, and works the same on every platform. Fallbacks, in order: the QR code (`pokercredits://join?h=<ip>:<port>&c=<ROOM>`, skips the search), the typed `address[:port]` behind "Enter host address instead" (shown automatically when the search finds nothing, and the only mode on web, which cannot probe the LAN). A guest whose host stops answering after 3 reconnect attempts repeats the search for the stored room code and, if the host moved, resumes there with its session token.
 
-**Why QR is primary:** iOS gates multicast behind an entitlement that needs Apple approval (**verify at Phase 6**) and a Local Network permission prompt; Android needs a multicast lock; many hotspots and routers isolate clients or drop multicast. QR works everywhere the TCP connection works.
+**Why not multicast/mDNS:** iOS gates multicast behind an entitlement that needs Apple approval; many routers and hotspots drop or isolate multicast; it cannot be tested on the Android emulator. UDP broadcast/multicast announce (LocalSend's primary path) may still be added later as a speed-up and is never required.
+
+**Limits:** the search covers /24 networks only and cannot cross subnets or "client isolation" guest Wi-Fi (the UI says so and offers the address field). Host port 7878/7879 is fixed so players can probe it; a host forced onto a random port needs the typed address or QR.
 
 **Transport security:** LAN uses `ws://` on a trusted network (documented warning). Android's network security config and iOS App Transport Security only govern the platform HTTP stacks (`HttpURLConnection`, `NSURLSession`, WebViews). Dart's `dart:io` sockets and the Rust server use raw sockets and are not subject to them, so Phase 0 adds no cleartext exceptions. Verify with a real `ws://` connection on a physical Android and iOS device in Phase 5; add exceptions only if it fails. iOS still needs the Local Network permission description (added in Phase 0). Cloud uses `wss://`. A later hardening step (open) is a per-host self-signed certificate whose fingerprint travels in the QR code, like LocalSend's fingerprint-based identity.
 

@@ -46,7 +46,7 @@ class QrPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          Strings.roomCode.toUpperCase(),
+          Strings.joinByCode.toUpperCase(),
           style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: c.muted),
         ),
         FittedBox(

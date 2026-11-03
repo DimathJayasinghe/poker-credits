@@ -1,4 +1,5 @@
 import 'package:poker_credits/net/socket_client.dart';
+import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/platform/host_server.dart';
 import 'package:poker_credits/platform/server_address.dart';
 import 'package:poker_credits/platform/token_store.dart';
@@ -15,6 +16,7 @@ final tokenStoreProvider = Provider<TokenStore>((ref) => createTokenStore());
 final wakeLockProvider = Provider<WakeLock>((ref) => createWakeLock());
 final hapticsProvider = Provider<Haptics>((ref) => const Haptics());
 final soundProvider = Provider<Sound>((ref) => const Sound());
+final hostFinderProvider = Provider<HostFinder>((ref) => createHostFinder());
 final localAddressesProvider = Provider<LocalAddressLister>((ref) => listLocalAddresses);
 
 /// Local clock; overridden in tests.

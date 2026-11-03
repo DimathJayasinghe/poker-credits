@@ -1,5 +1,6 @@
 import 'package:logging/logging.dart';
 import 'package:poker_credits/model/join_link.dart';
+import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_protocol/poker_protocol.dart';
@@ -17,6 +18,12 @@ class JoinService {
   JoinService(this._ref);
 
   final Ref _ref;
+
+  /// Whether this platform can look for a host by room code.
+  bool get canFind => _ref.read(hostFinderProvider).isSupported;
+
+  /// Looks for the device that hosts [roomCode] on the local network.
+  HostSearch find(String roomCode) => _ref.read(hostFinderProvider).search(roomCode);
 
   /// Opens a socket to [link] and sends `JOIN_ROOM`. Any earlier attempt is dropped first (a
   /// fixable error such as a bad name is retried this way, with the fields corrected).

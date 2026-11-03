@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:logging/logging.dart';
 import 'package:poker_credits/model/hosting.dart';
+import 'package:poker_credits/model/join_link.dart';
 import 'package:poker_credits/model/room_state.dart';
 import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/net/socket_client.dart';
@@ -77,6 +78,10 @@ class SessionNotifier extends Notifier<SessionState> {
   bool _established = false;
   final List<StreamSubscription<Object?>> _subscriptions = <StreamSubscription<Object?>>[];
 
+  /// A search for the host's new address ran during the current outage. Reset when the link is
+  /// live again or the user presses Retry.
+  bool _rediscoveryTried = false;
+
   @override
   SessionState init() => const SessionState();
 
@@ -99,7 +104,10 @@ class SessionNotifier extends Notifier<SessionState> {
   bool send(ClientMessage message) => _client?.send(message) ?? false;
 
   /// Reconnects at once: the app returned to the foreground, or the user pressed Retry.
-  void reconnect() => _client?.reconnectNow();
+  void reconnect() {
+    _rediscoveryTried = false;
+    _client?.reconnectNow();
+  }
 
   /// Leaves the room: closes the socket and forgets the stored session.
   Future<void> leave() async {
@@ -136,6 +144,13 @@ class SessionNotifier extends Notifier<SessionState> {
 
   void _onLink(LinkState link) {
     state = state.copyWith(link: link);
+    if (link.isLive) _rediscoveryTried = false;
+    // A guest whose host does not answer after a few attempts looks for the room again: the host
+    // may have a new address (Wi-Fi reconnect, DHCP lease) and the room code finds it.
+    if (!state.isHost && _established && !link.isLive && link.failure == null && link.attempt >= 3 && !_rediscoveryTried) {
+      _rediscoveryTried = true;
+      unawaited(rediscover());
+    }
     final failure = link.failure;
     if (_established &&
         failure != null &&
@@ -145,6 +160,38 @@ class SessionNotifier extends Notifier<SessionState> {
       // The room or the session is gone; the stored tokens are useless now.
       unawaited(ref.read(tokenStoreProvider).clear());
     }
+  }
+
+  /// Looks for the stored room by its code on the local network and, if the host moved, resumes
+  /// there. The server still checks the session token, so a wrong answer cannot get anybody in.
+  Future<void> rediscover() async {
+    final finder = ref.read(hostFinderProvider);
+    final stored = await ref.read(tokenStoreProvider).read();
+    if (stored == null || stored.isHost || !finder.isSupported) return;
+    final uri = Uri.tryParse(stored.serverUri);
+    if (uri == null || !JoinLink.isLanAddress(uri.host)) return;
+    final found = await finder.search(stored.roomCode).result;
+    if (found == null || state.serverUri != stored.serverUri || state.link.isLive) return;
+    final moved = Uri.tryParse('${uri.scheme}://${found.hostAndPort}${uri.path}');
+    if (moved == null || moved == uri) return;
+    _log.info('host of room ${stored.roomCode} moved');
+    await ref
+        .read(tokenStoreProvider)
+        .write(
+          StoredSession(
+            serverUri: moved.toString(),
+            roomCode: stored.roomCode,
+            sessionToken: stored.sessionToken,
+            playerId: stored.playerId,
+          ),
+        );
+    if (_client == null || state.link.isLive) return;
+    attach(
+      uri: moved,
+      first: Resume(roomCode: stored.roomCode, sessionToken: stored.sessionToken),
+      host: false,
+      playerId: stored.playerId,
+    );
   }
 
   void _onMessage(Envelope<ServerMessage> envelope) {

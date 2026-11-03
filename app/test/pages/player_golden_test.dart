@@ -41,10 +41,10 @@ Future<TestHarness> _open(WidgetTester tester, Size size, {required bool myTurn}
   await tester.pumpAndSettle();
   final fields = find.byType(TextField);
   await tester.enterText(fields.at(0), 'KQ7M');
-  await tester.enterText(fields.at(1), '192.168.1.5');
-  await tester.enterText(fields.at(2), 'Alice');
+  await tester.enterText(fields.at(1), 'Alice');
   await tester.ensureVisible(find.text('JOIN'));
   await tester.tap(find.text('JOIN'));
+  await tester.pump();
   await tester.pump();
   await tester.pump();
   harness.network.last
