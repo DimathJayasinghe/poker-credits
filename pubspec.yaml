@@ -6,4 +6,5 @@ environment:
 
 workspace:
   - app
+  - packages/poker_bridge
   - packages/poker_protocol

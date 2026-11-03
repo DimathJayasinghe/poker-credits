@@ -1,0 +1,24 @@
+name: poker_bridge
+description: "Dart facade over the embedded Rust poker server (flutter_rust_bridge). Native only: never imported by web-safe code."
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.11.5
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Pinned to the codegen version (docs/SPIKE_BRIDGE_FINDINGS.md); the Rust side pins the same.
+  flutter_rust_bridge: 2.13.0
+  rust_lib_poker_bridge:
+    path: rust_builder
+  logging: ^1.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  integration_test:
+    sdk: flutter

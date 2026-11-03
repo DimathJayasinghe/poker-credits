@@ -1,6 +1,6 @@
 # Project Status & Handoff
 
-Last updated: 2026-11-02 (branch `feature/engine-core`, stacked on the unmerged `chore/bootstrap`).
+Last updated: 2026-11-03 (branch `feature/protocol-dart-models`, stacked on `feature/server-core`).
 
 ## Where we are
 **Phase 0 (bootstrap) is done and Phase 1 (engine) is implemented for review.** The old TypeScript scaffold was deleted (owner approved 2026-11-01). The stack was changed to **Flutter (app) + Rust (engine and server)**, and the docs were rewritten to match, using LocalSend (`~/Documents/dev_projects/localsend`) as the model for repo layout, Flutter-Rust bridging and crash handling.
@@ -54,7 +54,12 @@ Deviations from the guide, for review:
 - Not tested: a journal replay that panics (poisoning path).
 
 Phase 3a done: `packages/poker_protocol` (Dart models for every client and server message, `dart_mappable` as the plan says, generated `*.mapper.dart` files are committed). Tests: all 42 golden fixtures decode and re-encode to identical JSON, every message type must have a fixture, unknown message types / error codes / roles decode to safe defaults. The API doc error list was checked against `protocol.rs`: identical (34 codes plus Dart-only `unknown`). Deviations: extra files `room_config.dart`, `player_action.dart`, `wire_case.dart` beside the five in the guide; `protocolVersion` moved to `envelope.dart`.
-Still to do: Phase 3b (`packages/poker_bridge`), plus the open owner questions below.
+Phase 3b done: `packages/poker_bridge` (FRB 2.13.0 + cargokit, added to the Cargo and pub workspaces).
+- Rust `api/server.rs`: `start_server(RsServerConfig{port, exposeOnLan, dataDir, serverName}) -> RsServerHandle` (opaque: `port`, `isRunning()`, `stop()`, `subscribe()` event stream of `RsServerEvent{kind, value}`); `api/logging.rs`: `init_app` (FRB hook, then our chained panic hook), `init_logging` (logcat on Android). Events wait in a bounded channel until Dart subscribes, so `listening` is never missed. 4 Rust tests.
+- Dart facade: `initBridge()`, `ServerController` (`start`, `stop`, `ensureRunning` = the lifecycle probe, `events`), `BridgeException(kind: panic|bind|dataDir|unknown)`; every call goes through `guardBridge`, which maps `PanicException` and `RsServerError`. 7 fake-backed unit tests plus a smoke test against the real native library (HTTP `/v1/info` answers, busy port is a typed error, `stopped` event arrives); run it with `POKER_BRIDGE_LIB=<path to librust_lib_poker_bridge.so> fvm flutter test` (skipped otherwise).
+- Deviations: no `network.rs` (local addresses come from Dart `NetworkInterface.list()`, per the approved dependency list); events and errors are a struct plus a plain enum instead of enums with data, because the generator would then require the `freezed` package, which is not approved. No bridged panic-trigger function is generated (the `test-hooks` feature is declared but the real-panic path was proven in the Phase 0 spike).
+- Codegen: `cd packages/poker_bridge && flutter_rust_bridge_codegen generate`. It rewrites `.fvmrc` and `.gitignore` as a side effect (`git checkout .fvmrc .gitignore` afterwards) and leaves `frb_generated.rs` unformatted (run `cargo fmt --all`, the pre-commit hook checks it). Generated Rust and Dart files are committed.
+- Not verified: Android/iOS/macOS/Windows builds of the bridge in this repo (the spike built Android), running the bridge inside `app/` (Phase 4).
 
 Local `main` was fast-forwarded (not pushed) to the end of Phase 2 (`2173d0f`) on 2026-11-03; `feature/server-core` holds the same commits.
 

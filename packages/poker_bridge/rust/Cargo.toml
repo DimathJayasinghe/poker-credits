@@ -1,0 +1,45 @@
+[package]
+# The name must match the Flutter plugin in ../rust_builder (cargokit looks the library up by it).
+name = "rust_lib_poker_bridge"
+description = "Flutter bridge to the embedded poker server (flutter_rust_bridge)."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+# Pinned to the codegen version (docs/SPIKE_BRIDGE_FINDINGS.md).
+flutter_rust_bridge = "=2.13.0"
+poker_server_core = { path = "../../../crates/poker_server_core" }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "sync", "time"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+[dev-dependencies]
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+
+[features]
+# Exposes `panic_for_test` to the Dart tests of the panic handling. Never enabled in app builds.
+test-hooks = []
+
+[target.'cfg(target_os = "android")'.dependencies]
+tracing-android = "0.2.0"
+
+# Not `workspace = true`: the generated bridge code needs `unsafe`, which the workspace forbids.
+# Hand-written modules under `api/` carry `#![forbid(unsafe_code)]` themselves, and the generated
+# module opts out of the strict lints where it is declared in lib.rs.
+[lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+todo = "deny"
+dbg_macro = "deny"
