@@ -96,4 +96,65 @@ abstract final class Strings {
   static const String no = 'No';
   static const String lobbyHint = 'Players join with the room code. Press start when everyone is seated.';
   static const String hostingUnavailable = 'Hosting unavailable on this device';
+
+  // Join
+  static const String joinGame = 'Join a game';
+  static const String joinTitle = 'Join a game';
+  static const String joinCode = 'Room code';
+  static const String joinAddress = 'Host address (192.168.1.5 or 192.168.1.5:7878)';
+  static const String joinName = 'Your name';
+  static const String joinButton = 'Join';
+  static const String watchButton = 'Watch only';
+  static const String scanQr = 'Scan QR code';
+  static const String scanTitle = 'Scan the host\'s code';
+  static const String scanHint = 'Point the camera at the QR code on the table screen.';
+  static const String scanNotOurs = 'That is not a Poker Credits code';
+  static const String scanCameraFailed = 'The camera cannot be used. Type the address instead.';
+  static const String codeInvalid = 'The room code has 4 letters or digits';
+  static const String addressInvalid = 'Enter the host address, for example 192.168.1.5';
+  static const String connecting = 'Connecting';
+  static const String cannotReach = 'Cannot reach the host yet. Still trying';
+  static const String resumeGame = 'Back to my game';
+  static const String errRoomFull = 'The table is full. You can still watch';
+  static const String errSpectatorsFull = 'The room cannot take more watchers';
+  static const String errNameTaken = 'That seat or name is taken. Change your name or try again';
+  static const String errSeatOccupied = 'That seat is taken';
+  static const String errAlreadySeated = 'You already have a seat';
+  static const String errNameInvalid = 'Use 1 to 20 letters, digits, spaces, - or _';
+  static const String errRoomNotFound = 'No game with that code on this address';
+  static const String errHandInProgress = 'A hand is being played. You join the next one';
+  static const String errGeneric = 'The server said no';
+
+  // Player controller
+  static const String yourTurn = 'Your turn';
+  static const String waitingFor = 'Waiting for';
+  static const String waitingForHand = 'Waiting for the next hand';
+  static const String yourStack = 'Your chips';
+  static const String yourBet = 'Your bet';
+  static const String fold = 'Fold';
+  static const String check = 'Check';
+  static const String call = 'Call';
+  static const String raise = 'Raise';
+  static const String raiseTo = 'Raise to';
+  static const String allInAction = 'All-in';
+  static const String min = 'Min';
+  static const String max = 'All-in';
+  static const String topUp = 'Top up';
+  static const String topUpTitle = 'Ask the host for chips';
+  static const String topUpAsk = 'Ask';
+  static const String topUpPending = 'Top-up requested';
+  static const String topUpApproved = 'Top-up approved: you get it before the next hand';
+  static const String sitOut = 'Sit out';
+  static const String imBack = 'I\'m back';
+  static const String leave = 'Leave';
+  static const String leaveTable = 'Leave table';
+  static const String leaveTableTitle = 'Leave the table?';
+  static const String leaveTableBody = 'You fold if a hand is running, and your chips leave with you.';
+  static const String youAreOut = 'You are sitting out the next hands';
+  static const String watchingOnly = 'You are watching';
+  static const String noSeat = 'You do not have a seat';
+  static const String stillHere = 'Still here?';
+  static const String actionRejected = 'The server did not accept that';
+  static const String turnLeft = 'left';
+  static const String amount = 'Amount';
 }

@@ -119,6 +119,7 @@ class HostNotifier extends Notifier<HostState> {
           uri: _loopback(room.port),
           first: Resume(roomCode: room.roomCode, sessionToken: room.sessionToken, hostToken: room.hostToken),
           host: true,
+          playerId: room.playerId.isEmpty ? null : room.playerId,
         );
   }
 

@@ -1,3 +1,4 @@
+import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
@@ -37,3 +38,27 @@ String clock(int milliseconds) {
   final seconds = total % 60;
   return '$minutes:${seconds.toString().padLeft(2, '0')}';
 }
+
+/// Words for a link that gave up.
+String linkFailureText(LinkFailure failure) => switch (failure) {
+  LinkFailure.roomGone => Strings.linkFailedRoomGone,
+  LinkFailure.invalidSession => Strings.linkFailedSession,
+  LinkFailure.superseded => Strings.linkFailedSuperseded,
+  LinkFailure.roomCrashed => Strings.linkFailedCrashed,
+  LinkFailure.roomExpired => Strings.linkFailedExpired,
+  LinkFailure.versionMismatch => Strings.linkFailedVersion,
+  LinkFailure.rateLimited => Strings.linkFailedRate,
+  LinkFailure.refused => Strings.linkFailedRefused,
+};
+
+/// Words for a server error shown while joining or acting.
+String errorText(ErrorCode code) => switch (code) {
+  ErrorCode.roomFull => Strings.errRoomFull,
+  ErrorCode.spectatorsFull => Strings.errSpectatorsFull,
+  ErrorCode.seatOccupied => Strings.errSeatOccupied,
+  ErrorCode.alreadySeated => Strings.errAlreadySeated,
+  ErrorCode.nameInvalid => Strings.errNameInvalid,
+  ErrorCode.roomNotFound => Strings.errRoomNotFound,
+  ErrorCode.handInProgress => Strings.errHandInProgress,
+  _ => Strings.errGeneric,
+};

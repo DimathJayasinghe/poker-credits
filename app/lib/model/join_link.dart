@@ -31,6 +31,26 @@ class JoinLink {
     return JoinLink(hostAndPort: hostAndPort, roomCode: code.toUpperCase());
   }
 
+  /// The port a host listens on unless it picked another one.
+  static const int defaultPort = 7878;
+
+  /// Normalises what a person typed (`192.168.1.5`, `192.168.1.5:7878`, `ws://...` is refused) into
+  /// `address:port`; `null` when it cannot be an address.
+  static String? normalizeAddress(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty || trimmed.contains('/') || trimmed.contains(' ')) return null;
+    final withPort = trimmed.contains(':') ? trimmed : '$trimmed:$defaultPort';
+    if (!_hostAndPort.hasMatch(withPort)) return null;
+    final port = int.parse(withPort.substring(withPort.lastIndexOf(':') + 1));
+    return port >= 1 && port <= 65535 ? withPort : null;
+  }
+
+  /// Normalises a typed room code (case-insensitive, spaces ignored); `null` when invalid.
+  static String? normalizeRoomCode(String text) {
+    final code = text.replaceAll(' ', '').toUpperCase();
+    return _roomCode.hasMatch(code) ? code : null;
+  }
+
   static final RegExp _hostAndPort = RegExp(r'^[A-Za-z0-9.\-]{1,253}:\d{1,5}$');
   static final RegExp _roomCode = RegExp(r'^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$');
 

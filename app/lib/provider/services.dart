@@ -3,6 +3,8 @@ import 'package:poker_credits/platform/host_server.dart';
 import 'package:poker_credits/platform/server_address.dart';
 import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/platform/wake_lock.dart';
+import 'package:poker_credits/util/haptics.dart';
+import 'package:poker_credits/util/sound.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 
@@ -11,6 +13,8 @@ import 'package:refena_flutter/refena_flutter.dart';
 final hostServerProvider = Provider<HostServer>((ref) => createHostServer());
 final tokenStoreProvider = Provider<TokenStore>((ref) => createTokenStore());
 final wakeLockProvider = Provider<WakeLock>((ref) => createWakeLock());
+final hapticsProvider = Provider<Haptics>((ref) => const Haptics());
+final soundProvider = Provider<Sound>((ref) => const Sound());
 final localAddressesProvider = Provider<LocalAddressLister>((ref) => listLocalAddresses);
 
 /// Local clock; overridden in tests.

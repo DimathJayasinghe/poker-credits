@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/pages/host_page.dart';
+import 'package:poker_credits/pages/join_page.dart';
+import 'package:poker_credits/pages/player_page.dart';
+import 'package:poker_credits/pages/spectator_page.dart';
+import 'package:poker_credits/provider/connection_provider.dart';
+import 'package:poker_credits/provider/join_provider.dart';
 import 'package:poker_credits/pages/table_page.dart';
 import 'package:poker_credits/provider/host_provider.dart';
 import 'package:poker_credits/provider/services.dart';
@@ -22,6 +27,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with Refena {
   StoredSession? _hosted;
+  StoredSession? _playing;
   bool _resuming = false;
   String? _resumeError;
 
@@ -30,7 +36,14 @@ class _HomePageState extends State<HomePage> with Refena {
     super.initState();
     ensureRef((ref) async {
       final stored = await ref.read(tokenStoreProvider).read();
-      if (mounted && stored != null && stored.isHost) setState(() => _hosted = stored);
+      if (!mounted || stored == null) return;
+      setState(() {
+        if (stored.isHost) {
+          _hosted = stored;
+        } else {
+          _playing = stored;
+        }
+      });
     });
   }
 
@@ -47,6 +60,19 @@ class _HomePageState extends State<HomePage> with Refena {
       setState(() => _resumeError = Strings.hostingUnavailable);
     }
     if (mounted) setState(() => _resuming = false);
+  }
+
+  /// Back to the game this device joined as a guest: a `RESUME` with the stored session. Whether
+  /// the session is still good is the server's call; the page shows the answer.
+  Future<void> _resumePlaying() async {
+    final ok = await ref.read(joinProvider).restore();
+    if (!mounted) return;
+    if (!ok) {
+      setState(() => _playing = null);
+      return;
+    }
+    // A guest without a seat in the view was a spectator.
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const _ResumedGuestPage()));
   }
 
   @override
@@ -84,6 +110,23 @@ class _HomePageState extends State<HomePage> with Refena {
                     ),
                     const SizedBox(height: BrutalMetrics.gapM),
                   ],
+                  if (_playing != null) ...<Widget>[
+                    BrutalButton(
+                      label: '${Strings.resumeGame} ${_playing!.roomCode}',
+                      kind: BrutalButtonKind.info,
+                      minHeight: BrutalMetrics.tapPlayer,
+                      onPressed: _resumePlaying,
+                    ),
+                    const SizedBox(height: BrutalMetrics.gapM),
+                  ],
+                  BrutalButton(
+                    label: Strings.joinGame,
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const JoinPage())),
+                    kind: BrutalButtonKind.info,
+                    heavy: true,
+                    minHeight: BrutalMetrics.tapPlayer,
+                  ),
+                  const SizedBox(height: BrutalMetrics.gapM),
                   BrutalButton(
                     label: Strings.hostGame,
                     onPressed: supported ? () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const HostPage())) : null,
@@ -104,5 +147,18 @@ class _HomePageState extends State<HomePage> with Refena {
         ),
       ),
     );
+  }
+}
+
+/// Shown after a guest resumes: becomes the player controller once the server confirms a seat,
+/// or the spectator view if the session has none.
+class _ResumedGuestPage extends StatelessWidget {
+  const _ResumedGuestPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final session = context.ref.watch(sessionProvider);
+    final spectating = session.room.view != null && !session.isSeated && session.role != Role.player;
+    return spectating ? const SpectatorPage() : const PlayerPage();
   }
 }

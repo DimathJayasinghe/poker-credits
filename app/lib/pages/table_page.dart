@@ -5,6 +5,7 @@ import 'package:poker_credits/model/room_state.dart';
 import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/host_provider.dart';
+import 'package:poker_credits/provider/join_provider.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
@@ -15,6 +16,7 @@ import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_dialog.dart';
 import 'package:poker_credits/widget/brutal/brutal_sheet.dart';
+import 'package:poker_credits/widget/brutal/brutal_tag.dart';
 import 'package:poker_credits/widget/table/action_ticker.dart';
 import 'package:poker_credits/widget/table/felt_layout.dart';
 import 'package:poker_credits/widget/table/host_controls.dart';
@@ -29,9 +31,11 @@ import 'package:refena_flutter/refena_flutter.dart';
 const int tableSeats = 10;
 
 /// The Table display: dark by default, landscape, readable from across the room. The host sees
-/// the controls; the same view without them will serve spectators later.
+/// the controls; with [watching] it is the read-only spectator view (no controls, no seat menu).
 class TablePage extends StatefulWidget {
-  const TablePage({super.key});
+  const TablePage({super.key, this.watching = false});
+
+  final bool watching;
 
   @override
   State<TablePage> createState() => _TablePageState();
@@ -55,7 +59,11 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      ref.notifier(hostProvider).onForeground();
+      if (widget.watching) {
+        ref.notifier(sessionProvider).reconnect();
+      } else {
+        ref.notifier(hostProvider).onForeground();
+      }
     }
   }
 
@@ -68,7 +76,11 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
   }
 
   Future<void> _leave() async {
-    await ref.notifier(hostProvider).stop();
+    if (widget.watching) {
+      await ref.read(joinProvider).leave();
+    } else {
+      await ref.notifier(hostProvider).stop();
+    }
     if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
@@ -116,17 +128,6 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
     if (yes) _send(Kick(playerId: seat.playerId));
   }
 
-  String _failureText(LinkFailure failure) => switch (failure) {
-    LinkFailure.roomGone => Strings.linkFailedRoomGone,
-    LinkFailure.invalidSession => Strings.linkFailedSession,
-    LinkFailure.superseded => Strings.linkFailedSuperseded,
-    LinkFailure.roomCrashed => Strings.linkFailedCrashed,
-    LinkFailure.roomExpired => Strings.linkFailedExpired,
-    LinkFailure.versionMismatch => Strings.linkFailedVersion,
-    LinkFailure.rateLimited => Strings.linkFailedRate,
-    LinkFailure.refused => Strings.linkFailedRefused,
-  };
-
   @override
   Widget build(BuildContext context) {
     final session = context.ref.watch(sessionProvider);
@@ -147,7 +148,7 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
     final failure = session.link.failure;
     final ended = session.room.ended;
     if (failure != null || ended != null) {
-      final text = failure != null ? _failureText(failure) : (ended == RoomEnd.crashed ? Strings.linkFailedCrashed : Strings.linkFailedExpired);
+      final text = failure != null ? linkFailureText(failure) : (ended == RoomEnd.crashed ? Strings.linkFailedCrashed : Strings.linkFailedExpired);
       return Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
@@ -195,7 +196,7 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        _TopBar(view: view),
+        _TopBar(view: view, watching: widget.watching),
         if (!session.link.isLive) _linkBanner(session.link),
         if (view.paused) const BrutalBanner(message: Strings.gamePaused, kind: BrutalBannerKind.warning),
         if (room.presenceCheck != null && session.isHost) _presenceStrip(room.presenceCheck!),
@@ -331,9 +332,10 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.view});
+  const _TopBar({required this.view, required this.watching});
 
   final RoomView view;
+  final bool watching;
 
   @override
   Widget build(BuildContext context) {
@@ -350,7 +352,10 @@ class _TopBar extends StatelessWidget {
         children: <Widget>[
           Text('${Strings.room.toUpperCase()} ${view.roomCode}', style: style(22)),
           Text('${Strings.hand.toUpperCase()} ${view.handNumber}   ${phaseLabel(view.phase).toUpperCase()}', style: style(22)),
-          if (view.spectatorCount > 0) Text('${Strings.watching.toUpperCase()} ${view.spectatorCount}', style: style(16)),
+          if (watching)
+            const BrutalTag(Strings.watching)
+          else if (view.spectatorCount > 0)
+            Text('${Strings.watching.toUpperCase()} ${view.spectatorCount}', style: style(16)),
         ],
       ),
     );

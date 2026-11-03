@@ -8,6 +8,8 @@ import 'package:poker_credits/platform/host_server.dart';
 import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/platform/wake_lock.dart';
 import 'package:poker_credits/provider/services.dart';
+import 'package:poker_credits/util/haptics.dart';
+import 'package:poker_credits/util/sound.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 
@@ -131,6 +133,8 @@ class TestHarness {
   final List<String> addresses;
   final FakeNetwork network = FakeNetwork();
   final FakeWakeLock wakeLock = FakeWakeLock();
+  final FakeHaptics haptics = FakeHaptics();
+  final FakeSound sound = FakeSound();
   DateTime clock = DateTime.fromMillisecondsSinceEpoch(1730000000000);
 
   /// Wraps [child] in a Refena scope with every service replaced by a fake.
@@ -139,12 +143,36 @@ class TestHarness {
       hostServerProvider.overrideWithValue(host),
       tokenStoreProvider.overrideWithValue(tokens),
       wakeLockProvider.overrideWithValue(wakeLock),
+      hapticsProvider.overrideWithValue(haptics),
+      soundProvider.overrideWithValue(sound),
       localAddressesProvider.overrideWithValue(() async => addresses),
       clockProvider.overrideWithValue(() => clock),
       roomClientFactoryProvider.overrideWithValue((uri, first) => RoomClient(uri: uri, firstMessage: first, transport: network.connect)),
     ],
     child: child,
   );
+}
+
+class FakeHaptics extends Haptics {
+  FakeHaptics();
+
+  int turns = 0;
+  int taps = 0;
+
+  @override
+  Future<void> yourTurn() async => turns++;
+
+  @override
+  Future<void> tap() async => taps++;
+}
+
+class FakeSound extends Sound {
+  FakeSound();
+
+  int turns = 0;
+
+  @override
+  Future<void> yourTurn() async => turns++;
 }
 
 class FakeWakeLock implements WakeLock {

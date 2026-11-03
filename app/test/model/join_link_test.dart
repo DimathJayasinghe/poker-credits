@@ -26,4 +26,26 @@ void main() {
       expect(JoinLink.tryParse(text), isNull, reason: text);
     }
   });
+
+  group('typed input', () {
+    test('an address gets the default port, an explicit port is kept', () {
+      expect(JoinLink.normalizeAddress('192.168.1.5'), '192.168.1.5:7878');
+      expect(JoinLink.normalizeAddress(' 10.0.2.2:9000 '), '10.0.2.2:9000');
+      expect(JoinLink.normalizeAddress('table.local'), 'table.local:7878');
+    });
+
+    test('things that are not an address are refused', () {
+      for (final bad in <String>['', 'ws://192.168.1.5:7878', '192.168.1.5/v1', 'a b', '192.168.1.5:0', '192.168.1.5:70000', '192.168.1.5:abc']) {
+        expect(JoinLink.normalizeAddress(bad), isNull, reason: bad);
+      }
+    });
+
+    test('a room code is case-insensitive and uses the server alphabet', () {
+      expect(JoinLink.normalizeRoomCode('kq7m'), 'KQ7M');
+      expect(JoinLink.normalizeRoomCode(' k q7m '), 'KQ7M');
+      expect(JoinLink.normalizeRoomCode('KQ7'), isNull);
+      expect(JoinLink.normalizeRoomCode('KQ0M'), isNull, reason: '0 is not in the alphabet');
+      expect(JoinLink.normalizeRoomCode('KQ1M'), isNull, reason: '1 is not in the alphabet');
+    });
+  });
 }

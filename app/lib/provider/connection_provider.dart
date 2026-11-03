@@ -13,7 +13,14 @@ final _log = Logger('Session');
 
 /// The link plus the room as the server last described it.
 class SessionState {
-  const SessionState({this.link = const LinkState(), this.room = const RoomState(), this.serverUri, this.isHost = false});
+  const SessionState({
+    this.link = const LinkState(),
+    this.room = const RoomState(),
+    this.serverUri,
+    this.isHost = false,
+    this.playerId,
+    this.role,
+  });
 
   final LinkState link;
   final RoomState room;
@@ -22,10 +29,41 @@ class SessionState {
   final String? serverUri;
   final bool isHost;
 
+  /// This device's player id, once the server told it (`JOINED`, `ROOM_CREATED`) or the stored
+  /// session knew it.
+  final String? playerId;
+
+  /// Role from `JOINED`; `null` after a plain `RESUME` (use [isSeated] then).
+  final Role? role;
+
   bool get isAttached => serverUri != null;
 
-  SessionState copyWith({LinkState? link, RoomState? room}) =>
-      SessionState(link: link ?? this.link, room: room ?? this.room, serverUri: serverUri, isHost: isHost);
+  /// Whether this device has a seat in the room view. The server decides; spectators have none.
+  bool get isSeated {
+    final id = playerId;
+    final view = room.view;
+    return id != null && view != null && view.seats.any((seat) => seat.playerId == id);
+  }
+
+  /// The seat of this device, if any.
+  SeatView? get mySeat {
+    final id = playerId;
+    final view = room.view;
+    if (id == null || view == null) return null;
+    for (final seat in view.seats) {
+      if (seat.playerId == id) return seat;
+    }
+    return null;
+  }
+
+  SessionState copyWith({LinkState? link, RoomState? room, String? playerId, Role? role}) => SessionState(
+    link: link ?? this.link,
+    room: room ?? this.room,
+    serverUri: serverUri,
+    isHost: isHost,
+    playerId: playerId ?? this.playerId,
+    role: role ?? this.role,
+  );
 }
 
 final sessionProvider = NotifierProvider<SessionNotifier, SessionState>((ref) => SessionNotifier());
@@ -33,17 +71,23 @@ final sessionProvider = NotifierProvider<SessionNotifier, SessionState>((ref) =>
 /// Owns the [RoomClient] of the room the user is in and turns its messages into [SessionState].
 class SessionNotifier extends Notifier<SessionState> {
   RoomClient? _client;
+
+  /// The server knows this session: a `RESUME` was accepted or a join went through. Until then a
+  /// failure belongs to the join attempt and must not touch the stored session of another room.
+  bool _established = false;
   final List<StreamSubscription<Object?>> _subscriptions = <StreamSubscription<Object?>>[];
 
   @override
   SessionState init() => const SessionState();
 
-  /// Connects to [uri] and sends [first] (`RESUME` for a host, `JOIN_ROOM` for a player).
-  void attach({required Uri uri, required ClientMessage first, required bool host}) {
+  /// Connects to [uri] and sends [first] (`RESUME` to re-attach, `JOIN_ROOM` to join).
+  /// [playerId] is known when re-attaching from a stored session.
+  void attach({required Uri uri, required ClientMessage first, required bool host, String? playerId}) {
     unawaited(_detach());
     final client = ref.read(roomClientFactoryProvider)(uri, first);
     _client = client;
-    state = SessionState(serverUri: uri.toString(), isHost: host);
+    _established = first is Resume;
+    state = SessionState(serverUri: uri.toString(), isHost: host, playerId: playerId);
     _subscriptions
       ..add(client.states.listen(_onLink))
       ..add(client.messages.listen(_onMessage))
@@ -59,9 +103,14 @@ class SessionNotifier extends Notifier<SessionState> {
 
   /// Leaves the room: closes the socket and forgets the stored session.
   Future<void> leave() async {
-    await _detach();
-    await ref.read(tokenStoreProvider).clear();
+    final forget = _established;
+    _established = false;
+    // The synchronous part of detaching (timers, subscriptions) runs at once. Closing the socket
+    // can take a while when the peer is gone, so nothing that matters waits for it.
+    final detaching = _detach();
     state = const SessionState();
+    if (forget) await ref.read(tokenStoreProvider).clear();
+    unawaited(detaching.catchError((Object error) => _log.info('closing the socket failed: $error')));
   }
 
   /// Closes the client without touching the stored session (app shutdown).
@@ -88,7 +137,11 @@ class SessionNotifier extends Notifier<SessionState> {
   void _onLink(LinkState link) {
     state = state.copyWith(link: link);
     final failure = link.failure;
-    if (failure != null && failure != LinkFailure.refused && failure != LinkFailure.versionMismatch && failure != LinkFailure.rateLimited) {
+    if (_established &&
+        failure != null &&
+        failure != LinkFailure.refused &&
+        failure != LinkFailure.versionMismatch &&
+        failure != LinkFailure.rateLimited) {
       // The room or the session is gone; the stored tokens are useless now.
       unawaited(ref.read(tokenStoreProvider).clear());
     }
@@ -102,12 +155,16 @@ class SessionNotifier extends Notifier<SessionState> {
       room = room.resyncRequested();
       _client?.reconnectNow();
     }
-    state = state.copyWith(room: room);
+    final body = envelope.body;
+    state = body is Joined ? state.copyWith(room: room, playerId: body.playerId, role: body.role) : state.copyWith(room: room);
   }
 
   void _onCredentials(RoomCredentials credentials) {
     final uri = state.serverUri;
     if (uri == null) return;
+    _established = true;
+    final id = credentials.playerId;
+    if (id != null && id != state.playerId) state = state.copyWith(playerId: id);
     unawaited(
       ref
           .read(tokenStoreProvider)
