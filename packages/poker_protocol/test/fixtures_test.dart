@@ -5,7 +5,20 @@ import 'package:poker_protocol/poker_protocol.dart';
 import 'package:test/test.dart';
 
 /// Golden files shared with the Rust tests (`crates/poker_server_core/tests/protocol_fixtures.rs`).
-final Directory fixtureDir = Directory('../../protocol/fixtures/v1');
+/// `protocol/fixtures/v1`, found by walking up from the working directory: the tests run from
+/// `packages/poker_protocol` locally and from the repository root in CI.
+final Directory fixtureDir = _findFixtures();
+
+Directory _findFixtures() {
+  var dir = Directory.current.absolute;
+  while (true) {
+    final candidate = Directory('${dir.path}${Platform.pathSeparator}protocol${Platform.pathSeparator}fixtures${Platform.pathSeparator}v1');
+    if (candidate.existsSync()) return candidate;
+    final parent = dir.parent;
+    if (parent.path == dir.path) return Directory('protocol/fixtures/v1');
+    dir = parent;
+  }
+}
 
 /// Every message type the protocol has, with the Dart class it must decode to. A new message
 /// without a fixture, or a fixture without an entry here, fails the test on purpose.
@@ -61,7 +74,7 @@ Map<String, dynamic> asMap(String text) => jsonDecode(text) as Map<String, dynam
 
 void main() {
   test('the fixture folder is found', () {
-    expect(fixtureDir.existsSync(), isTrue, reason: 'run the tests from packages/poker_protocol');
+    expect(fixtureDir.existsSync(), isTrue, reason: 'protocol/fixtures/v1 must exist above the working directory');
   });
 
   group('client fixtures', () {

@@ -40,7 +40,17 @@ jobs:
       - run: flutter pub get
       - run: dart format --output=none --set-exit-if-changed app packages
       - run: flutter analyze
-      - run: flutter test app packages/poker_protocol
+      # Each package runs from its own directory: the app tests load fonts and goldens by relative
+      # path, and the protocol tests look for the shared fixtures.
+      - name: App tests
+        run: flutter test
+        working-directory: app
+      - name: Protocol tests
+        run: flutter test
+        working-directory: packages/poker_protocol
+      - name: Bridge tests
+        run: flutter test
+        working-directory: packages/poker_bridge
       - name: Web-safety guard (ADR-014, ADR-013)
         run: bash tool/check_web_safe.sh
       - name: Web build smoke test (ADR-014)
