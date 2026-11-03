@@ -28,6 +28,9 @@ Implemented on `feature/engine-core` (branched from `chore/bootstrap`, nothing c
 
 Deviations from the guide's file list: there is no separate `AdminCommand`; all commands are variants of `Command`, and `Command::origin()` returns `Player`, `Host` or `Server` so the server can enforce who may send what (`Timeout` is `Server`: only the turn timer may time a player out; the server must bind `player_id` to the session for `Action` and `SetSittingOut`). `undo.rs` is public, not private.
 
+## Phase 2 status (server core), in progress on `feature/server-core`
+Committed: `protocol.rs` (wire types, parsing, `protocol/fixtures/v1/*.json`, round-trip tests). Uncommitted, compiles, clippy clean: `config.rs` (Limits, Timings), `util/` (room code, token hash, panic hook), `room/state.rs` (`RoomState`, `Op`, pure `apply` reducer), `room/ops.rs` (op handlers: join, act, timeout, host commands, rebuy, presence check, removals), `room/view.rs` (`RoomState` to `RoomView`). **No reducer tests yet.** Still to do: `room/actor.rs`, `handle.rs`, `session.rs`, `supervisor.rs`, `store/{snapshot,journal}.rs`, `net/{ws,http,guards}.rs`, `start()`/`ServerHandle`, `server/` binary, integration tests (`hand_flow`, `resume`, `races`, `panic_recovery`, `slow_consumer`, `rate_limit`).
+
 ## Next step
 1. Owner reviews Phase 0 (`chore/bootstrap`) and Phase 1 (`feature/engine-core`, which contains Phase 0) and merges to `main`.
 2. Start **Phase 2** (server core and cloud binary) after approval. The engine's `PokerError` variants `NothingToCall`, `BettingNotReopened`, `NotPaused`, `NotEnoughPlayers`, `UnknownPlayer`, `PlayerExists`, `InvalidSeat`, `InvalidAmount`, `Overflow`, `IllegalTransition`, `NothingToUndo` and `InvalidAllocation` have no wire code yet in `API_AND_EVENTS.md` section 6; add them when writing the exhaustive `From<PokerError> for ErrorCode`.
