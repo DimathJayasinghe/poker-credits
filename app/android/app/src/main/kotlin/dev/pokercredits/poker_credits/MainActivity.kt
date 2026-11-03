@@ -33,6 +33,17 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
+     * The embedded server lives inside the Flutter engine. When the engine goes away (the user
+     * leaves with Back, the system destroys the activity) the server is gone too, so the
+     * "Hosting" notification must go with it instead of claiming a game that nobody can reach.
+     * The next launch offers to resume the room from the journal.
+     */
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        HostService.stop(this)
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    /**
      * Android 13+ hides the service notification until the user allows notifications. The service
      * runs either way; this only asks once so the host can see why the phone stays awake.
      */

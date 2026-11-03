@@ -35,6 +35,7 @@ The host's phone or computer runs the server; others join by room code on the sa
 
 ### Android
 - Hosting starts a **foreground service** with a notification ("Hosting room XXXX"), so the server keeps answering when the host opens another app or locks the screen. It ends with END GAME or when the app is closed.
+- The server lives inside the app's Flutter engine, so the service is stopped together with it: swiping the app away (or the system destroying its activity) ends hosting, the notification disappears, and the next launch offers **Resume hosted game** (the room is restored from its journal). The service lowers the chance of that happening in the background; it cannot make hosting survive the app being closed. Pressing Back on the table only leaves that screen; hosting continues until END GAME.
 - Android 13+ asks once to allow notifications. If refused, the service still runs; only its notification is hidden.
 - Type is `specialUse` (no standard type fits; `dataSync` is time-limited on Android 15). **Play Console:** the app must declare the special-use foreground service with the subtype text from the manifest ("Hosts a local poker game for other devices on the same network") and a short video of the feature when publishing.
 - Battery optimisation on some vendors (Xiaomi, Huawei, Samsung "sleeping apps") can still kill a background app; add the app to the unrestricted list if a long game drops.
