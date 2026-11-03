@@ -59,6 +59,7 @@ class HostNotifier extends Notifier<HostState> {
           );
       final addresses = await _addresses();
       _connect(room);
+      unawaited(ref.read(hostKeepAliveProvider).start(room.roomCode));
       state = HostState(phase: HostPhase.ready, room: room, addresses: addresses);
     } on HostException catch (error) {
       _log.warning('hosting failed', error);
@@ -83,6 +84,7 @@ class HostNotifier extends Notifier<HostState> {
         port: port,
       );
       _connect(room);
+      unawaited(ref.read(hostKeepAliveProvider).start(room.roomCode));
       state = HostState(phase: HostPhase.ready, room: room, addresses: await _addresses());
       return true;
     } on HostException catch (error) {
@@ -109,6 +111,7 @@ class HostNotifier extends Notifier<HostState> {
   Future<void> stop() async {
     await ref.notifier(sessionProvider).leave();
     await ref.read(hostServerProvider).stop();
+    await ref.read(hostKeepAliveProvider).stop();
     state = const HostState();
   }
 

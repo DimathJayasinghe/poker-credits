@@ -240,6 +240,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(TablePage), findsNothing);
     expect(harness.host.stopped, 1);
+    expect(harness.keepAlive.stopped, 1, reason: 'the background service ends with the game');
     await _close(tester);
   });
 

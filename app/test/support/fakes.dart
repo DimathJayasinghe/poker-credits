@@ -5,6 +5,7 @@ import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/net/socket_client.dart';
 import 'package:poker_credits/net/transport.dart';
 import 'package:poker_credits/platform/host_finder.dart';
+import 'package:poker_credits/platform/host_keep_alive.dart';
 import 'package:poker_credits/platform/host_server.dart';
 import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/platform/wake_lock.dart';
@@ -141,6 +142,7 @@ class TestHarness {
   final FakeHaptics haptics = FakeHaptics();
   final FakeSound sound = FakeSound();
   final FakeHostFinder finder = FakeHostFinder();
+  final FakeKeepAlive keepAlive = FakeKeepAlive();
   DateTime clock = DateTime.fromMillisecondsSinceEpoch(1730000000000);
 
   /// Wraps [child] in a Refena scope with every service replaced by a fake.
@@ -152,12 +154,25 @@ class TestHarness {
       hapticsProvider.overrideWithValue(haptics),
       soundProvider.overrideWithValue(sound),
       hostFinderProvider.overrideWithValue(finder),
+      hostKeepAliveProvider.overrideWithValue(keepAlive),
       localAddressesProvider.overrideWithValue(() async => addresses),
       clockProvider.overrideWithValue(() => clock),
       roomClientFactoryProvider.overrideWithValue((uri, first) => RoomClient(uri: uri, firstMessage: first, transport: network.connect)),
     ],
     child: child,
   );
+}
+
+/// Records the foreground service the host would run on Android.
+class FakeKeepAlive implements HostKeepAlive {
+  final List<String> started = <String>[];
+  int stopped = 0;
+
+  @override
+  Future<void> start(String roomCode) async => started.add(roomCode);
+
+  @override
+  Future<void> stop() async => stopped++;
 }
 
 /// Answers every search at once with [found]; set it to `null` for "nobody answered", or set

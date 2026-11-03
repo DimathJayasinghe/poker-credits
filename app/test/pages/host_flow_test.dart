@@ -34,6 +34,7 @@ void main() {
     expect(harness.host.started, 1);
     expect(find.byType(TablePage), findsOneWidget);
     expect(harness.wakeLock.enabled, 1, reason: 'the screen stays on while the table is shown');
+    expect(harness.keepAlive.started, <String>['KQ7M'], reason: 'Android keeps the process alive for the players');
 
     // The host UI talks to its own server like any client: RESUME with both tokens.
     final resume = harness.network.last.sent.single as Resume;

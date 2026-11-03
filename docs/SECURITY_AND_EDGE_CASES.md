@@ -204,7 +204,8 @@ flowchart LR
 > The following security controls were **absent from the original documentation** and are required before production deployment:
 
 ### 6.1. Origin and Transport Policy
-* The native app is not a browser, so CORS does not apply. In **both** cloud and host mode the server checks the `Origin` header **if present** and rejects browser origins unless the origin is in `POKER_ALLOWED_ORIGINS` or is **same-origin** with the server (the `Origin` host equals the `Host` header, which is how the future web player served by the same server connects, ADR-014). This blocks malicious web pages from opening sockets to a LAN host from a user's browser (cross-site WebSocket hijacking against `ws://192.168.x.x`).
+* The native app is not a browser, so CORS does not apply. In **both** cloud and host mode the WebSocket upgrade checks the `Origin` header **if present** (implemented 2026-11-03, `net/guards.rs::origin_allowed`): a browser origin is refused with 403 unless it is listed in `POKER_ALLOWED_ORIGINS` or is **same-origin with an address host**, meaning the `Origin` authority equals the `Host` header **and** that host is an IP literal or `localhost`. Requests without `Origin` (the native app) pass. This blocks malicious web pages from opening sockets to a LAN host from a user's browser (cross-site WebSocket hijacking against `ws://192.168.x.x`).
+* "Origin equals Host" is **not** trusted for named hosts: `Host` is chosen by whoever opened the page, so under DNS rebinding a hostile `evil.example` that resolves to the server would look same-origin (found by the automated security review of the first version of this check). A server reached by name, such as a future web player, must list its own origin in `POKER_ALLOWED_ORIGINS`.
 * Cloud mode requires `wss://` (TLS terminated by the host platform or a reverse proxy).
 * Host (LAN) mode uses `ws://`; see 6.4.
 
