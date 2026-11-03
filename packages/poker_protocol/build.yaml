@@ -1,0 +1,10 @@
+targets:
+  $default:
+    builders:
+      dart_mappable_builder:
+        options:
+          # Rust is the schema: fields are camelCase on the wire, optional fields are left out
+          # (never written as null), and the generated helpers are the Map converters only.
+          caseStyle: camelCase
+          ignoreNull: true
+          generateMethods: [decode, encode, copy, equals, stringify]

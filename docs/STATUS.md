@@ -53,7 +53,8 @@ Deviations from the guide, for review:
 - Not tested over real sockets: a slow reader filling the outbound queue (needs megabytes of unread data). The policy itself (queue full means the room drops the connection) is tested at actor level in `tests/actor.rs`, and a room-side close ending the socket is tested through the kick test.
 - Not tested: a journal replay that panics (poisoning path).
 
-Still to do: Phase 3 (protocol package and bridge), plus open owner questions below. Update `docs/API_AND_EVENTS.md` section 6 error list if the exhaustive `PokerError` mapping gained codes (check against `protocol.rs`).
+Phase 3a done: `packages/poker_protocol` (Dart models for every client and server message, `dart_mappable` as the plan says, generated `*.mapper.dart` files are committed). Tests: all 42 golden fixtures decode and re-encode to identical JSON, every message type must have a fixture, unknown message types / error codes / roles decode to safe defaults. The API doc error list was checked against `protocol.rs`: identical (34 codes plus Dart-only `unknown`). Deviations: extra files `room_config.dart`, `player_action.dart`, `wire_case.dart` beside the five in the guide; `protocolVersion` moved to `envelope.dart`.
+Still to do: Phase 3b (`packages/poker_bridge`), plus the open owner questions below.
 
 Local `main` was fast-forwarded (not pushed) to the end of Phase 2 (`2173d0f`) on 2026-11-03; `feature/server-core` holds the same commits.
 
