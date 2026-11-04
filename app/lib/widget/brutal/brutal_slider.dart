@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
+import 'package:poker_credits/widget/brutal/brutal_number.dart';
 
 /// A labelled mark on a [BrutalSlider] (for example MIN, 1/2, POT, ALL-IN).
 @immutable
@@ -65,19 +66,10 @@ class BrutalSlider extends StatelessWidget {
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapS),
           decoration: BoxDecoration(
-            color: c.paper,
-            border: Border.all(color: c.ink, width: BrutalMetrics.borderHeavy),
+            color: c.surface,
+            border: Border.all(color: c.line, width: BrutalMetrics.border),
           ),
-          child: Text(
-            '$_clamped',
-            style: TextStyle(
-              fontFamily: BrutalFonts.display,
-              fontSize: 40,
-              height: 1,
-              color: c.ink,
-              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
-            ),
-          ),
+          child: BrutalNumber(_clamped, size: 56),
         ),
         const SizedBox(height: BrutalMetrics.gapM),
         LayoutBuilder(
@@ -120,8 +112,8 @@ class BrutalSlider extends StatelessWidget {
                           child: Container(
                             height: _track,
                             decoration: BoxDecoration(
-                              color: c.paper,
-                              border: Border.all(color: c.ink, width: BrutalMetrics.border),
+                              color: c.surface,
+                              border: Border.all(color: c.line, width: BrutalMetrics.border),
                             ),
                           ),
                         ),
@@ -142,9 +134,8 @@ class BrutalSlider extends StatelessWidget {
                             width: _thumb,
                             height: _thumb,
                             decoration: BoxDecoration(
-                              color: c.signal,
-                              border: Border.all(color: c.ink, width: BrutalMetrics.borderHeavy),
-                              boxShadow: <BoxShadow>[BoxShadow(color: c.ink, offset: const Offset(BrutalMetrics.shadow, BrutalMetrics.shadow))],
+                              color: c.accent,
+                              border: Border.all(color: c.line, width: BrutalMetrics.borderHeavy),
                             ),
                           ),
                         ),
@@ -173,8 +164,8 @@ class BrutalSlider extends StatelessWidget {
                       constraints: const BoxConstraints(minHeight: BrutalMetrics.tap, minWidth: BrutalMetrics.tap),
                       padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
                       decoration: BoxDecoration(
-                        color: _clamped == tick.value.clamp(min, max) ? c.signal : c.paper,
-                        border: Border.all(color: c.ink, width: BrutalMetrics.border),
+                        color: _clamped == tick.value.clamp(min, max) ? c.accent : c.surface,
+                        border: Border.all(color: c.line, width: BrutalMetrics.border),
                       ),
                       child: Center(
                         widthFactor: 1,
@@ -185,7 +176,7 @@ class BrutalSlider extends StatelessWidget {
                             fontFamily: BrutalFonts.mono,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: _clamped == tick.value.clamp(min, max) ? BrutalColors.light.ink : c.ink,
+                            color: _clamped == tick.value.clamp(min, max) ? c.onAccent : c.ink,
                           ),
                         ),
                       ),

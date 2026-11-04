@@ -1,79 +1,116 @@
 import 'package:flutter/widgets.dart';
 
-/// Design tokens for the neo-brutalist UI (docs/UI_DESIGN.md section 2, ADR-013).
+/// Design tokens for the editorial UI (docs/UI_DESIGN.md section 2, ADR-015).
 ///
 /// This is the only file allowed to contain colour literals (enforced by tool/check_web_safe.sh).
 @immutable
 class BrutalColors {
   const BrutalColors({
-    required this.ink,
     required this.paper,
+    required this.surface,
+    required this.ink,
+    required this.accent,
+    required this.onAccent,
     required this.felt,
-    required this.signal,
-    required this.danger,
-    required this.info,
-    required this.chip,
-    required this.muted,
     required this.onFelt,
-    required this.onDanger,
-    required this.onInfo,
+    required this.chip,
+    required this.onChip,
+    required this.muted,
+    required this.grain,
+    required this.grainOpacity,
   });
 
-  /// Text, borders and shadows.
-  final Color ink;
-
-  /// Backgrounds.
+  /// Page background, under the grain.
   final Color paper;
 
-  /// Table surface.
+  /// Raised cells: cards, inputs, sheets.
+  final Color surface;
+
+  /// Text, lines and the ink-filled buttons.
+  final Color ink;
+
+  /// Whose turn it is, the primary action, errors. Use for fills and large type only: small text
+  /// in this colour can fall under 4.5:1 once the grain is laid over the background.
+  final Color accent;
+
+  /// Text on [accent].
+  final Color onAccent;
+
+  /// The table panel.
   final Color felt;
 
-  /// Active turn and primary action highlight.
-  final Color signal;
+  /// Text on [felt].
+  final Color onFelt;
 
-  /// Fold, all-in and errors.
-  final Color danger;
-
-  /// Call, links and connection state.
-  final Color info;
-
-  /// Chip amounts and pot.
+  /// Pot block and chip marks.
   final Color chip;
 
-  /// Secondary text. Keep at 4.5:1 contrast or better on its background.
+  /// Text on [chip]: always dark.
+  final Color onChip;
+
+  /// Secondary text. At least 4.5:1 on [paper] and [surface].
   final Color muted;
 
-  final Color onFelt;
-  final Color onDanger;
-  final Color onInfo;
+  /// Colour the noise tile is painted in.
+  final Color grain;
 
+  /// How strongly the noise tile shows.
+  final double grainOpacity;
+
+  /// Every hairline.
+  Color get line => ink;
+
+  // The earlier palette had three loud hues. Meaning now rides on position and label (docs section
+  // 2), so these map onto the new colours and old call sites keep working.
+
+  /// The acting seat and the control that acts. Same as [accent].
+  Color get signal => accent;
+
+  /// Fold, all-in and errors. Same as [accent].
+  Color get danger => accent;
+
+  /// Text on [danger].
+  Color get onDanger => onAccent;
+
+  /// Call and check: the ink-filled button.
+  Color get info => ink;
+
+  /// Text on [info].
+  Color get onInfo => paper;
+
+  /// Text on [signal].
+  Color get onSignal => onAccent;
+
+  /// Paper theme.
   static const BrutalColors light = BrutalColors(
-    ink: Color(0xFF0A0A0A),
-    paper: Color(0xFFF3F0E6),
-    felt: Color(0xFF0F6B3A),
-    signal: Color(0xFFFFE600),
-    danger: Color(0xFFFF3B1D),
-    info: Color(0xFF2B50FF),
-    chip: Color(0xFFFF9F1C),
-    muted: Color(0xFF6B6B6B),
-    onFelt: Color(0xFFF3F0E6),
-    onDanger: Color(0xFF0A0A0A),
-    onInfo: Color(0xFFFFFFFF),
+    paper: Color(0xFFEFE5CF),
+    surface: Color(0xFFF8F1E0),
+    ink: Color(0xFF15120F),
+    accent: Color(0xFFB52D14),
+    onAccent: Color(0xFFFFF6E6),
+    felt: Color(0xFF143A2B),
+    onFelt: Color(0xFFF2E8D2),
+    chip: Color(0xFFE8A23A),
+    onChip: Color(0xFF15120F),
+    muted: Color(0xFF5C5547),
+    grain: Color(0xFF000000),
+    grainOpacity: 0.07,
   );
 
-  /// Default for the Table screen.
+  /// Night theme.
   static const BrutalColors dark = BrutalColors(
-    ink: Color(0xFFF3F0E6),
-    paper: Color(0xFF0A0A0A),
-    felt: Color(0xFF0F6B3A),
-    signal: Color(0xFFFFE600),
-    danger: Color(0xFFFF5A3C),
-    info: Color(0xFF6B83FF),
-    chip: Color(0xFFFF9F1C),
-    muted: Color(0xFFA8A8A8),
-    onFelt: Color(0xFFF3F0E6),
-    onDanger: Color(0xFF0A0A0A),
-    onInfo: Color(0xFF0A0A0A),
+    paper: Color(0xFF12100F),
+    surface: Color(0xFF1B1816),
+    ink: Color(0xFFF2E8D2),
+    accent: Color(0xFFFF5A36),
+    onAccent: Color(0xFF12100F),
+    felt: Color(0xFF0F2E22),
+    onFelt: Color(0xFFF2E8D2),
+    chip: Color(0xFFF0AE48),
+    onChip: Color(0xFF15120F),
+    muted: Color(0xFFA89F8D),
+    grain: Color(0xFFFFFFFF),
+    grainOpacity: 0.05,
   );
 }
 
@@ -82,24 +119,23 @@ abstract final class BrutalMetrics {
   /// Corner radius is always zero.
   static const double radius = 0;
 
-  /// Standard border width.
-  static const double border = 3;
+  /// The hairline: every divider and cell border.
+  static const double border = 1.5;
 
-  /// Border width for primary buttons and the pot.
-  static const double borderHeavy = 4;
+  /// The rule: the one underline or frame that anchors a screen, and the pot block.
+  static const double borderHeavy = 3;
 
-  /// Hard shadow offset (no blur).
-  static const double shadow = 4;
+  /// There are no shadows in this look; kept at zero so older call sites draw nothing.
+  static const double shadow = 0;
+  static const double shadowHeavy = 0;
 
-  /// Hard shadow offset for the pot block.
-  static const double shadowHeavy = 8;
-
-  /// 8-point spacing grid.
+  /// Spacing grid.
   static const double gapXs = 4;
   static const double gapS = 8;
   static const double gapM = 16;
   static const double gapL = 24;
   static const double gapXl = 32;
+  static const double gapXxl = 48;
 
   /// Minimum tap target on the Player screen.
   static const double tapPlayer = 56;
@@ -107,13 +143,23 @@ abstract final class BrutalMetrics {
   /// Minimum tap target elsewhere.
   static const double tap = 48;
 
-  static const Duration fast = Duration(milliseconds: 80);
-  static const Duration base = Duration(milliseconds: 150);
-  static const Duration max = Duration(milliseconds: 300);
+  /// Width from which navigation moves from a bottom bar to a side rail.
+  static const double wide = 840;
+
+  static const Duration fast = Duration(milliseconds: 90);
+  static const Duration base = Duration(milliseconds: 160);
+  static const Duration max = Duration(milliseconds: 280);
 }
 
 /// Bundled font families (declared in pubspec.yaml). Never downloaded at runtime.
 abstract final class BrutalFonts {
-  static const String display = 'ArchivoBlack';
+  /// Condensed heavy face for titles and numerals.
+  static const String display = 'Anton';
+
+  /// Labels, body text and data.
   static const String mono = 'SpaceMono';
+
+  /// Anton's digits are all one width except `1`, and it has no tabular figures, so live numbers
+  /// go through `BrutalNumber`, which sets every digit in a box this wide (in em).
+  static const double displayDigitEm = 0.494;
 }

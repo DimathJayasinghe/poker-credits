@@ -4,7 +4,7 @@ import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_credits/widget/brutal/brutal_card.dart';
 
-/// A bordered dialog with a hard shadow. Returns what [actions] pop with.
+/// A hairline-bordered dialog on a flat surface. Returns what [actions] pop with.
 Future<T?> showBrutalDialog<T>({
   required BuildContext context,
   required String title,
@@ -15,7 +15,7 @@ Future<T?> showBrutalDialog<T>({
   return showDialog<T>(
     context: context,
     barrierDismissible: barrierDismissible,
-    barrierColor: BrutalTheme.of(context).colors.ink.withValues(alpha: 0.6),
+    barrierColor: BrutalColors.dark.paper.withValues(alpha: 0.7),
     builder: (context) => BrutalDialog(title: title, content: content, actions: actions),
   );
 }

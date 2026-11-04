@@ -3,11 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 
-/// Visual variants of [BrutalButton].
+/// Visual variants of [BrutalButton]. Meaning rides on position and label, not on hue
+/// (docs/UI_DESIGN.md section 2):
+/// - [primary]: accent fill, the action the screen is for (raise, host, start).
+/// - [info]: ink fill (call, check, join).
+/// - [neutral]: outlined.
+/// - [danger]: outlined with an accent bar on the left (fold, end game, forget).
 enum BrutalButtonKind { primary, danger, info, neutral }
 
-/// Rectangular button with a thick border and a hard offset shadow. Pressing moves it onto its
-/// shadow. Disabled when [onPressed] is null. See docs/UI_DESIGN.md section 3.
+/// Rectangular cell button: a hairline border and flat fill. Pressing inverts it. Disabled when
+/// [onPressed] is null. See docs/UI_DESIGN.md section 3.
 class BrutalButton extends StatefulWidget {
   const BrutalButton({
     super.key,
@@ -22,7 +27,7 @@ class BrutalButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final BrutalButtonKind kind;
 
-  /// Use the 4 px border and 8 px shadow (primary actions).
+  /// Larger label and the heavy rule as the border (primary actions).
   final bool heavy;
   final double minHeight;
 
@@ -43,15 +48,14 @@ class _BrutalButtonState extends State<BrutalButton> {
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    final (Color fill, Color text) = switch (widget.kind) {
-      BrutalButtonKind.primary => (c.signal, BrutalColors.light.ink),
-      BrutalButtonKind.danger => (c.danger, c.onDanger),
-      BrutalButtonKind.info => (c.info, c.onInfo),
-      BrutalButtonKind.neutral => (c.paper, c.ink),
+    var (Color fill, Color text) = switch (widget.kind) {
+      BrutalButtonKind.primary => (c.accent, c.onAccent),
+      BrutalButtonKind.info => (c.ink, c.paper),
+      BrutalButtonKind.danger || BrutalButtonKind.neutral => (c.surface, c.ink),
     };
+    // Pressed: the cell inverts (ink becomes paper, anything else becomes ink).
+    if (_pressed && _enabled) (fill, text) = fill == c.ink ? (c.paper, c.ink) : (c.ink, c.paper);
     final border = widget.heavy ? BrutalMetrics.borderHeavy : BrutalMetrics.border;
-    final shadow = widget.heavy ? BrutalMetrics.shadowHeavy : BrutalMetrics.shadow;
-    final offset = _pressed && _enabled ? shadow : 0.0;
 
     return Semantics(
       button: true,
@@ -75,35 +79,45 @@ class _BrutalButtonState extends State<BrutalButton> {
           onTapUp: (_) => _setPressed(false),
           onTapCancel: () => _setPressed(false),
           onTap: widget.onPressed,
-          child: Padding(
-            // Room for the shadow so layout does not shift when pressed.
-            padding: EdgeInsets.only(right: shadow, bottom: shadow),
-            child: AnimatedContainer(
-              duration: BrutalTheme.duration(context, BrutalMetrics.fast),
-              transform: Matrix4.translationValues(offset, offset, 0),
-              constraints: BoxConstraints(minHeight: widget.minHeight, minWidth: BrutalMetrics.tap),
-              padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
-              decoration: BoxDecoration(
-                color: _enabled ? fill : c.muted.withValues(alpha: 0.35),
-                border: Border.all(color: c.ink, width: border),
-                boxShadow: _enabled && !_pressed ? <BoxShadow>[BoxShadow(color: c.ink, offset: Offset(shadow, shadow))] : const <BoxShadow>[],
-              ),
-              foregroundDecoration: _focused
-                  ? BoxDecoration(
-                      border: Border.all(color: c.info, width: 3, strokeAlign: BorderSide.strokeAlignOutside),
-                    )
-                  : null,
+          child: AnimatedContainer(
+            duration: BrutalTheme.duration(context, BrutalMetrics.fast),
+            constraints: BoxConstraints(minHeight: widget.minHeight, minWidth: BrutalMetrics.tap),
+            padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
+            decoration: BoxDecoration(
+              color: _enabled ? fill : c.muted.withValues(alpha: 0.18),
+              border: Border.all(color: _enabled ? c.line : c.muted, width: border),
+            ),
+            foregroundDecoration: _focused
+                ? BoxDecoration(
+                    border: Border.all(color: c.ink, width: 3, strokeAlign: BorderSide.strokeAlignOutside),
+                  )
+                : null,
+            alignment: Alignment.center,
+            child: Stack(
               alignment: Alignment.center,
-              child: Text(
-                widget.label.toUpperCase(),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: BrutalFonts.display,
-                  fontSize: 16,
-                  letterSpacing: 0.5,
-                  color: _enabled ? text : c.muted,
+              children: <Widget>[
+                if (widget.kind == BrutalButtonKind.danger && _enabled && !_pressed)
+                  Positioned(
+                    left: -BrutalMetrics.gapM,
+                    top: -BrutalMetrics.gapS,
+                    bottom: -BrutalMetrics.gapS,
+                    child: ColoredBox(
+                      color: c.accent,
+                      child: const SizedBox(width: BrutalMetrics.gapS),
+                    ),
+                  ),
+                Text(
+                  widget.label.toUpperCase(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: BrutalFonts.display,
+                    fontSize: widget.heavy ? 22 : 17,
+                    height: 1.1,
+                    letterSpacing: 0.8,
+                    color: _enabled ? text : c.muted,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),

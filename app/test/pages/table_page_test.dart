@@ -6,6 +6,7 @@ import 'package:poker_credits/widget/player/raise_slider.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
 import '../support/fakes.dart';
+import '../support/test_app.dart';
 
 final _seats = <SeatView>[
   seatView(0, 'Alice', chips: 940, bet: 60),
@@ -73,7 +74,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('210'), findsOneWidget);
+    expect(findNumber(210), findsOneWidget);
     expect(find.textContaining('ACTING: BOB'), findsOneWidget);
     expect(find.textContaining('0:21'), findsOneWidget);
     expect(find.text('FOLDED'), findsOneWidget);
@@ -249,7 +250,9 @@ void main() {
     final harness = TestHarness();
     await _openTable(tester, harness, _betting());
     final opened = harness.network.opened.length;
+    // The order a device really goes through (the framework asserts it).
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);

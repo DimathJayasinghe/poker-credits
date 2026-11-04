@@ -22,7 +22,7 @@ class TurnAlertGate {
   }
 }
 
-/// The big block in the middle of the controller: `signal` and loud on your turn, calm `paper`
+/// The big block in the middle of the controller: `accent` and loud on your turn, quiet `surface`
 /// otherwise. The state is in the words as well as the colour.
 class TurnBlock extends StatelessWidget {
   const TurnBlock({super.key, required this.myTurn, required this.title, this.detail});
@@ -36,44 +36,40 @@ class TurnBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    final fill = myTurn ? c.signal : c.paper;
-    final text = myTurn ? BrutalColors.light.ink : c.ink;
+    final fill = myTurn ? c.accent : c.surface;
+    final text = myTurn ? c.onAccent : c.ink;
     return Semantics(
       container: true,
       liveRegion: true,
       label: '$title${detail == null ? '' : ', $detail'}',
       excludeSemantics: true,
-      child: Padding(
-        padding: const EdgeInsets.only(right: BrutalMetrics.shadow, bottom: BrutalMetrics.shadow),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: fill,
-            border: Border.all(color: c.ink, width: myTurn ? BrutalMetrics.borderHeavy : BrutalMetrics.border),
-            boxShadow: <BoxShadow>[BoxShadow(color: c.ink, offset: const Offset(BrutalMetrics.shadow, BrutalMetrics.shadow))],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapL),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    title.toUpperCase(),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontFamily: BrutalFonts.display, fontSize: myTurn ? 48 : 28, height: 1.1, color: text),
-                  ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: fill,
+          border: Border.all(color: c.line, width: myTurn ? BrutalMetrics.borderHeavy : BrutalMetrics.border),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapL),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  title.toUpperCase(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: BrutalFonts.display, fontSize: myTurn ? 48 : 28, height: 1.1, color: text),
                 ),
-                if (detail != null) ...<Widget>[
-                  const SizedBox(height: BrutalMetrics.gapS),
-                  Text(
-                    detail!.toUpperCase(),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 20, color: text),
-                  ),
-                ],
+              ),
+              if (detail != null) ...<Widget>[
+                const SizedBox(height: BrutalMetrics.gapS),
+                Text(
+                  detail!.toUpperCase(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.5, color: text),
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ),

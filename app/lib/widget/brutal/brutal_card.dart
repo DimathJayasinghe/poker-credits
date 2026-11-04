@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 
-/// Bordered block with a hard shadow and an optional inverted header strip.
+/// A raised cell: `surface` fill and a hairline, with an optional caption strip on top.
 class BrutalCard extends StatelessWidget {
   const BrutalCard({super.key, required this.child, this.header, this.padding = const EdgeInsets.all(BrutalMetrics.gapM)});
 
@@ -13,30 +13,30 @@ class BrutalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    return Padding(
-      padding: const EdgeInsets.only(right: BrutalMetrics.shadow, bottom: BrutalMetrics.shadow),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: c.paper,
-          border: Border.all(color: c.ink, width: BrutalMetrics.border),
-          boxShadow: <BoxShadow>[BoxShadow(color: c.ink, offset: const Offset(BrutalMetrics.shadow, BrutalMetrics.shadow))],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            if (header != null)
-              Container(
-                color: c.ink,
-                padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
-                child: Text(
-                  header!.toUpperCase(),
-                  style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: c.paper),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border.all(color: c.line, width: BrutalMetrics.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          if (header != null)
+            Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
                 ),
               ),
-            Padding(padding: padding, child: child),
-          ],
-        ),
+              padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
+              child: Text(
+                header!.toUpperCase(),
+                style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2, color: c.ink),
+              ),
+            ),
+          Padding(padding: padding, child: child),
+        ],
       ),
     );
   }

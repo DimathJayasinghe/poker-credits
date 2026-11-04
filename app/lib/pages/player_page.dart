@@ -6,11 +6,14 @@ import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/join_provider.dart';
 import 'package:poker_credits/provider/services.dart';
+import 'package:poker_credits/provider/settings_provider.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/describe.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
+import 'package:poker_credits/widget/brutal/brutal_number.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_dialog.dart';
@@ -46,7 +49,9 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    ensureRef((ref) => ref.read(wakeLockProvider).enable());
+    ensureRef((ref) {
+      if (ref.read(settingsProvider).keepAwake) ref.read(wakeLockProvider).enable();
+    });
     _ticker = Timer.periodic(const Duration(milliseconds: 250), (_) {
       if (mounted) setState(() {});
     });
@@ -143,11 +148,9 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
   Widget build(BuildContext context) {
     final session = context.ref.watch(sessionProvider);
     // One thumb column: on a tablet or TV it stays phone-sized in the middle.
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: _body(context, session)),
-        ),
+    return PaperScaffold(
+      body: Center(
+        child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: _body(context, session)),
       ),
     );
   }
@@ -372,13 +375,17 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
     return Container(
-      color: c.ink,
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
+        ),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
       child: Row(
         children: <Widget>[
           Text(
             '${Strings.room.toUpperCase()} $roomCode',
-            style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 22, color: c.paper),
+            style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 22, letterSpacing: 0.8, color: c.ink),
           ),
           const Spacer(),
           BrutalTag(link.isLive ? 'Live' : Strings.reconnecting, kind: link.isLive ? BrutalTagKind.neutral : BrutalTagKind.signal),
@@ -402,7 +409,7 @@ class _StackBlock extends StatelessWidget {
       children: <Widget>[
         Text(
           '${Strings.yourStack} · ${seat.name}'.toUpperCase(),
-          style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: c.muted),
+          style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, letterSpacing: 1.5, color: c.muted),
         ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -411,10 +418,7 @@ class _StackBlock extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text(
-                  '${seat.chips}',
-                  style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 64, height: 1, color: c.ink),
-                ),
+                child: BrutalNumber(seat.chips, size: 64, color: c.ink),
               ),
             ),
             if (seat.streetBet > 0) ...<Widget>[

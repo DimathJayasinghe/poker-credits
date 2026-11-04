@@ -83,7 +83,7 @@ class _InitErrorPageState extends State<_InitErrorPage> {
             children: <Widget>[
               Text(
                 Strings.initErrorTitle.toUpperCase(),
-                style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 32, color: c.danger),
+                style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 32, color: c.ink),
               ),
               const SizedBox(height: BrutalMetrics.gapS),
               Text(Strings.initErrorHint, style: TextStyle(color: c.muted)),

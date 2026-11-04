@@ -7,9 +7,11 @@ import 'package:poker_credits/net/transport.dart';
 import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/platform/host_keep_alive.dart';
 import 'package:poker_credits/platform/host_server.dart';
+import 'package:poker_credits/platform/settings_store.dart';
 import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/platform/wake_lock.dart';
 import 'package:poker_credits/provider/services.dart';
+import 'package:poker_credits/provider/settings_provider.dart';
 import 'package:poker_credits/util/haptics.dart';
 import 'package:poker_credits/util/sound.dart';
 import 'package:poker_protocol/poker_protocol.dart';
@@ -143,6 +145,7 @@ class TestHarness {
   final FakeSound sound = FakeSound();
   final FakeHostFinder finder = FakeHostFinder();
   final FakeKeepAlive keepAlive = FakeKeepAlive();
+  final MemorySettingsStore settings = MemorySettingsStore();
   DateTime clock = DateTime.fromMillisecondsSinceEpoch(1730000000000);
 
   /// Wraps [child] in a Refena scope with every service replaced by a fake.
@@ -154,6 +157,9 @@ class TestHarness {
       hapticsProvider.overrideWithValue(haptics),
       soundProvider.overrideWithValue(sound),
       hostFinderProvider.overrideWithValue(finder),
+      settingsStoreProvider.overrideWithValue(settings),
+      appVersionProvider.overrideWithValue(() async => '0.1.0+1'),
+      initialSettingsProvider.overrideWithValue(settings.value),
       hostKeepAliveProvider.overrideWithValue(keepAlive),
       localAddressesProvider.overrideWithValue(() async => addresses),
       clockProvider.overrideWithValue(() => clock),

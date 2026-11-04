@@ -63,13 +63,14 @@ class _BrutalTextFieldState extends State<BrutalTextField> {
       children: <Widget>[
         Text(
           widget.label.toUpperCase(),
-          style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5, color: c.ink),
+          style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2, color: c.ink),
         ),
         const SizedBox(height: BrutalMetrics.gapXs),
         DecoratedBox(
           decoration: BoxDecoration(
-            color: c.paper,
-            border: Border.all(color: _focus.hasFocus ? c.info : c.ink, width: BrutalMetrics.border),
+            color: c.surface,
+            // Focus is the heavy rule, not a colour change: visible to everyone.
+            border: Border.all(color: c.line, width: _focus.hasFocus ? BrutalMetrics.borderHeavy : BrutalMetrics.border),
           ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: BrutalMetrics.tap),
@@ -92,7 +93,7 @@ class _BrutalTextFieldState extends State<BrutalTextField> {
                   style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: 18, color: c.ink),
                   decoration: InputDecoration.collapsed(
                     hintText: widget.hintText,
-                    hintStyle: TextStyle(fontFamily: BrutalFonts.mono, fontSize: 18, color: c.muted),
+                    hintStyle: TextStyle(fontFamily: BrutalFonts.mono, fontSize: 14, color: c.muted),
                   ).copyWith(counterText: ''),
                 ),
               ),

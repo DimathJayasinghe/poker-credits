@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/pages/host_page.dart';
 import 'package:poker_credits/pages/join_page.dart';
+import 'package:poker_credits/pages/settings_page.dart';
 import 'package:poker_credits/pages/player_page.dart';
 import 'package:poker_credits/pages/spectator_page.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
@@ -9,11 +11,16 @@ import 'package:poker_credits/provider/join_provider.dart';
 import 'package:poker_credits/pages/table_page.dart';
 import 'package:poker_credits/provider/host_provider.dart';
 import 'package:poker_credits/provider/services.dart';
+import 'package:poker_credits/provider/settings_provider.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
-import 'package:poker_credits/widget/brutal/brutal_button.dart';
+import 'package:poker_credits/widget/brutal/brutal_row.dart';
+import 'package:poker_credits/widget/brutal/echo_title.dart';
+import 'package:poker_credits/widget/brutal/felt_panel.dart';
+import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 
@@ -29,6 +36,7 @@ class _HomePageState extends State<HomePage> with Refena {
   StoredSession? _hosted;
   StoredSession? _playing;
   bool _resuming = false;
+  int _tab = 0;
   String? _resumeError;
 
   @override
@@ -75,75 +83,129 @@ class _HomePageState extends State<HomePage> with Refena {
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const _ResumedGuestPage()));
   }
 
+  void _push(Widget page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+
+  /// Flips between light and dark from what is actually shown. Decided from the settings and the
+  /// operating system, not from the theme in the tree, which is still mid-animation right after
+  /// a change.
+  void _toggleTheme() {
+    final settings = ref.read(settingsProvider);
+    final platformDark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+    final showingDark = switch (settings.theme) {
+      ThemeChoice.dark => true,
+      ThemeChoice.light => false,
+      ThemeChoice.system => platformDark,
+    };
+    ref.notifier(settingsProvider).update((s) => s.copyWith(theme: showingDark ? ThemeChoice.light : ThemeChoice.dark));
+  }
+
+  /// Title, tagline and the actions: the Play destination.
+  Widget _actions(BuildContext context, {required bool supported}) {
+    final c = BrutalTheme.of(context).colors;
+    final resume = (_hosted != null && supported) ? _hosted : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Container(
+          padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapL, BrutalMetrics.gapXl, BrutalMetrics.gapL, BrutalMetrics.gapL),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              // Fits the width at any text size instead of overflowing.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: BrutalMetrics.gapL, left: BrutalMetrics.gapS),
+                  child: EchoTitle(Strings.appName.split(' ')),
+                ),
+              ),
+              const SizedBox(height: BrutalMetrics.gapM),
+              Text(Strings.tagline, style: TextStyle(fontSize: 14, height: 1.4, color: c.muted)),
+            ],
+          ),
+        ),
+        if (_resumeError != null) BrutalBanner(message: _resumeError!, kind: BrutalBannerKind.error),
+        if (resume != null)
+          BrutalRow(
+            label: '${Strings.resumeHosting} ${resume.roomCode}',
+            emphasis: true,
+            onTap: _resuming ? null : _resume,
+          ),
+        if (_playing != null) BrutalRow(label: '${Strings.resumeGame} ${_playing!.roomCode}', emphasis: resume == null, onTap: _resumePlaying),
+        BrutalRow(
+          label: Strings.hostGame,
+          caption: supported ? Strings.hostRowCaption : Strings.hostUnsupported,
+          emphasis: resume == null && _playing == null && supported,
+          onTap: supported ? () => _push(const HostPage()) : null,
+        ),
+        BrutalRow(label: Strings.joinGame, caption: Strings.joinRowCaption, onTap: () => _push(const JoinPage())),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
     final supported = context.ref.watch(hostServerProvider).isSupported;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Padding(
-              padding: const EdgeInsets.all(BrutalMetrics.gapM),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Text(
-                    Strings.appName.toUpperCase(),
-                    style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 40, height: 1, color: c.ink),
-                  ),
-                  const SizedBox(height: BrutalMetrics.gapS),
-                  Text(Strings.tagline.toUpperCase(), style: TextStyle(letterSpacing: 0.5, color: c.muted)),
-                  const SizedBox(height: BrutalMetrics.gapL),
-                  if (_resumeError != null) ...<Widget>[
-                    BrutalBanner(message: _resumeError!, kind: BrutalBannerKind.error),
-                    const SizedBox(height: BrutalMetrics.gapM),
-                  ],
-                  if (_hosted != null && supported) ...<Widget>[
-                    BrutalButton(
-                      label: '${Strings.resumeHosting} ${_hosted!.roomCode}',
-                      kind: BrutalButtonKind.info,
-                      minHeight: BrutalMetrics.tapPlayer,
-                      onPressed: _resuming ? null : _resume,
-                    ),
-                    const SizedBox(height: BrutalMetrics.gapM),
-                  ],
-                  if (_playing != null) ...<Widget>[
-                    BrutalButton(
-                      label: '${Strings.resumeGame} ${_playing!.roomCode}',
-                      kind: BrutalButtonKind.info,
-                      minHeight: BrutalMetrics.tapPlayer,
-                      onPressed: _resumePlaying,
-                    ),
-                    const SizedBox(height: BrutalMetrics.gapM),
-                  ],
-                  BrutalButton(
-                    label: Strings.joinGame,
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const JoinPage())),
-                    kind: BrutalButtonKind.info,
-                    heavy: true,
-                    minHeight: BrutalMetrics.tapPlayer,
-                  ),
-                  const SizedBox(height: BrutalMetrics.gapM),
-                  BrutalButton(
-                    label: Strings.hostGame,
-                    onPressed: supported ? () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const HostPage())) : null,
-                    kind: BrutalButtonKind.primary,
-                    heavy: true,
-                    minHeight: BrutalMetrics.tapPlayer,
-                  ),
-                  if (!supported) ...<Widget>[
-                    const SizedBox(height: BrutalMetrics.gapS),
-                    Text(Strings.hostUnsupported, style: TextStyle(color: c.muted)),
-                  ],
-                  const SizedBox(height: BrutalMetrics.gapL),
-                  Text('PROTOCOL V$protocolVersion', style: TextStyle(color: c.muted, fontSize: 12)),
-                ],
-              ),
+    final wide = MediaQuery.sizeOf(context).width >= BrutalMetrics.wide;
+    final play = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        AppTopBar(
+          title: Strings.navPlay,
+          actions: <Widget>[
+            TopBarCell(
+              semanticLabel: Strings.switchTheme,
+              onTap: _toggleTheme,
+              child: Icon(Icons.contrast, size: 22, color: c.ink),
+            ),
+          ],
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                _actions(context, supported: supported),
+                if (!wide) const FeltPanel(height: 180),
+              ],
             ),
           ),
+        ),
+      ],
+    );
+    final body = wide
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Expanded(flex: 5, child: play),
+              VerticalDivider(width: BrutalMetrics.border, thickness: BrutalMetrics.border, color: c.line),
+              const Expanded(flex: 4, child: FeltPanel()),
+            ],
+          )
+        : play;
+    return PaperScaffold(
+      body: AppShell(
+        destinations: const <AppDestination>[AppDestination(Strings.navPlay), AppDestination(Strings.navSettings)],
+        index: _tab,
+        onSelect: (i) => setState(() => _tab = i),
+        body: IndexedStack(
+          index: _tab,
+          children: <Widget>[
+            body,
+            SettingsView(
+              onGameForgotten: () => setState(() {
+                _hosted = null;
+                _playing = null;
+              }),
+            ),
+          ],
         ),
       ),
     );

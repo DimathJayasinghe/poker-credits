@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poker_credits/widget/brutal/brutal_keypad.dart';
 import 'package:poker_credits/main.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/pages/join_page.dart';
@@ -10,6 +11,7 @@ import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
 import '../support/fakes.dart';
+import '../support/test_app.dart';
 
 final List<SeatView> _seats = <SeatView>[
   seatView(0, 'Dimath'),
@@ -104,7 +106,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
 
     expect(find.byType(PlayerPage), findsOneWidget);
-    expect(find.text('940'), findsOneWidget, reason: 'my chips in large type');
+    expect(findNumber(940), findsOneWidget, reason: 'my chips in large type');
     expect(find.textContaining('WAITING FOR BOB'), findsOneWidget);
     expect(find.text('FOLD'), findsNothing, reason: 'no buttons when it is not my turn');
 
@@ -303,7 +305,9 @@ void main() {
   testWidgets('coming back to the foreground resumes with the token, never a second join', (tester) async {
     final harness = await _joined(tester);
     final opened = harness.network.opened.length;
+    // The order a device really goes through (the framework asserts it).
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
@@ -321,7 +325,7 @@ void main() {
     await tester.tap(find.text('TOP UP'));
     await tester.pumpAndSettle();
     for (final digit in <String>['5', '0', '0']) {
-      await tester.tap(find.text(digit));
+      await tester.tap(find.descendant(of: find.byType(BrutalKeypad), matching: find.text(digit)));
       await tester.pump();
     }
     await tester.tap(find.text('ASK'));
@@ -388,7 +392,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byType(PlayerPage), findsOneWidget);
-    expect(find.text('940'), findsOneWidget, reason: 'same seat as before the app was killed');
+    expect(findNumber(940), findsOneWidget, reason: 'same seat as before the app was killed');
     await _close(tester);
   });
 
@@ -491,7 +495,7 @@ void main() {
     expect(harness.network.uris.last.toString(), 'ws://192.168.1.23:7878/v1/ws');
     expect(harness.network.opened.length, greaterThan(opened));
     expect(find.byType(PlayerPage), findsOneWidget, reason: 'the table stays on screen while the new address connects');
-    expect(find.text('940'), findsOneWidget, reason: 'with the last known chips, not a blank screen');
+    expect(findNumber(940), findsOneWidget, reason: 'with the last known chips, not a blank screen');
     expect(find.text('RECONNECTING'), findsWidgets);
     expect(harness.network.last.sent.single, isA<Resume>());
     expect((await tokens.read())!.serverUri, 'ws://192.168.1.23:7878/v1/ws');

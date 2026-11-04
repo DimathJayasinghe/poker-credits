@@ -59,7 +59,7 @@ class _ShowdownSheetState extends State<ShowdownSheet> {
           if (pot.eligiblePlayerIds.isEmpty)
             Text(
               Strings.noEligible.toUpperCase(),
-              style: TextStyle(color: c.danger, fontWeight: FontWeight.bold),
+              style: TextStyle(color: c.ink, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
             )
           else
             Wrap(
@@ -118,7 +118,7 @@ class _WinnerChip extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: BrutalMetrics.tap, minWidth: BrutalMetrics.tap),
           padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
           decoration: BoxDecoration(
-            color: selected ? c.signal : c.paper,
+            color: selected ? c.accent : c.surface,
             border: Border.all(color: c.ink, width: BrutalMetrics.border),
           ),
           child: Center(
@@ -130,7 +130,7 @@ class _WinnerChip extends StatelessWidget {
                 fontFamily: BrutalFonts.mono,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
-                color: selected ? BrutalColors.light.ink : c.ink,
+                color: selected ? c.onAccent : c.ink,
               ),
             ),
           ),

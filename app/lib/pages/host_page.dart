@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/pages/table_page.dart';
 import 'package:poker_credits/provider/host_provider.dart';
-import 'package:poker_credits/theme/brutal_theme.dart';
+import 'package:poker_credits/provider/settings_provider.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
+import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_text_field.dart';
@@ -24,7 +26,7 @@ class HostPage extends StatefulWidget {
 }
 
 class _HostPageState extends State<HostPage> with Refena {
-  final _name = TextEditingController();
+  late final _name = TextEditingController(text: ref.read(settingsProvider).defaultName);
   final _chips = TextEditingController(text: '${defaultRoomConfig.startingChips}');
   final _small = TextEditingController(text: '${defaultRoomConfig.smallBlind}');
   final _big = TextEditingController(text: '${defaultRoomConfig.bigBlind}');
@@ -82,94 +84,94 @@ class _HostPageState extends State<HostPage> with Refena {
   @override
   Widget build(BuildContext context) {
     final host = context.ref.watch(hostProvider);
-    final c = BrutalTheme.of(context).colors;
     final busy = host.phase == HostPhase.starting;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(BrutalMetrics.gapM),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Text(
-                    Strings.hostTitle.toUpperCase(),
-                    style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 40, height: 1, color: c.ink),
-                  ),
-                  const SizedBox(height: BrutalMetrics.gapL),
-                  if (host.error != null) ...<Widget>[
-                    BrutalBanner(message: _errorText(host.error!), kind: BrutalBannerKind.error),
-                    const SizedBox(height: BrutalMetrics.gapM),
-                  ],
-                  BrutalCard(
-                    header: Strings.hostName,
-                    child: BrutalTextField(
-                      label: Strings.hostName,
-                      controller: _name,
-                      autofocus: true,
-                      maxLength: 20,
-                      errorText: _submitted && !_nameRule.hasMatch(_name.text.trim()) ? Strings.nameInvalid : null,
-                    ),
-                  ),
-                  const SizedBox(height: BrutalMetrics.gapM),
-                  BrutalCard(
-                    header: Strings.players,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        BrutalTextField(
-                          label: Strings.startingChips,
-                          controller: _chips,
-                          keyboardType: TextInputType.number,
-                          errorText: _numberError(_chips),
-                        ),
+    return PaperScaffold(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          AppTopBar(title: Strings.hostTitle, onBack: busy ? null : () => Navigator.of(context).maybePop()),
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(BrutalMetrics.gapM),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      if (host.error != null) ...<Widget>[
+                        BrutalBanner(message: _errorText(host.error!), kind: BrutalBannerKind.error),
                         const SizedBox(height: BrutalMetrics.gapM),
-                        Row(
+                      ],
+                      BrutalCard(
+                        header: Strings.hostName,
+                        child: BrutalTextField(
+                          label: Strings.hostName,
+                          controller: _name,
+                          autofocus: true,
+                          maxLength: 20,
+                          errorText: _submitted && !_nameRule.hasMatch(_name.text.trim()) ? Strings.nameInvalid : null,
+                        ),
+                      ),
+                      const SizedBox(height: BrutalMetrics.gapM),
+                      BrutalCard(
+                        header: Strings.players,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
-                            Expanded(
-                              child: BrutalTextField(
-                                label: Strings.smallBlind,
-                                controller: _small,
-                                keyboardType: TextInputType.number,
-                                errorText: _numberError(_small),
-                              ),
+                            BrutalTextField(
+                              label: Strings.startingChips,
+                              controller: _chips,
+                              keyboardType: TextInputType.number,
+                              errorText: _numberError(_chips),
                             ),
-                            const SizedBox(width: BrutalMetrics.gapM),
-                            Expanded(
-                              child: BrutalTextField(
-                                label: Strings.bigBlind,
-                                controller: _big,
-                                keyboardType: TextInputType.number,
-                                errorText: _numberError(_big),
-                              ),
+                            const SizedBox(height: BrutalMetrics.gapM),
+                            Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: BrutalTextField(
+                                    label: Strings.smallBlind,
+                                    controller: _small,
+                                    keyboardType: TextInputType.number,
+                                    errorText: _numberError(_small),
+                                  ),
+                                ),
+                                const SizedBox(width: BrutalMetrics.gapM),
+                                Expanded(
+                                  child: BrutalTextField(
+                                    label: Strings.bigBlind,
+                                    controller: _big,
+                                    keyboardType: TextInputType.number,
+                                    errorText: _numberError(_big),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: BrutalMetrics.gapM),
+                            BrutalTextField(
+                              label: Strings.turnSeconds,
+                              controller: _seconds,
+                              keyboardType: TextInputType.number,
+                              errorText: _numberError(_seconds),
                             ),
                           ],
                         ),
-                        const SizedBox(height: BrutalMetrics.gapM),
-                        BrutalTextField(
-                          label: Strings.turnSeconds,
-                          controller: _seconds,
-                          keyboardType: TextInputType.number,
-                          errorText: _numberError(_seconds),
-                        ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: BrutalMetrics.gapL),
+                      BrutalButton(
+                        label: busy ? Strings.starting : Strings.startHosting,
+                        kind: BrutalButtonKind.primary,
+                        heavy: true,
+                        minHeight: BrutalMetrics.tapPlayer,
+                        onPressed: busy ? null : _start,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: BrutalMetrics.gapL),
-                  BrutalButton(
-                    label: busy ? Strings.starting : Strings.startHosting,
-                    kind: BrutalButtonKind.primary,
-                    heavy: true,
-                    minHeight: BrutalMetrics.tapPlayer,
-                    onPressed: busy ? null : _start,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

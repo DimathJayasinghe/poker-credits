@@ -8,14 +8,13 @@ Future<T?> showBrutalSheet<T>({
   required String title,
   required WidgetBuilder builder,
 }) {
-  final c = BrutalTheme.of(context).colors;
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
     elevation: 0,
-    barrierColor: c.ink.withValues(alpha: 0.6),
+    barrierColor: BrutalColors.dark.paper.withValues(alpha: 0.7),
     sheetAnimationStyle: AnimationStyle(
       duration: BrutalTheme.duration(context, BrutalMetrics.base),
       reverseDuration: BrutalTheme.duration(context, BrutalMetrics.fast),
@@ -46,11 +45,11 @@ class BrutalSheet extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 560),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: c.paper,
+              color: c.surface,
               border: Border(
-                top: BorderSide(color: c.ink, width: BrutalMetrics.borderHeavy),
-                left: BorderSide(color: c.ink, width: BrutalMetrics.borderHeavy),
-                right: BorderSide(color: c.ink, width: BrutalMetrics.borderHeavy),
+                top: BorderSide(color: c.line, width: BrutalMetrics.borderHeavy),
+                left: BorderSide(color: c.line, width: BrutalMetrics.border),
+                right: BorderSide(color: c.line, width: BrutalMetrics.border),
               ),
             ),
             child: SingleChildScrollView(
@@ -60,11 +59,15 @@ class BrutalSheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   Container(
-                    color: c.ink,
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
+                      ),
+                    ),
                     padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
                     child: Text(
                       title.toUpperCase(),
-                      style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: c.paper),
+                      style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 2, color: c.ink),
                     ),
                   ),
                   Padding(padding: const EdgeInsets.all(BrutalMetrics.gapM), child: child),

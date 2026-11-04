@@ -48,8 +48,7 @@ class FeltLayout extends StatelessWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: c.felt,
-                    border: Border.all(color: c.ink, width: BrutalMetrics.borderHeavy),
-                    boxShadow: <BoxShadow>[BoxShadow(color: c.ink, offset: const Offset(BrutalMetrics.shadowHeavy, BrutalMetrics.shadowHeavy))],
+                    border: Border.all(color: c.line, width: BrutalMetrics.border),
                   ),
                 ),
               ),
@@ -81,8 +80,7 @@ class FeltLayout extends StatelessWidget {
           DecoratedBox(
             decoration: BoxDecoration(
               color: c.felt,
-              border: Border.all(color: c.ink, width: BrutalMetrics.borderHeavy),
-              boxShadow: <BoxShadow>[BoxShadow(color: c.ink, offset: const Offset(BrutalMetrics.shadowHeavy, BrutalMetrics.shadowHeavy))],
+              border: Border.all(color: c.line, width: BrutalMetrics.border),
             ),
             child: Padding(
               padding: const EdgeInsets.all(gap),

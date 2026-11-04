@@ -11,6 +11,48 @@ abstract final class Strings {
   static const String hostUnsupported = 'Hosting is not available on this platform';
   static const String comingSoon = 'Coming in the next phases';
 
+  // Navigation
+  static const String back = 'Back';
+  static const String navPlay = 'Play';
+  static const String navSettings = 'Settings';
+  static const String switchTheme = 'Switch light and dark';
+
+  // Play (home)
+  static const String hostRowCaption = 'Start a table on this device. Others join over Wi-Fi.';
+  static const String joinRowCaption = 'Type the room code the host shows you.';
+
+  // Settings
+  static const String settingsTitle = 'Settings';
+  static const String sectionAppearance = 'Appearance';
+  static const String themeLabel = 'Theme';
+  static const String themeSystem = 'System';
+  static const String themeLight = 'Light';
+  static const String themeDark = 'Dark';
+  static const String textureLabel = 'Paper texture';
+  static const String textureCaption = 'Fine grain behind the screens. Turn off for flat colour.';
+  static const String sectionTable = 'Table';
+  static const String soundLabel = 'Sound';
+  static const String soundCaption = 'A beep when it is your turn.';
+  static const String vibrationLabel = 'Vibration';
+  static const String vibrationCaption = 'A buzz when it is your turn.';
+  static const String keepAwakeLabel = 'Keep screen on';
+  static const String keepAwakeCaption = 'While a game is open, so the screen never dims.';
+  static const String sectionYou = 'You';
+  static const String defaultNameLabel = 'Default name';
+  static const String defaultNameHint = 'Filled in when you join a game';
+  static const String sectionData = 'Data';
+  static const String forgetGame = 'Forget saved game';
+  static const String forgetGameCaption = 'Stop offering to go back to the last game on this device.';
+  static const String forgetGameNothing = 'No saved game on this device.';
+  static const String forgetTitle = 'Forget the saved game?';
+  static const String forgetBody = 'You will not be able to go back to it from this device. Other players are not affected.';
+  static const String forgetConfirm = 'Forget';
+  static const String forgetDone = 'Saved game forgotten.';
+  static const String sectionAbout = 'About';
+  static const String versionLabel = 'Version';
+  static const String protocolLabel = 'Protocol';
+  static const String licences = 'Open-source licences';
+
   // Host setup
   static const String hostTitle = 'Host a game';
   static const String hostName = 'Your name';

@@ -17,10 +17,10 @@ class BrutalTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
     final (Color fill, Color text) = switch (kind) {
-      BrutalTagKind.neutral => (c.paper, c.ink),
-      BrutalTagKind.signal => (c.signal, BrutalColors.light.ink),
-      BrutalTagKind.danger => (c.danger, c.onDanger),
-      BrutalTagKind.info => (c.info, c.onInfo),
+      BrutalTagKind.neutral => (c.surface, c.ink),
+      BrutalTagKind.signal => (c.accent, c.onAccent),
+      BrutalTagKind.danger => (c.accent, c.onAccent),
+      BrutalTagKind.info => (c.ink, c.paper),
     };
     return Semantics(
       label: label,
@@ -28,13 +28,13 @@ class BrutalTag extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: fill,
-          border: Border.all(color: c.ink, width: 2),
+          border: Border.all(color: c.line, width: BrutalMetrics.border),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS, vertical: BrutalMetrics.gapXs / 2),
           child: Text(
             label.toUpperCase(),
-            style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5, color: text),
+            style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1, color: text),
           ),
         ),
       ),

@@ -7,11 +7,13 @@ import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/host_provider.dart';
 import 'package:poker_credits/provider/join_provider.dart';
 import 'package:poker_credits/provider/services.dart';
+import 'package:poker_credits/provider/settings_provider.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/describe.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
+import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_dialog.dart';
@@ -56,7 +58,9 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    ensureRef((ref) => ref.read(wakeLockProvider).enable());
+    ensureRef((ref) {
+      if (ref.read(settingsProvider).keepAwake) ref.read(wakeLockProvider).enable();
+    });
     // Repaints about 4 times a second for the turn countdown (the text is derived from the
     // server deadline, nothing is counted locally).
     _ticker = Timer.periodic(const Duration(milliseconds: 250), (_) {
@@ -182,15 +186,8 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
   Widget build(BuildContext context) {
     final session = context.ref.watch(sessionProvider);
     final host = context.ref.watch(hostProvider);
-    final theme = buildBrutalTheme(BrutalColors.dark, Brightness.dark);
-    return Theme(
-      data: theme,
-      child: Builder(
-        builder: (context) => Scaffold(
-          body: SafeArea(child: _body(context, session, host)),
-        ),
-      ),
-    );
+    // Follows the app theme (Settings): the table is no longer forced dark.
+    return PaperScaffold(body: _body(context, session, host));
   }
 
   Widget _body(BuildContext context, SessionState session, HostState host) {
@@ -304,7 +301,7 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
                     Text(
                       '${Strings.yourTurn}${remaining == null ? '' : '  ${clock(remaining)}'}'.toUpperCase(),
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 24, color: c.signal),
+                      style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 24, color: c.accent),
                     ),
                     const SizedBox(height: BrutalMetrics.gapS),
                     ActionButtons(
@@ -390,7 +387,12 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
 
   Widget _presenceStrip(PresenceCheck check) {
     return Container(
-      color: BrutalTheme.of(context).colors.paper,
+      decoration: BoxDecoration(
+        color: BrutalTheme.of(context).colors.surface,
+        border: Border(
+          bottom: BorderSide(color: BrutalTheme.of(context).colors.line, width: BrutalMetrics.border),
+        ),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
       child: Row(
         children: <Widget>[
@@ -422,9 +424,13 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    TextStyle style(double size) => TextStyle(fontFamily: BrutalFonts.display, fontSize: size, letterSpacing: 0.5, color: c.paper);
+    TextStyle style(double size) => TextStyle(fontFamily: BrutalFonts.display, fontSize: size, letterSpacing: 0.8, color: c.ink);
     return Container(
-      color: c.ink,
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
+        ),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
       // Wraps onto a second line on a narrow phone instead of overflowing.
       child: Wrap(
@@ -432,7 +438,7 @@ class _TopBar extends StatelessWidget {
         crossAxisAlignment: WrapCrossAlignment.center,
         spacing: BrutalMetrics.gapM,
         children: <Widget>[
-          Text('${Strings.room.toUpperCase()} ${view.roomCode}', style: style(22)),
+          Text('${Strings.room.toUpperCase()} ${view.roomCode}', style: style(24)),
           Text('${Strings.hand.toUpperCase()} ${view.handNumber}   ${phaseLabel(view.phase).toUpperCase()}', style: style(22)),
           if (watching)
             const BrutalTag(Strings.watching)

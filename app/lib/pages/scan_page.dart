@@ -4,6 +4,7 @@ import 'package:poker_credits/platform/qr_scanner.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
 
@@ -46,7 +47,7 @@ class _ScanPageState extends State<ScanPage> {
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
     final builder = widget.scanner ?? qrScannerBuilder;
-    return Scaffold(
+    return PaperScaffold(
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

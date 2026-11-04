@@ -15,16 +15,34 @@ double contrast(Color a, Color b) {
   return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05);
 }
 
+/// The background as it looks with the grain at its strongest: every speck fully opaque.
+Color _grainy(BrutalColors c) => Color.alphaBlend(c.grain.withValues(alpha: c.grainOpacity), c.paper);
+
 void main() {
   for (final entry in <String, BrutalColors>{'light': BrutalColors.light, 'dark': BrutalColors.dark}.entries) {
     final c = entry.value;
-    group('${entry.key} palette contrast (docs/UI_DESIGN.md section 5)', () {
-      test('ink on paper is at least 7:1', () => expect(contrast(c.ink, c.paper), greaterThanOrEqualTo(7)));
-      test('muted on paper is at least 4.5:1', () => expect(contrast(c.muted, c.paper), greaterThanOrEqualTo(4.5)));
-      test('text on signal is at least 7:1', () => expect(contrast(BrutalColors.light.ink, c.signal), greaterThanOrEqualTo(7)));
+    group('${entry.key} palette contrast (docs/UI_DESIGN.md section 6)', () {
+      test('ink on paper and surface is at least 7:1', () {
+        expect(contrast(c.ink, c.paper), greaterThanOrEqualTo(7));
+        expect(contrast(c.ink, c.surface), greaterThanOrEqualTo(7));
+      });
+      test('ink stays at least 7:1 under the strongest grain', () => expect(contrast(c.ink, _grainy(c)), greaterThanOrEqualTo(7)));
+      test('muted text is at least 4.5:1 on paper, surface and under the grain', () {
+        expect(contrast(c.muted, c.paper), greaterThanOrEqualTo(4.5));
+        expect(contrast(c.muted, c.surface), greaterThanOrEqualTo(4.5));
+        expect(contrast(c.muted, _grainy(c)), greaterThanOrEqualTo(4.5));
+      });
+      test('text on the accent fill is at least 4.5:1', () => expect(contrast(c.onAccent, c.accent), greaterThanOrEqualTo(4.5)));
+      test('the accent against paper clears 3:1 for fills and large type', () {
+        expect(contrast(c.accent, c.paper), greaterThanOrEqualTo(3));
+        expect(contrast(c.accent, _grainy(c)), greaterThanOrEqualTo(3));
+      });
       test('text on felt is at least 4.5:1', () => expect(contrast(c.onFelt, c.felt), greaterThanOrEqualTo(4.5)));
-      test('text on danger is at least 4.5:1', () => expect(contrast(c.onDanger, c.danger), greaterThanOrEqualTo(4.5)));
-      test('text on info is at least 4.5:1', () => expect(contrast(c.onInfo, c.info), greaterThanOrEqualTo(4.5)));
+      test('text on the chip fill is at least 7:1', () => expect(contrast(c.onChip, c.chip), greaterThanOrEqualTo(7)));
+      test('inverted cells (paper on ink) are at least 7:1', () => expect(contrast(c.paper, c.ink), greaterThanOrEqualTo(7)));
+      test('a pressed accent cell (paper on ink) and the ink focus outline read on paper', () {
+        expect(contrast(c.ink, c.paper), greaterThanOrEqualTo(3));
+      });
     });
   }
 }

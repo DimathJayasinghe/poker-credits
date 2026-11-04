@@ -6,7 +6,14 @@ import 'package:flutter/services.dart';
 /// has a click. The vibration in `Haptics` is the primary turn cue on phones; a real audio
 /// plugin can replace this class later without touching the callers.
 class Sound {
-  const Sound();
+  /// [enabled] is asked every time, so the Settings switch takes effect at once.
+  const Sound({this.enabled = _always});
 
-  Future<void> yourTurn() => SystemSound.play(SystemSoundType.alert);
+  final bool Function() enabled;
+
+  static bool _always() => true;
+
+  Future<void> yourTurn() async {
+    if (enabled()) await SystemSound.play(SystemSoundType.alert);
+  }
 }

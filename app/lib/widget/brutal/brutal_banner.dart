@@ -5,8 +5,9 @@ import 'package:poker_credits/theme/tokens.dart';
 /// Visual variants of [BrutalBanner].
 enum BrutalBannerKind { info, warning, error }
 
-/// Full-width strip for Reconnecting, Paused and errors. Warnings use a striped signal/ink
-/// background so they cannot be missed or confused with a plain yellow turn signal.
+/// Full-width strip for Reconnecting, Paused and errors. Info is an ink strip, errors are the
+/// accent fill, and warnings (reconnecting, paused) are a hatched surface with an accent bar on
+/// the left, so they cannot be mistaken for the turn signal.
 class BrutalBanner extends StatelessWidget {
   const BrutalBanner({super.key, required this.message, this.kind = BrutalBannerKind.info, this.actionLabel, this.onAction});
 
@@ -20,15 +21,15 @@ class BrutalBanner extends StatelessWidget {
     final c = BrutalTheme.of(context).colors;
     final Color text = switch (kind) {
       BrutalBannerKind.info => c.onInfo,
-      BrutalBannerKind.warning => BrutalColors.light.ink,
+      BrutalBannerKind.warning => c.ink,
       BrutalBannerKind.error => c.onDanger,
     };
     final label = Container(
-      color: kind == BrutalBannerKind.warning ? c.signal : null,
+      color: kind == BrutalBannerKind.warning ? c.surface : null,
       padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS, vertical: BrutalMetrics.gapXs),
       child: Text(
         message.toUpperCase(),
-        style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: text),
+        style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1, color: text),
       ),
     );
     return Semantics(
@@ -40,7 +41,7 @@ class BrutalBanner extends StatelessWidget {
         decoration: BoxDecoration(
           color: switch (kind) {
             BrutalBannerKind.info => c.info,
-            BrutalBannerKind.warning => c.signal,
+            BrutalBannerKind.warning => c.surface,
             BrutalBannerKind.error => c.danger,
           },
           border: Border.symmetric(
@@ -48,9 +49,9 @@ class BrutalBanner extends StatelessWidget {
           ),
         ),
         child: CustomPaint(
-          painter: kind == BrutalBannerKind.warning ? _StripePainter(c.ink) : null,
+          painter: kind == BrutalBannerKind.warning ? _StripePainter(c.ink.withValues(alpha: 0.12), c.accent) : null,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
+            padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapL, BrutalMetrics.gapS, BrutalMetrics.gapM, BrutalMetrics.gapS),
             child: Row(
               children: <Widget>[
                 Expanded(child: label),
@@ -63,8 +64,8 @@ class BrutalBanner extends StatelessWidget {
                         constraints: const BoxConstraints(minHeight: BrutalMetrics.tap),
                         padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
                         decoration: BoxDecoration(
-                          color: c.paper,
-                          border: Border.all(color: c.ink, width: BrutalMetrics.border),
+                          color: c.surface,
+                          border: Border.all(color: c.line, width: BrutalMetrics.border),
                         ),
                         child: Center(
                           widthFactor: 1,
@@ -87,21 +88,23 @@ class BrutalBanner extends StatelessWidget {
 }
 
 class _StripePainter extends CustomPainter {
-  const _StripePainter(this.color);
+  const _StripePainter(this.color, this.bar);
 
   final Color color;
+  final Color bar;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 8;
+      ..strokeWidth = 4;
     canvas.clipRect(Offset.zero & size);
-    for (double x = -size.height; x < size.width; x += 24) {
+    for (double x = -size.height; x < size.width; x += 14) {
       canvas.drawLine(Offset(x, size.height), Offset(x + size.height, 0), paint);
     }
+    canvas.drawRect(Rect.fromLTWH(0, 0, 8, size.height), Paint()..color = bar);
   }
 
   @override
-  bool shouldRepaint(_StripePainter old) => old.color != color;
+  bool shouldRepaint(_StripePainter old) => old.color != color || old.bar != bar;
 }

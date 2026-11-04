@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/widget/brutal/brutal_number.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_credits/widget/brutal/brutal_keypad.dart';
 
@@ -36,13 +37,10 @@ class _RebuySheetState extends State<RebuySheet> {
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapS),
           decoration: BoxDecoration(
-            color: c.paper,
-            border: Border.all(color: c.ink, width: BrutalMetrics.borderHeavy),
+            color: c.surface,
+            border: Border.all(color: c.line, width: BrutalMetrics.border),
           ),
-          child: Text(
-            _digits.isEmpty ? '0' : _digits,
-            style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 40, height: 1, color: c.ink),
-          ),
+          child: BrutalNumber(int.tryParse(_digits) ?? 0, size: 40, color: c.ink),
         ),
         const SizedBox(height: BrutalMetrics.gapS),
         BrutalKeypad(

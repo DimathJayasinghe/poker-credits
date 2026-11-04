@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/widget/brutal/brutal_number.dart';
 import 'package:poker_credits/widget/brutal/brutal_tag.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
-/// A rectangular name plate for one seat. The player who must act is the only `signal` fill;
+/// A rectangular name plate for one seat. The player who must act is the only accent fill;
 /// state is always spelled out in a tag (never colour alone).
 class SeatPlate extends StatelessWidget {
   const SeatPlate({
@@ -32,8 +33,8 @@ class SeatPlate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    final Color fill = isActive ? c.signal : c.paper;
-    final Color text = isActive ? BrutalColors.light.ink : c.ink;
+    final Color fill = isActive ? c.accent : c.surface;
+    final Color text = isActive ? c.onAccent : c.ink;
     final dim = seat.hasFolded || seat.isSittingOut;
     final nameStyle = TextStyle(
       fontFamily: BrutalFonts.display,
@@ -59,73 +60,64 @@ class SeatPlate extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.only(right: BrutalMetrics.shadow, bottom: BrutalMetrics.shadow),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: fill,
-              border: Border.all(color: c.ink, width: BrutalMetrics.border),
-              boxShadow: <BoxShadow>[BoxShadow(color: c.ink, offset: const Offset(BrutalMetrics.shadow, BrutalMetrics.shadow))],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapS, BrutalMetrics.gapS, BrutalMetrics.gapS, BrutalMetrics.gapXs),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(seat.name.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: nameStyle),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: <Widget>[
-                          Flexible(
-                            child: Text(
-                              '${seat.chips}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontFamily: BrutalFonts.display,
-                                fontSize: 28,
-                                height: 1.1,
-                                color: dim && !isActive ? c.muted : text,
-                                fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
-                              ),
-                            ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: fill,
+            border: Border.all(color: c.line, width: BrutalMetrics.border),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapS, BrutalMetrics.gapS, BrutalMetrics.gapS, BrutalMetrics.gapXs),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(seat.name.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: nameStyle),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: <Widget>[
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: BrutalNumber(seat.chips, size: 28, color: dim && !isActive ? c.muted : text),
                           ),
-                          if (seat.streetBet > 0) ...<Widget>[
-                            const SizedBox(width: BrutalMetrics.gapS),
-                            Text(
-                              '${Strings.bet.toUpperCase()} ${seat.streetBet}',
-                              style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, color: text),
-                            ),
-                          ],
+                        ),
+                        if (seat.streetBet > 0) ...<Widget>[
+                          const SizedBox(width: BrutalMetrics.gapS),
+                          Text(
+                            '${Strings.bet.toUpperCase()} ${seat.streetBet}',
+                            style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, color: text),
+                          ),
                         ],
-                      ),
-                      if (tags.isNotEmpty) ...<Widget>[
-                        const SizedBox(height: BrutalMetrics.gapXs),
-                        Wrap(spacing: BrutalMetrics.gapXs, runSpacing: BrutalMetrics.gapXs, children: tags),
                       ],
+                    ),
+                    if (tags.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: BrutalMetrics.gapXs),
+                      Wrap(spacing: BrutalMetrics.gapXs, runSpacing: BrutalMetrics.gapXs, children: tags),
                     ],
+                  ],
+                ),
+              ),
+              if (isActive && turnFraction != null)
+                Container(
+                  height: 10,
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: text, width: BrutalMetrics.border),
+                    ),
+                  ),
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: turnFraction!.clamp(0.0, 1.0),
+                    child: ColoredBox(color: text, child: const SizedBox.expand()),
                   ),
                 ),
-                if (isActive && turnFraction != null)
-                  Container(
-                    height: 10,
-                    decoration: BoxDecoration(
-                      border: Border(top: BorderSide(color: c.ink, width: 2)),
-                    ),
-                    alignment: Alignment.centerLeft,
-                    child: FractionallySizedBox(
-                      widthFactor: turnFraction!.clamp(0.0, 1.0),
-                      child: ColoredBox(color: c.ink, child: const SizedBox.expand()),
-                    ),
-                  ),
-              ],
-            ),
+            ],
           ),
         ),
       ),

@@ -33,12 +33,15 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  assets:
+    - assets/images/grain.png
+
   # Fonts are bundled (SIL OFL, licences next to the files). Never download fonts at runtime:
   # LAN games are offline (ADR-013).
   fonts:
-    - family: ArchivoBlack
+    - family: Anton
       fonts:
-        - asset: assets/fonts/ArchivoBlack-Regular.ttf
+        - asset: assets/fonts/Anton-Regular.ttf
     - family: SpaceMono
       fonts:
         - asset: assets/fonts/SpaceMono-Regular.ttf

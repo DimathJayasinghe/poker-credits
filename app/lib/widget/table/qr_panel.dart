@@ -75,39 +75,35 @@ class QrPanel extends StatelessWidget {
       ],
     );
 
-    return Padding(
-      padding: const EdgeInsets.only(right: BrutalMetrics.shadowHeavy, bottom: BrutalMetrics.shadowHeavy),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: c.paper,
-          border: Border.all(color: c.ink, width: BrutalMetrics.borderHeavy),
-          boxShadow: <BoxShadow>[BoxShadow(color: c.ink, offset: const Offset(BrutalMetrics.shadowHeavy, BrutalMetrics.shadowHeavy))],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(BrutalMetrics.gapM),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final narrow = constraints.maxWidth < _narrowWidth;
-              if (narrow) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    if (qr != null) ...<Widget>[Center(child: qr), const SizedBox(height: BrutalMetrics.gapM)],
-                    details,
-                  ],
-                );
-              }
-              return Row(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border.all(color: c.line, width: BrutalMetrics.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(BrutalMetrics.gapM),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < _narrowWidth;
+            if (narrow) {
+              return Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  if (qr != null) ...<Widget>[qr, const SizedBox(width: BrutalMetrics.gapL)],
-                  Flexible(child: details),
+                  if (qr != null) ...<Widget>[Center(child: qr), const SizedBox(height: BrutalMetrics.gapM)],
+                  details,
                 ],
               );
-            },
-          ),
+            }
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                if (qr != null) ...<Widget>[qr, const SizedBox(width: BrutalMetrics.gapL)],
+                Flexible(child: details),
+              ],
+            );
+          },
         ),
       ),
     );
