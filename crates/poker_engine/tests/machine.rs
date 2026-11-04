@@ -9,7 +9,7 @@
 mod support;
 
 use poker_engine::command::Allocation;
-use poker_engine::{AllocationError, Command, Event, Phase, PlayerAction, PokerError};
+use poker_engine::{AllocationError, Command, Event, Phase, PlayerAction, PokerError, apply};
 use support::{act, chips, dealt, lobby, pid, raise_to, seat, stack, step, try_act, try_step};
 
 fn call_around(state: &mut poker_engine::GameState, players: &[usize]) {
@@ -924,4 +924,153 @@ fn table_total_is_capped_so_payouts_can_never_overflow() {
     state.table.seats[1].chips = chips(0);
     state.table.seats[0].chips = chips(9 * MAX_CHIPS + 5);
     assert_eq!(try_step(&mut state, rebuy), Err(PokerError::InvalidAmount));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Moving seats
+// ---------------------------------------------------------------------------------------------
+
+fn order(state: &poker_engine::GameState) -> Vec<(u8, String)> {
+    state
+        .table
+        .seats
+        .iter()
+        .map(|s| (s.index.get(), s.player_id.to_string()))
+        .collect()
+}
+
+/// Everyone folds in turn until the hand is over.
+fn fold_to_the_end(state: &mut poker_engine::GameState) {
+    while let Some(active) = state.table.active {
+        let player_id = state.table.seat(active).unwrap().player_id.clone();
+        step(
+            state,
+            Command::Action {
+                player_id,
+                action: PlayerAction::Fold,
+            },
+        );
+    }
+}
+
+#[test]
+fn a_player_can_move_to_an_empty_seat() {
+    let mut state = lobby(&[1000, 1000, 1000], 5, 10);
+    let events = step(
+        &mut state,
+        Command::MoveSeat {
+            player_id: pid(0),
+            seat: seat(7),
+        },
+    );
+    assert_eq!(
+        order(&state),
+        vec![(1, "p1".into()), (2, "p2".into()), (7, "p0".into())]
+    );
+    assert_eq!(events.len(), 1);
+}
+
+#[test]
+fn moving_onto_an_occupied_seat_swaps_the_two_players() {
+    let mut state = lobby(&[1000, 1000, 1000], 5, 10);
+    let events = step(
+        &mut state,
+        Command::MoveSeat {
+            player_id: pid(0),
+            seat: seat(2),
+        },
+    );
+    assert_eq!(
+        order(&state),
+        vec![(0, "p2".into()), (1, "p1".into()), (2, "p0".into())]
+    );
+    assert_eq!(events.len(), 2, "one event per player who changed seat");
+}
+
+#[test]
+fn moving_to_your_own_seat_is_a_harmless_no_op() {
+    let mut state = lobby(&[1000, 1000], 5, 10);
+    let before = state.clone();
+    let events = step(
+        &mut state,
+        Command::MoveSeat {
+            player_id: pid(1),
+            seat: seat(1),
+        },
+    );
+    assert!(events.is_empty());
+    assert_eq!(order(&state), order(&before));
+}
+
+#[test]
+fn moving_an_unknown_player_is_rejected() {
+    let state = lobby(&[1000, 1000], 5, 10);
+    let result = apply(
+        &state,
+        Command::MoveSeat {
+            player_id: pid(9),
+            seat: seat(4),
+        },
+    );
+    assert!(matches!(
+        result,
+        Err(poker_engine::PokerError::UnknownPlayer)
+    ));
+}
+
+#[test]
+fn seats_cannot_move_during_a_hand() {
+    let state = dealt(&[1000, 1000, 1000], 5, 10);
+    let result = apply(
+        &state,
+        Command::MoveSeat {
+            player_id: pid(0),
+            seat: seat(5),
+        },
+    );
+    assert!(matches!(
+        result,
+        Err(poker_engine::PokerError::HandInProgress)
+    ));
+}
+
+#[test]
+fn the_button_stays_on_its_chair_when_players_swap() {
+    let mut state = dealt(&[1000, 1000, 1000], 5, 10);
+    let dealer = state.table.dealer;
+    // Finish the hand: everyone folds to the big blind.
+    fold_to_the_end(&mut state);
+    assert!(matches!(
+        state.table.phase,
+        poker_engine::Phase::NextHandPrep | poker_engine::Phase::Lobby
+    ));
+    step(
+        &mut state,
+        Command::MoveSeat {
+            player_id: pid(0),
+            seat: seat(1),
+        },
+    );
+    assert_eq!(
+        state.table.dealer, dealer,
+        "the button marks a seat, not a player"
+    );
+    assert_eq!(order(&state).len(), 3);
+}
+
+#[test]
+fn a_seat_move_clears_the_undo_history() {
+    let mut state = dealt(&[1000, 1000, 1000], 5, 10);
+    fold_to_the_end(&mut state);
+    step(
+        &mut state,
+        Command::MoveSeat {
+            player_id: pid(0),
+            seat: seat(9),
+        },
+    );
+    assert!(matches!(
+        apply(&state, Command::Undo),
+        Err(poker_engine::PokerError::NothingToUndo)
+    ));
 }

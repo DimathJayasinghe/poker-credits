@@ -73,6 +73,16 @@ pub enum Command {
         /// Buy-in.
         chips: Chips,
     },
+    /// Move a seated player to another seat between hands. An empty target seat is simply taken;
+    /// an occupied one is swapped with, so the host can reorder the table in one step. The button
+    /// and blind markers stay on their seats (a physical button stays on its chair), so they
+    /// follow the chairs, not the people.
+    MoveSeat {
+        /// Player to move.
+        player_id: PlayerId,
+        /// Target seat.
+        seat: SeatIndex,
+    },
     /// Host: remove a player (not while they are in a hand).
     RemovePlayer {
         /// Player to remove.
@@ -131,6 +141,9 @@ pub enum Origin {
 impl Command {
     /// Who may send this command.
     ///
+    /// [`Command::MoveSeat`] is a host command, but the server also lets a player move themselves
+    /// into a *free* seat (never displacing anyone), so a guest can pick where they sit.
+    ///
     /// The engine trusts the `player_id` it is given: for [`Command::Action`],
     /// [`Command::SetSittingOut`] and [`Command::LeaveHand`] (origin [`Origin::Player`]) the server must bind it to the
     /// authenticated session, never take it from the message body.
@@ -142,6 +155,7 @@ impl Command {
             }
             Command::Timeout { .. } => Origin::Server,
             Command::AddPlayer { .. }
+            | Command::MoveSeat { .. }
             | Command::RemovePlayer { .. }
             | Command::Rebuy { .. }
             | Command::Configure { .. }

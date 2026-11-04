@@ -48,6 +48,15 @@ pub enum Event {
         /// Their seat.
         seat: SeatIndex,
     },
+    /// A player changed seat (once per player; a swap emits two events).
+    SeatMoved {
+        /// Player who moved.
+        player_id: PlayerId,
+        /// Seat they left.
+        from: SeatIndex,
+        /// Seat they now hold.
+        to: SeatIndex,
+    },
     /// A player was removed. Their stack leaves the table, so the server must credit `chips` to
     /// the room ledger or the credits vanish.
     PlayerRemoved {

@@ -40,6 +40,7 @@ enum Step {
     SitOut(bool),
     Remove,
     Leave,
+    Move(u8),
 }
 
 fn step_strategy() -> impl Strategy<Value = (Step, u8)> {
@@ -61,6 +62,7 @@ fn step_strategy() -> impl Strategy<Value = (Step, u8)> {
         1 => any::<bool>().prop_map(Step::SitOut),
         1 => Just(Step::Remove),
         2 => Just(Step::Leave),
+        2 => (0_u8..10).prop_map(Step::Move),
     ];
     // The second value picks who the command is sent as (mostly the active player).
     (step, any::<u8>())
@@ -136,6 +138,10 @@ fn command_for(state: &GameState, step: &Step, who: u8, players: usize) -> Comma
         },
         Step::Remove => Command::RemovePlayer { player_id: player },
         Step::Leave => Command::LeaveHand { player_id: player },
+        Step::Move(target) => Command::MoveSeat {
+            player_id: player,
+            seat: seat(*target),
+        },
     }
 }
 

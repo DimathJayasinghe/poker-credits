@@ -61,6 +61,7 @@ fn history_effect(command: &Command) -> HistoryEffect {
         | Command::BeginShowdown
         | Command::ResolveShowdown { .. } => HistoryEffect::Record,
         Command::AddPlayer { .. }
+        | Command::MoveSeat { .. }
         | Command::RemovePlayer { .. }
         | Command::Rebuy { .. }
         | Command::Configure { .. } => HistoryEffect::Clear,
@@ -106,6 +107,7 @@ fn run(table: &mut Table, command: Command, events: &mut Vec<Event>) -> Result<(
             seat,
             chips,
         } => add_player(table, player_id, seat, chips, events),
+        Command::MoveSeat { player_id, seat } => move_seat(table, &player_id, seat, events),
         Command::RemovePlayer { player_id } => remove_player(table, &player_id, events),
         Command::SetSittingOut {
             player_id,
@@ -172,6 +174,49 @@ fn add_player(
     table.seats.push(Seat::new(seat, player_id.clone(), chips));
     table.seats.sort_unstable_by_key(|s| s.index);
     events.push(Event::PlayerAdded { player_id, seat });
+    Ok(())
+}
+
+/// Moves a player to `target`, swapping with whoever sits there. Only between hands: during a hand
+/// the seat order is the turn order and the pots refer to seats. Moving onto your own seat is a
+/// no-op so a retried request is harmless. The dealer and blind markers are left alone.
+fn move_seat(
+    table: &mut Table,
+    player_id: &PlayerId,
+    target: SeatIndex,
+    events: &mut Vec<Event>,
+) -> Result<(), PokerError> {
+    require_between_hands(table)?;
+    let from = table
+        .seat_of(player_id)
+        .ok_or(PokerError::UnknownPlayer)?
+        .index;
+    if from == target {
+        return Ok(());
+    }
+    let displaced = table.seat(target).map(|seat| seat.player_id.clone());
+    // Re-index by occupant, not by position: after the first assignment two seats would share
+    // an index and a positional lookup could hit the wrong one.
+    for seat in &mut table.seats {
+        if &seat.player_id == player_id {
+            seat.index = target;
+        } else if displaced.as_ref() == Some(&seat.player_id) {
+            seat.index = from;
+        }
+    }
+    table.seats.sort_unstable_by_key(|s| s.index);
+    events.push(Event::SeatMoved {
+        player_id: player_id.clone(),
+        from,
+        to: target,
+    });
+    if let Some(other) = displaced {
+        events.push(Event::SeatMoved {
+            player_id: other,
+            from: target,
+            to: from,
+        });
+    }
     Ok(())
 }
 
