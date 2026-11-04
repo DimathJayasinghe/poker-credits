@@ -51,7 +51,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - name: Build
-        run: flutter build ${{ matrix.target }} --release
+        run: flutter build ${{ matrix.target }} --release -v
         working-directory: app
       - name: Pack (Windows)
         if: matrix.target == 'windows'

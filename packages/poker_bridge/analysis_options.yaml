@@ -1,0 +1,5 @@
+analyzer:
+  exclude:
+    # Vendored build tooling (cargokit): its own dependencies are not part of this workspace and
+    # it is not ours to lint.
+    - rust_builder/**
