@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
+import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/brutal_number.dart';
 
 /// A labelled mark on a [BrutalSlider] (for example MIN, 1/2, POT, ALL-IN).
@@ -27,6 +30,7 @@ class BrutalSlider extends StatelessWidget {
     this.ticks = const <BrutalTick>[],
     this.step = 1,
     this.semanticLabel,
+    this.stepButtons = false,
   }) : assert(max >= min, 'max must not be below min');
 
   final int value;
@@ -36,6 +40,11 @@ class BrutalSlider extends StatelessWidget {
   final List<BrutalTick> ticks;
   final int step;
   final String? semanticLabel;
+
+  /// Shows a minus and a plus button beside the value. A press moves the value by one [step];
+  /// holding repeats, and the longer it is held the bigger the jumps, so a long range is quick to
+  /// cross and a single tap is still exact.
+  final bool stepButtons;
 
   static const double _thumb = 32;
   static const double _track = 12;
@@ -53,7 +62,7 @@ class BrutalSlider extends StatelessWidget {
     return snapped.clamp(min, max);
   }
 
-  void _nudge(int direction) => onChanged((_clamped + direction * step).clamp(min, max));
+  void _nudge(int direction, [int multiplier = 1]) => onChanged((_clamped + direction * step * multiplier).clamp(min, max));
 
   @override
   Widget build(BuildContext context) {
@@ -62,14 +71,32 @@ class BrutalSlider extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Container(
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapS),
-          decoration: BoxDecoration(
-            color: c.surface,
-            border: Border.all(color: c.line, width: BrutalMetrics.border),
+        // The buttons stretch to the height of the value box.
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              if (stepButtons) ...<Widget>[
+                _StepButton(plus: false, enabled: _clamped > min, onStep: (m) => _nudge(-1, m)),
+                const SizedBox(width: BrutalMetrics.gapS),
+              ],
+              Expanded(
+                child: Container(
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapS),
+                  decoration: BoxDecoration(
+                    color: c.surface,
+                    border: Border.all(color: c.line, width: BrutalMetrics.border),
+                  ),
+                  child: BrutalNumber(_clamped, size: 56),
+                ),
+              ),
+              if (stepButtons) ...<Widget>[
+                const SizedBox(width: BrutalMetrics.gapS),
+                _StepButton(plus: true, enabled: _clamped < max, onStep: (m) => _nudge(1, m)),
+              ],
+            ],
           ),
-          child: BrutalNumber(_clamped, size: 56),
         ),
         const SizedBox(height: BrutalMetrics.gapM),
         LayoutBuilder(
@@ -189,4 +216,115 @@ class BrutalSlider extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The minus or plus beside the slider's value. Acts on press, repeats while held and speeds up.
+class _StepButton extends StatefulWidget {
+  const _StepButton({required this.plus, required this.enabled, required this.onStep});
+
+  final bool plus;
+  final bool enabled;
+
+  /// Called with how many steps to move: 1, then more the longer the button is held.
+  final ValueChanged<int> onStep;
+
+  @override
+  State<_StepButton> createState() => _StepButtonState();
+}
+
+class _StepButtonState extends State<_StepButton> {
+  static const Duration _delay = Duration(milliseconds: 380);
+  static const Duration _every = Duration(milliseconds: 80);
+
+  Timer? _timer;
+  int _ticks = 0;
+  bool _down = false;
+
+  void _start() {
+    if (!widget.enabled) return;
+    setState(() => _down = true);
+    _ticks = 0;
+    widget.onStep(1);
+    _timer?.cancel();
+    _timer = Timer(_delay, () {
+      _timer = Timer.periodic(_every, (_) {
+        _ticks++;
+        widget.onStep(_ticks > 30 ? 20 : (_ticks > 12 ? 5 : 1));
+      });
+    });
+  }
+
+  void _stop() {
+    _timer?.cancel();
+    _timer = null;
+    if (_down && mounted) setState(() => _down = false);
+  }
+
+  @override
+  void didUpdateWidget(_StepButton old) {
+    super.didUpdateWidget(old);
+    // Reaching either end of the range ends the repeat.
+    if (!widget.enabled) _stop();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = BrutalTheme.of(context).colors;
+    final enabled = widget.enabled;
+    final pressed = _down && enabled;
+    final color = !enabled ? c.muted : (pressed ? c.paper : c.ink);
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: widget.plus ? Strings.increase : Strings.decrease,
+      excludeSemantics: true,
+      onTap: enabled ? () => widget.onStep(1) : null,
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: (_) => _start(),
+        onPointerUp: (_) => _stop(),
+        onPointerCancel: (_) => _stop(),
+        child: AnimatedContainer(
+          duration: BrutalTheme.duration(context, BrutalMetrics.fast),
+          width: 72,
+          constraints: const BoxConstraints(minHeight: BrutalMetrics.tapPlayer),
+          decoration: BoxDecoration(
+            color: !enabled ? c.muted.withValues(alpha: 0.18) : (pressed ? c.ink : c.surface),
+            border: Border.all(color: enabled ? c.line : c.muted, width: BrutalMetrics.border),
+          ),
+          child: Center(
+            child: CustomPaint(
+              size: const Size(22, 22),
+              painter: _SignPainter(plus: widget.plus, color: color),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A minus or plus sign drawn as flat bars, so it never depends on a font having the glyph.
+class _SignPainter extends CustomPainter {
+  const _SignPainter({required this.plus, required this.color});
+
+  final bool plus;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    const bar = 4.0;
+    canvas.drawRect(Rect.fromLTWH(0, (size.height - bar) / 2, size.width, bar), paint);
+    if (plus) canvas.drawRect(Rect.fromLTWH((size.width - bar) / 2, 0, bar, size.height), paint);
+  }
+
+  @override
+  bool shouldRepaint(_SignPainter old) => old.plus != plus || old.color != color;
 }

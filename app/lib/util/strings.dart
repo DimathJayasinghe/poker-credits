@@ -14,6 +14,8 @@ abstract final class Strings {
   // Navigation
   static const String back = 'Back';
   static const String close = 'Close';
+  static const String increase = 'Increase';
+  static const String decrease = 'Decrease';
   static const String phase = 'Phase';
   static const String connection = 'Connection';
   static const String live = 'Live';

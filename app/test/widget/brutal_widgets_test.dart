@@ -75,6 +75,67 @@ void main() {
       expect(value, 400);
     });
 
+    group('plus and minus buttons', () {
+      Future<ValueNotifier<int>> pump(WidgetTester tester, {int value = 100, int min = 0, int max = 1000, int step = 5}) async {
+        final notifier = ValueNotifier<int>(value);
+        await tester.pumpWidget(
+          brutalHost(
+            ValueListenableBuilder<int>(
+              valueListenable: notifier,
+              builder: (context, v, _) =>
+                  BrutalSlider(value: v, min: min, max: max, step: step, stepButtons: true, onChanged: (n) => notifier.value = n),
+            ),
+          ),
+        );
+        return notifier;
+      }
+
+      testWidgets('a tap moves the value by exactly one step', (tester) async {
+        final value = await pump(tester);
+        await tester.tap(find.bySemanticsLabel('Increase'));
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(value.value, 105);
+        await tester.tap(find.bySemanticsLabel('Decrease'));
+        await tester.pump(const Duration(milliseconds: 100));
+        await tester.tap(find.bySemanticsLabel('Decrease'));
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(value.value, 95);
+      });
+
+      testWidgets('holding repeats, then speeds up', (tester) async {
+        final value = await pump(tester, value: 0, max: 100000);
+        // Frames, as on a device: the value is rebuilt between timer ticks.
+        Future<void> hold(int milliseconds) async {
+          for (var t = 0; t < milliseconds; t += 16) {
+            await tester.pump(const Duration(milliseconds: 16));
+          }
+        }
+
+        final gesture = await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Increase')));
+        await hold(300);
+        expect(value.value, 5, reason: 'nothing repeats before the delay');
+        await hold(1000);
+        final slow = value.value;
+        expect(slow, greaterThan(5 * 5), reason: 'repeating while held');
+        await hold(3000);
+        expect(value.value - slow, greaterThan(5 * 5 * 30), reason: 'jumps grow the longer it is held');
+        await gesture.up();
+        final stopped = value.value;
+        await hold(1000);
+        expect(value.value, stopped, reason: 'releasing stops it');
+      });
+
+      testWidgets('stops at the ends of the range and the button is disabled there', (tester) async {
+        final value = await pump(tester, value: 8, max: 10);
+        await tester.tap(find.bySemanticsLabel('Increase'));
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(value.value, 10, reason: 'clamped to max');
+        await tester.tap(find.bySemanticsLabel('Increase'), warnIfMissed: false);
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(value.value, 10);
+      });
+    });
+
     testWidgets('semantic increase and decrease move by one step', (tester) async {
       final handle = tester.ensureSemantics();
       var value = 100;

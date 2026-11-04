@@ -39,6 +39,7 @@ class _RaiseSliderState extends State<RaiseSlider> {
           max: _max,
           step: step,
           semanticLabel: Strings.raiseTo,
+          stepButtons: true,
           ticks: <BrutalTick>[BrutalTick(Strings.min, _min), BrutalTick(Strings.max, _max)],
           onChanged: (v) => setState(() => _value = v),
         ),
