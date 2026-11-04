@@ -1,6 +1,6 @@
 name: Desktop builds
 
-# Builds the Windows and Linux apps and keeps them as downloadable artifacts. Runs by hand
+# Builds the Windows (zip and installer) and Linux apps and keeps them as downloadable artifacts. Runs by hand
 # (Actions tab, once this file is on the default branch), on version tags, and on a pull request
 # that changes this file, so the first run can happen before anything is merged.
 on:
@@ -53,10 +53,28 @@ jobs:
       - name: Build
         run: flutter build ${{ matrix.target }} --release -v
         working-directory: app
+      # The Flutter Windows bundle does not carry the Visual C++ runtime. Shipping these three DLLs next
+      # to the exe (app-local deployment) lets it start on a PC that never installed it.
+      - name: Add the Visual C++ runtime (Windows)
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+            Copy-Item "$env:SystemRoot\System32\$dll" "${{ matrix.output }}"
+          }
       - name: Pack (Windows)
         if: matrix.target == 'windows'
         shell: pwsh
         run: Compress-Archive -Path "${{ matrix.output }}/*" -DestinationPath poker-credits-windows-x64.zip
+      - name: Installer (Windows)
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $version = ((Select-String -Path app/pubspec.yaml -Pattern '^version:\s*([0-9.]+)').Matches[0].Groups[1].Value)
+          $source = Join-Path $PWD "${{ matrix.output }}"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" "/DSourceDir=$source" "/DOutputDir=$PWD" packaging/windows/installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
       - name: Pack (Linux)
         if: matrix.target == 'linux'
         run: tar -czf poker-credits-linux-x64.tar.gz -C "$(dirname '${{ matrix.output }}')" bundle
@@ -65,6 +83,7 @@ jobs:
           name: poker-credits-${{ matrix.target }}
           path: |
             poker-credits-windows-x64.zip
+            poker-credits-windows-x64-setup.exe
             poker-credits-linux-x64.tar.gz
           if-no-files-found: error
           retention-days: 14
