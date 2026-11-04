@@ -70,7 +70,8 @@ Pressed state: the cell inverts (`ink` fill with `paper` text, or `accent` darke
 | `BrutalSwitchRow` (new) | Label, one-line explanation, and a square switch. |
 | `BrutalSlider`, `BrutalKeypad` | Hairline track, square thumb, ticks; the number in Anton. |
 | `BrutalBanner` | Full-width strip: reconnecting and paused (ink with hatch), errors (accent). |
-| `BrutalDialog`, `BrutalSheet` | `surface` panels with a hairline top rule; sheets slide in with `base`. |
+| `BrutalDialog`, `BrutalSheet` | `surface` panels with a hairline top rule; sheets slide in with `base`. A sheet's header (title and a CLOSE cell) never scrolls, so there is always a visible way out even when the sheet fills a short screen. |
+| `TopBarStat` | A labelled value in a game top bar: a small muted label over the value in Anton, behind a hairline (ROOM / HMB5, HAND / 7, PHASE / PRE-FLOP). Accent colour only for something that needs attention. |
 | `BrutalTextField` | Hairline box on `surface`, label above, error line in accent below. |
 | `PaperBackdrop` (new) | Paints `paper` plus grain behind every route (installed once in `MaterialApp.builder`). |
 | `EchoTitle` (new) | The hero wordmark: solid Anton text with three outlined copies stepped up-left (the reference 1 effect). Home only. |
@@ -112,7 +113,7 @@ Game screens (Table, Player, Spectator) are full screen routes without the bar, 
 Phone: single column, the felt panel becomes a 160 px band under the title. The resume row, when present, is first and carries the accent.
 
 ### Table (landscape or tablet, host)
-Top bar cells: room code | hand and street | Pause | Undo. Centre: the `felt` panel with the pot block (`chip` fill, Anton 96) and seat plates on an oval path as hairline cells. The acting seat plate is the only accent fill, with its countdown as a 3 px bar. Ticker row of the last actions under the grid. Host controls sit in a right-hand cell column (landscape) or a bottom sheet (portrait). When the host is on turn, YOUR TURN and the action row appear above the controls.
+Top bar cells: room code | hand and street | Pause | Undo. Centre: the `felt` panel with the pot block (`chip` fill, Anton 96) and seat plates on an oval path as hairline cells. The acting seat plate is the only accent fill, with its countdown as a 3 px bar. Ticker row of the last actions under the grid. Host controls: the next step (START HAND, BEGIN SHOWDOWN, RESOLVE) is one full-width heavy button on its own row; the rest (Seats, Pause, Undo, End game) sit under it in a grid of equal cells, two or three per row. When the host is on turn, YOUR TURN and the action row appear above the controls.
 
 ### Player (portrait, one thumb)
 Top bar: room, connection state. Hero cell: stack in Anton 64, bet beside it. Middle: whose turn (quiet `surface` cell) or, when acting, a full-width accent YOUR TURN cell with the countdown. Bottom third: FOLD (outlined), CHECK or CALL n (ink), RAISE (accent); raise opens the slider sheet. Haptics unchanged.

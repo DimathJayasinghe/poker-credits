@@ -58,25 +58,66 @@ class HostControls extends StatelessWidget {
       _ => null,
     };
     final betweenHands = !seatsLocked(phase);
-    // A button fills the width it is given, so in a row of buttons each one is sized to its label.
-    Widget fit(Widget button) => IntrinsicWidth(
-      child: ConstrainedBox(constraints: const BoxConstraints(minWidth: 112), child: button),
-    );
-    return Wrap(
-      spacing: BrutalMetrics.gapM,
-      runSpacing: BrutalMetrics.gapS,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    // Secondary actions share one grid of equal cells, so their widths never depend on their labels.
+    final secondary = <Widget>[
+      if (betweenHands) BrutalButton(label: Strings.seatsButton, onPressed: enabled ? onSeats : null),
+      if (view.paused)
+        BrutalButton(label: Strings.resume, kind: BrutalButtonKind.info, onPressed: send(const ResumeGame()))
+      else if (inHand)
+        BrutalButton(label: Strings.pause, onPressed: send(const Pause())),
+      if (inHand || phase == WirePhase.allInRunout || phase == WirePhase.showdown) BrutalButton(label: Strings.undo, onPressed: send(const Undo())),
+      BrutalButton(label: Strings.endGame, kind: BrutalButtonKind.danger, onPressed: enabled ? onEndGame : null),
+    ];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        if (primary != null) fit(primary),
-        if (betweenHands) fit(BrutalButton(label: Strings.seatsButton, onPressed: enabled ? onSeats : null)),
-        if (view.paused)
-          fit(BrutalButton(label: Strings.resume, kind: BrutalButtonKind.info, onPressed: send(const ResumeGame())))
-        else if (inHand)
-          fit(BrutalButton(label: Strings.pause, onPressed: send(const Pause()))),
-        if (inHand || phase == WirePhase.allInRunout || phase == WirePhase.showdown)
-          fit(BrutalButton(label: Strings.undo, onPressed: send(const Undo()))),
-        fit(BrutalButton(label: Strings.endGame, kind: BrutalButtonKind.danger, onPressed: enabled ? onEndGame : null)),
+        // The one thing to do next gets a row of its own, the full width of the controls.
+        if (primary != null) ...<Widget>[primary, const SizedBox(height: BrutalMetrics.gapS)],
+        _ButtonGrid(children: secondary),
       ],
+    );
+  }
+}
+
+/// Lays buttons out in rows of equal cells. As many columns as keep a cell at least
+/// [minCellWidth] wide, then the rows are balanced (four buttons make 2 + 2, not 3 + 1).
+class _ButtonGrid extends StatelessWidget {
+  const _ButtonGrid({required this.children});
+
+  final List<Widget> children;
+
+  static const double minCellWidth = 104;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, box) {
+        const gap = BrutalMetrics.gapS;
+        final fit = ((box.maxWidth + gap) / (minCellWidth + gap)).floor().clamp(1, children.length);
+        final rows = (children.length / fit).ceil();
+        final columns = (children.length / rows).ceil();
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            for (var r = 0; r < rows; r++) ...<Widget>[
+              if (r > 0) const SizedBox(height: gap),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    for (var col = 0; col < columns; col++) ...<Widget>[
+                      if (col > 0) const SizedBox(width: gap),
+                      Expanded(child: r * columns + col < children.length ? children[r * columns + col] : const SizedBox.shrink()),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

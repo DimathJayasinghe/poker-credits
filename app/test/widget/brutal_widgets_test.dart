@@ -158,4 +158,41 @@ void main() {
     expect(find.text('RAISE'), findsOneWidget);
     expect(find.text('content'), findsOneWidget);
   });
+
+  group('sheet close cell', () {
+    Widget opener(Widget content) => brutalHost(
+      Builder(
+        builder: (context) => BrutalButton(
+          label: 'Open',
+          onPressed: () => showBrutalSheet<void>(context: context, title: 'Seats', builder: (_) => content),
+        ),
+      ),
+    );
+
+    testWidgets('CLOSE dismisses the sheet', (tester) async {
+      await tester.pumpWidget(opener(const Text('content')));
+      await tester.tap(find.text('OPEN'));
+      await tester.pumpAndSettle();
+      expect(find.text('CLOSE'), findsOneWidget);
+      await tester.tap(find.text('CLOSE'));
+      await tester.pumpAndSettle();
+      expect(find.text('content'), findsNothing);
+    });
+
+    testWidgets('on a short screen with long content the header stays put and CLOSE is reachable', (tester) async {
+      tester.view.physicalSize = const Size(800, 360);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(opener(Column(children: <Widget>[for (var i = 0; i < 30; i++) Text('row $i')])));
+      await tester.tap(find.text('OPEN'));
+      await tester.pumpAndSettle();
+      await tester.drag(find.text('row 1'), const Offset(0, -400));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.text('CLOSE')).top, greaterThanOrEqualTo(0), reason: 'the header does not scroll away');
+      await tester.tap(find.text('CLOSE'));
+      await tester.pumpAndSettle();
+      expect(find.text('row 1'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

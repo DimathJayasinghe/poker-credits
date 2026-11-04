@@ -21,7 +21,6 @@ import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_dialog.dart';
 import 'package:poker_credits/widget/brutal/brutal_sheet.dart';
-import 'package:poker_credits/widget/brutal/brutal_tag.dart';
 import 'package:poker_credits/widget/player/action_buttons.dart';
 import 'package:poker_credits/widget/player/raise_slider.dart';
 import 'package:poker_credits/widget/player/turn_alert.dart';
@@ -345,22 +344,22 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
         for (final rebuy in view.pendingRebuys.where((r) => !r.approved)) _rebuyStrip(view, rebuy),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
-          child: Row(
-            children: <Widget>[
-              if (view.phase == WirePhase.lobby)
-                Expanded(
-                  child: Text(
-                    Strings.lobbyHint.toUpperCase(),
-                    style: TextStyle(color: c.muted, fontWeight: FontWeight.bold),
-                  ),
-                )
-              else
-                const Spacer(),
-              Flexible(
-                flex: 2,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: HostControls(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  if (view.phase == WirePhase.lobby) ...<Widget>[
+                    Text(
+                      Strings.lobbyHint,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, height: 1.35, color: c.muted),
+                    ),
+                    const SizedBox(height: BrutalMetrics.gapS),
+                  ],
+                  HostControls(
                     view: view,
                     enabled: session.link.isLive,
                     onSend: _send,
@@ -368,9 +367,9 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
                     onSeats: () => showSeatOrderSheet(context, isHost: true),
                     onEndGame: _endGame,
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ],
@@ -420,7 +419,7 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
   /// Rough height of what sits under the table while it is shown: the turn buttons and the host
   /// controls. Only used to decide when the oval no longer fits next to them.
   static const double _turnBlockHeight = 150;
-  static const double _hostBlockHeight = 90;
+  static const double _hostBlockHeight = 190;
 
   bool _cramped(BuildContext context, BoxConstraints box, {required bool myTurn, required bool host}) {
     final chrome = (myTurn ? _turnBlockHeight : 0) + (host ? _hostBlockHeight : 0) + 2 * BrutalMetrics.gapM;
@@ -499,36 +498,39 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    TextStyle style(double size) => TextStyle(fontFamily: BrutalFonts.display, fontSize: size, letterSpacing: 0.8, color: c.ink);
     return Container(
+      height: 56,
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           BackCell(onTap: onBack),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS, vertical: BrutalMetrics.gapS),
-              // Wraps onto a second line on a narrow phone instead of overflowing.
-              child: Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: BrutalMetrics.gapM,
-                children: <Widget>[
-                  Text('${Strings.room.toUpperCase()} ${view.roomCode}', style: style(24)),
-                  Text('${Strings.hand.toUpperCase()} ${view.handNumber}   ${phaseLabel(view.phase).toUpperCase()}', style: style(22)),
-                  if (watching)
-                    const BrutalTag(Strings.watching)
-                  else if (view.spectatorCount > 0)
-                    Text('${Strings.watching.toUpperCase()} ${view.spectatorCount}', style: style(16)),
-                ],
-              ),
-            ),
+            flex: 3,
+            child: TopBarStat(label: Strings.room, value: view.roomCode),
           ),
-          const SizedBox(width: BrutalMetrics.gapS),
+          Expanded(
+            flex: 2,
+            child: TopBarStat(label: Strings.hand, value: '${view.handNumber}'),
+          ),
+          Expanded(
+            flex: 3,
+            child: TopBarStat(label: Strings.phase, value: phaseLabel(view.phase)),
+          ),
+          if (watching)
+            const Expanded(
+              flex: 3,
+              child: TopBarStat(label: Strings.you, value: Strings.watching),
+            )
+          else if (view.spectatorCount > 0)
+            Expanded(
+              flex: 2,
+              child: TopBarStat(label: Strings.watching, value: '${view.spectatorCount}'),
+            ),
           const GuideCell(),
         ],
       ),

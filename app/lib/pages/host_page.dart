@@ -104,7 +104,7 @@ class _HostPageState extends State<HostPage> with Refena {
                         const SizedBox(height: BrutalMetrics.gapM),
                       ],
                       BrutalCard(
-                        header: Strings.hostName,
+                        header: Strings.you,
                         child: BrutalTextField(
                           label: Strings.hostName,
                           controller: _name,
@@ -115,7 +115,7 @@ class _HostPageState extends State<HostPage> with Refena {
                       ),
                       const SizedBox(height: BrutalMetrics.gapM),
                       BrutalCard(
-                        header: Strings.players,
+                        header: Strings.gameSettings,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[

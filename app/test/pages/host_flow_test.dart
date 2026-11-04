@@ -51,7 +51,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('ROOM KQ7M'), findsOneWidget);
+    expect(find.bySemanticsLabel('Room KQ7M'), findsOneWidget);
     expect(find.text('KQ7M'), findsWidgets);
     expect(find.text('192.168.1.5:7878'), findsOneWidget, reason: 'typed address next to the QR code');
     expect(find.text('DIMATH'), findsOneWidget);

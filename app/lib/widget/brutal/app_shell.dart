@@ -49,6 +49,69 @@ class TopBarCell extends StatelessWidget {
   }
 }
 
+/// A labelled value in a game screen's top bar ("ROOM / WW6W"): a small muted label over the value
+/// in display type, behind a hairline. The label says what the value is, so the values can stay
+/// big and the whole bar reads as separate facts instead of one run of text.
+class TopBarStat extends StatelessWidget {
+  const TopBarStat({super.key, required this.label, required this.value, this.valueColor});
+
+  final String label;
+  final String value;
+
+  /// Defaults to ink. Use the accent only for something that needs attention.
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = BrutalTheme.of(context).colors;
+    return Semantics(
+      container: true,
+      label: '$label $value',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM - 4),
+        alignment: Alignment.centerLeft,
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: c.line, width: BrutalMetrics.border),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              label.toUpperCase(),
+              maxLines: 1,
+              style: TextStyle(
+                fontFamily: BrutalFonts.mono,
+                fontWeight: FontWeight.bold,
+                fontSize: 10,
+                height: 1.2,
+                letterSpacing: 1.4,
+                color: c.muted,
+              ),
+            ),
+            const SizedBox(height: 2),
+            // A long value (a phase name on a narrow phone) shrinks instead of wrapping or overflowing.
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  value.toUpperCase(),
+                  maxLines: 1,
+                  style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 22, height: 1.1, letterSpacing: 0.8, color: valueColor ?? c.ink),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// The back arrow cell at the left of a top bar. Pressing inverts it.
 class BackCell extends StatelessWidget {
   const BackCell({super.key, required this.onTap});

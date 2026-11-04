@@ -420,27 +420,28 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
     return Container(
+      height: 56,
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           BackCell(onTap: onBack),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS),
-              child: Text(
-                '${Strings.room.toUpperCase()} $roomCode',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 22, letterSpacing: 0.8, color: c.ink),
-              ),
+            flex: 3,
+            child: TopBarStat(label: Strings.room, value: roomCode),
+          ),
+          Expanded(
+            flex: 3,
+            child: TopBarStat(
+              label: Strings.connection,
+              value: link.isLive ? Strings.live : Strings.reconnecting,
+              valueColor: link.isLive ? null : c.accent,
             ),
           ),
-          BrutalTag(link.isLive ? 'Live' : Strings.reconnecting, kind: link.isLive ? BrutalTagKind.neutral : BrutalTagKind.signal),
-          const SizedBox(width: BrutalMetrics.gapM),
           const GuideCell(),
         ],
       ),

@@ -13,6 +13,12 @@ abstract final class Strings {
 
   // Navigation
   static const String back = 'Back';
+  static const String close = 'Close';
+  static const String phase = 'Phase';
+  static const String connection = 'Connection';
+  static const String live = 'Live';
+  static const String you = 'You';
+  static const String gameSettings = 'Game settings';
   static const String navPlay = 'Play';
   static const String navSettings = 'Settings';
   static const String navGuide = 'Guide';
