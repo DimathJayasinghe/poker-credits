@@ -610,7 +610,9 @@ fn contributions(table: &Table) -> Vec<Contribution> {
     table
         .seats
         .iter()
-        .filter(|s| !s.hand_contrib.is_zero())
+        // A contender who has paid nothing yet (the button when the blinds fold out of turn) must
+        // stay listed: she is the only one who can win the dead money.
+        .filter(|s| !s.hand_contrib.is_zero() || s.is_contesting())
         .map(|s| Contribution {
             seat: s.index,
             amount: s.hand_contrib,

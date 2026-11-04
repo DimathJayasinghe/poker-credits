@@ -172,3 +172,12 @@ fn button_winner_is_last_in_clockwise_order() {
 fn split_with_no_winners_pays_nobody() {
     assert!(split(chips(50), &[]).is_empty());
 }
+
+#[test]
+fn folded_chips_form_a_pot_when_no_live_seat_has_paid() {
+    // Seat 3 is still in the hand but has put nothing in; both blinds folded.
+    let pots = pots_of(&[paid(1, 1, true), paid(2, 1, true), paid(3, 0, false)]);
+    assert_eq!(pots.len(), 1);
+    assert_eq!(pots[0].amount.get(), 2);
+    assert_eq!(pots[0].eligible, vec![seat(3)]);
+}

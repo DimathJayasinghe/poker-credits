@@ -16,6 +16,14 @@ use poker_server_core::store::journal::Journal;
 use poker_server_core::store::{self, snapshot};
 use proptest::prelude::*;
 
+/// Case count: `PROPTEST_CASES` overrides the default so a long soak can be run on demand.
+fn cases(default: u32) -> u32 {
+    std::env::var("PROPTEST_CASES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
+}
+
 fn config() -> RoomConfig {
     RoomConfig {
         starting_chips: 500,
@@ -141,7 +149,7 @@ fn pick(state: &RoomState, code: u8, arg: u8, at_ms: u64, names: &mut u32) -> Op
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig { cases: 64, ..ProptestConfig::default() })]
+    #![proptest_config(ProptestConfig { cases: cases(64), ..ProptestConfig::default() })]
 
     #[test]
     fn replaying_snapshot_and_journal_equals_the_live_state(

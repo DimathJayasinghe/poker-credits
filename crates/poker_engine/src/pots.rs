@@ -85,10 +85,26 @@ pub fn calculate(contributions: &[Contribution]) -> Result<Vec<PotTier>, PokerEr
     for c in contributions {
         leftover = leftover.checked_add(c.amount.saturating_sub(previous))?;
     }
-    if !leftover.is_zero()
-        && let Some(last) = pots.last_mut()
-    {
-        last.amount = last.amount.checked_add(leftover)?;
+    if !leftover.is_zero() {
+        if let Some(last) = pots.last_mut() {
+            last.amount = last.amount.checked_add(leftover)?;
+        } else {
+            // Only folded players paid anything: no live contribution defines a level, but the
+            // chips still belong to whoever is left. Without this tier they would vanish.
+            let mut eligible: Vec<SeatIndex> = contributions
+                .iter()
+                .filter(|c| !c.folded)
+                .map(|c| c.seat)
+                .collect();
+            eligible.sort_unstable();
+            if !eligible.is_empty() {
+                pots.push(PotTier {
+                    tier_index: 0,
+                    amount: leftover,
+                    eligible,
+                });
+            }
+        }
     }
     Ok(pots)
 }

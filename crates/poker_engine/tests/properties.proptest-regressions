@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 3cc3bd50e9e4f77f8f42be2d34ab4a105382c8feadca5f92d1fca527f251f64a # shrinks to stacks = [999999995000, 11, 55, 1], small_blind = 1, extra_big = 0, steps = [(Start, 0), (Leave, 31), (Call, 0), (AllIn, 11), (Leave, 0), (Undo, 0), (Pause, 0), (Undo, 0), (Undo, 0), (Resume, 0), (Leave, 250), (Leave, 45)], snapshot_every = 1

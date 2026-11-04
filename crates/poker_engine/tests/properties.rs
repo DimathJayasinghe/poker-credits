@@ -14,6 +14,14 @@ use poker_engine::{Chips, Command, GameState, MAX_CHIPS, Phase, PlayerAction, Pl
 use proptest::prelude::*;
 use support::{cash, chips, pid, seat};
 
+/// Case count: `PROPTEST_CASES` overrides the default so a long soak can be run on demand.
+fn cases(default: u32) -> u32 {
+    std::env::var("PROPTEST_CASES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
+}
+
 #[derive(Clone, Debug)]
 enum Step {
     Fold,
@@ -193,7 +201,7 @@ fn assert_consistent(state: &GameState, expected_total: u64) {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig { cases: 300, ..ProptestConfig::default() })]
+    #![proptest_config(ProptestConfig { cases: cases(300), ..ProptestConfig::default() })]
 
     /// Fuzzing arbitrary commands never panics, keeps every invariant, and replay is exact.
     #[test]
@@ -317,7 +325,7 @@ fn legal_command(state: &GameState, byte: u8) -> Option<Command> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig { cases: 300, ..ProptestConfig::default() })]
+    #![proptest_config(ProptestConfig { cases: cases(300), ..ProptestConfig::default() })]
 
     /// Every command built from the engine's own legal actions is accepted, whole hands play out,
     /// and chips are conserved throughout.
@@ -347,4 +355,26 @@ proptest! {
         }
         prop_assert!(hands_ended >= 1, "200+ legal commands must finish at least one hand");
     }
+}
+
+/// Found by a long soak (`PROPTEST_CASES=50000`): the blinds fold out of turn, so the only
+/// contender is the button, who has paid nothing. The blinds used to vanish with no pot to hold
+/// them.
+#[test]
+fn dead_money_goes_to_a_contender_who_has_paid_nothing() {
+    let stacks = [1_000_u64, 11, 55, 1];
+    let mut state = initial_state(&stacks, 1, 0);
+    let total: u64 = stacks.iter().sum();
+    for command in [
+        Command::StartHand { elapsed_ms: 0 },
+        Command::LeaveHand { player_id: pid(3) },
+        Command::LeaveHand { player_id: pid(2) },
+        Command::LeaveHand { player_id: pid(1) },
+    ] {
+        state = apply(&state, command).unwrap().state;
+        assert_eq!(state.table.total_chips(), total, "chips must be conserved");
+    }
+    assert_eq!(state.table.phase, Phase::NextHandPrep);
+    let winner = state.table.seat_of(&pid(0)).unwrap();
+    assert_eq!(winner.chips.get(), 1_002);
 }
