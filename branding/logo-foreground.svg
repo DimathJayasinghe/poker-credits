@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Poker Credits">
+  <title>Poker Credits</title>
+  <!-- Palette: docs/UI_DESIGN.md (paper #EFE5CF, ink #15120F, accent #B52D14, onAccent #FFF6E6). -->
+  <g transform="translate(512 512) scale(.84) translate(-512 -512) translate(70 70)">
+  <!-- Echoes: the chip stacked behind itself, drawn as hairlines like the app's title. -->
+  <g fill="none" stroke="#15120F" stroke-width="14">
+    <circle cx="372" cy="372" r="300"/>
+    <circle cx="442" cy="442" r="300"/>
+  </g>
+  <!-- The chip. -->
+  <circle cx="512" cy="512" r="300" fill="#B52D14" stroke="#15120F" stroke-width="14"/>
+  <!-- Edge notches: eight blocks, clipped to the chip's face. -->
+  <clipPath id="face"><circle cx="512" cy="512" r="293"/></clipPath>
+  <g clip-path="url(#face)" fill="#FFF6E6">
+    <g id="n"><rect x="470" y="212" width="84" height="76"/><rect x="470" y="736" width="84" height="76"/></g>
+    <use href="#n" transform="rotate(45 512 512)"/>
+    <use href="#n" transform="rotate(90 512 512)"/>
+    <use href="#n" transform="rotate(135 512 512)"/>
+  </g>
+  <!-- Inner disc and the spade. -->
+  <circle cx="512" cy="512" r="192" fill="#15120F"/>
+  <circle cx="512" cy="512" r="168" fill="none" stroke="#FFF6E6" stroke-width="6"/>
+  <path fill="#FFF6E6" transform="translate(512 514) scale(.74) translate(-512 -504)"
+        d="M512 316C450 392 372 440 372 526C372 586 418 620 466 612C490 608 504 596 512 582C508 632 494 664 466 692L558 692C530 664 516 632 512 582C520 596 534 608 558 612C606 620 652 586 652 526C652 440 574 392 512 316Z"/>
+  </g>
+</svg>
