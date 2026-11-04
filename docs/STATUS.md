@@ -3,7 +3,7 @@
 Last updated: 2026-11-04 (branch `feature/hardening`, stacked on `feature/player-screens`, stacked on `feature/app-shell`). The older "Where we are" text below is the Phase 0/1 snapshot; **start with "Resume here"**.
 
 ## Resume here (2026-11-04)
-Open PRs, stacked in order: #1 bootstrap, #2 engine, #3 server core, #4 protocol/bridge, #5 app shell (Phase 4), #6 join by room code + player screens (Phase 5), **#7 hardening (Phase 6 partial, current branch `feature/hardening`)**. Nothing is merged to `main` (not authorized; the owner merges). GitHub Actions has never run: the repo shows **0 registered workflows** even for PR #1, so check the Actions tab / account settings first.
+**Release state (2026-11-04):** `main` was the old TypeScript scaffold (2 commits). It was fast-forwarded to `feature/hardening` at the owner's request (no force push; the old commits stay in history). The stacked PRs #1 to #7 were closed by that push. GitHub Actions now runs: **CI** (Rust fmt/clippy/test, cargo deny, Dart format/analyze/tests, web build) and **Desktop builds** (Windows and Linux bundles) are green. First pre-release `v0.1.0-beta.1` ships a Windows zip, a Linux tar.gz and an Android APK. These are **unsigned** (Android uses the debug key), untested on real phones and on Windows, and iOS is not built (needs a Mac runner, an Apple Developer account and signing).
 
 **Done on `feature/hardening`:** 10-room load test, Dockerfile + `docs/DEPLOY.md`, WebSocket Origin check (rebinding-safe), Android foreground service (stops with engine and task), SDK 24/25 guard, notification icon, no device-to-device data transfer, table kept on screen during re-discovery, CI fixed to run each package from its own directory, fixture lookup cwd-independent, flaky restore test fixed (it was a wrong assumption, not a durability bug).
 
@@ -18,8 +18,8 @@ Open PRs, stacked in order: #1 bootstrap, #2 engine, #3 server core, #4 protocol
 **Known gaps in the redesign:** the GUIDE tab in `UI_DESIGN.md` is specified but **not built** (the bar has PLAY and SETTINGS only; the owner has not been asked yet); the Table (host) and Spectator pages were checked in goldens only, not on a device this session; text-scale sweeps now cover every screen (3.0 everywhere, 2.0 on the host Table, which clamps by design); Anton replaces the previously approved display font (report to the owner).
 
 **Next tasks, in this order:**
-1. `flutter build apk --release` (debug signing is fine) and repeat the emulator flow: host, join by room code, resume. Debug builds hide R8/tree-shaking issues.
-2. `cargo deny check` (there is no `deny.toml` yet and it has never been run); check the load test's `max ack < 1 s` bound would hold on a 2-vCPU CI runner (consider 2 s).
+1. Release APK builds (debug signing). Still repeat the emulator flow with it: host, join by room code, resume. Debug builds hide R8/tree-shaking issues.
+2. `cargo deny` is set up (`deny.toml`, CI job, green). Still check the load test's `max ack < 1 s` bound would hold on a 2-vCPU CI runner (consider 2 s).
 3. The "no game found" message should mention allowing Local Network access on iOS; update PR #7's description.
 4. Write the owner's ordered release checklist (below) as `docs/RELEASE_CHECKLIST.md`.
 5. Ask the owner whether to build the GUIDE tab (static hand rankings strings only; no poker logic in Dart).
