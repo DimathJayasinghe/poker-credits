@@ -56,3 +56,11 @@ jobs:
       - name: Web build smoke test (ADR-014)
         run: flutter build web --no-web-resources-cdn
         working-directory: app
+
+  deny:
+    name: Dependencies (cargo deny)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Advisories, licences, bans and sources, as set in deny.toml.
+      - uses: EmbarkStudios/cargo-deny-action@v2
