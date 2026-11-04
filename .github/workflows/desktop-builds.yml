@@ -77,7 +77,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
       - name: Pack (Linux)
         if: matrix.target == 'linux'
-        run: tar -czf poker-credits-linux-x64.tar.gz -C "$(dirname '${{ matrix.output }}')" bundle
+        run: |
+          cp packaging/linux/install.sh packaging/linux/dev.pokercredits.poker_credits.desktop '${{ matrix.output }}/'
+          chmod +x '${{ matrix.output }}/install.sh'
+          tar -czf poker-credits-linux-x64.tar.gz -C "$(dirname '${{ matrix.output }}')" bundle
       - uses: actions/upload-artifact@v4
         with:
           name: poker-credits-${{ matrix.target }}

@@ -14,6 +14,24 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
+// Sets the window icon from data/dev.pokercredits.poker_credits.png next to the executable.
+// A desktop entry with an Icon key also gives the launcher and dock the icon, but a bundle that
+// was only unpacked has no desktop entry, so the window carries its own icon.
+static void set_window_icon(GtkWindow* window) {
+  g_autoptr(GError) error = nullptr;
+  g_autofree gchar* exe = g_file_read_link("/proc/self/exe", &error);
+  if (exe == nullptr) {
+    return;
+  }
+  g_autofree gchar* dir = g_path_get_dirname(exe);
+  g_autofree gchar* icon =
+      g_build_filename(dir, "data", APPLICATION_ID ".png", nullptr);
+  g_autoptr(GError) icon_error = nullptr;
+  if (!gtk_window_set_icon_from_file(window, icon, &icon_error)) {
+    g_warning("Could not load the window icon: %s", icon_error->message);
+  }
+}
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
@@ -53,6 +71,7 @@ static void my_application_activate(GApplication* application) {
   }
 
   gtk_window_set_default_size(window, 1280, 720);
+  set_window_icon(window);
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(

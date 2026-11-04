@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Poker Credits
+Comment=Digital chips and pots for in-person Texas Hold'em
+Exec=@EXEC@
+Path=@DIR@
+Icon=dev.pokercredits.poker_credits
+Terminal=false
+Categories=Game;CardGame;
+StartupWMClass=dev.pokercredits.poker_credits

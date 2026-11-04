@@ -70,6 +70,9 @@ save(mask, web / "icons/Icon-maskable-192.png", 192)
 save(mask, web / "icons/Icon-maskable-512.png", 512)
 save(master, web / "favicon.png", 32)
 
+# Linux: the window icon, and the icon the desktop entry points at.
+save(master, APP / "linux/icons/dev.pokercredits.poker_credits.png", 512)
+
 # README / docs.
 save(master, HERE / "logo.png", 512)
 print("icons written")

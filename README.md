@@ -27,7 +27,7 @@ Get the latest build from the [Releases page](https://github.com/DimathJayasingh
 | :--- | :--- |
 | Windows | `poker-credits-windows-x64-setup.exe` (installer) or the `.zip` |
 | Android | `poker-credits-android-arm64.apk` for most phones, or `poker-credits-android.apk` for any device (allow installs from unknown sources) |
-| Linux | `poker-credits-linux-x64.tar.gz` |
+| Linux | `poker-credits-linux-x64.tar.gz`. Unpack, then run `./install.sh` inside the folder to add it to your application menu with its icon |
 
 Each release lists `SHA256SUMS` so you can verify the files.
 
