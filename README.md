@@ -1,104 +1,80 @@
-# Poker Credits (Poker Companion App)
+<p align="center">
+  <img src="branding/logo.png" alt="Poker Credits logo" width="160">
+</p>
 
-> A real-time, cross-platform companion app for physical Texas Hold'em games that replaces poker chips with a digital credit and pot management system. **Flutter** app, **Rust** server and engine.
+<h1 align="center">Poker Credits</h1>
 
----
+<p align="center">
+  Digital chips and pots for in-person Texas Hold'em. Keep the cards, drop the chip stacks.
+</p>
 
-## Overview
+<p align="center">
+  <a href="https://github.com/DimathJayasinghe/poker-credits/actions/workflows/ci.yml"><img src="https://github.com/DimathJayasinghe/poker-credits/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/DimathJayasinghe/poker-credits/releases/latest"><img src="https://img.shields.io/github/v/release/DimathJayasinghe/poker-credits?include_prereleases" alt="Latest release"></a>
+</p>
 
-In home poker games, stacking, counting, making change and working out side pots slows play. **Poker Credits** keeps the physical cards and replaces the chips:
+## What it is
 
-* **Physical cards**: players shuffle and deal in real life.
-* **Table Display**: a tablet, laptop or TV in the middle shows the pot, side pots, radial seating, dealer button, blind badges and a live action ticker.
-* **Player Controllers**: each player uses their phone to fold, check, call or raise, with haptic feedback when it is their turn.
-* **Two ways to connect**: cloud rooms with 4-letter codes, or **Host mode** where the table device runs the server inside the app, so it works with no internet (Wi-Fi router or phone hotspot, QR join).
+Players deal and shuffle real cards. The app does the rest: blinds, the dealer button, bets, main and side pots, odd chips and payouts. One device sits on the table and shows the pot and every seat. Each player uses their own phone to fold, check, call or raise.
 
-Targets: iOS, Android, Windows (macOS and Linux come from the same code). A web Player build comes later; the code is kept web-ready (ADR-014). UI style: neo-brutalism ([`docs/UI_DESIGN.md`](docs/UI_DESIGN.md)).
+No internet is needed. The table device can run the game server inside the app, and players join over the same Wi-Fi or a phone hotspot with a 4-letter room code or a QR scan.
 
-> **Status:** design and documentation phase. The earlier TypeScript scaffold has been removed. See [`docs/STATUS.md`](docs/STATUS.md) for what is done and what comes next.
+## Download
 
----
+Get the latest build from the [Releases page](https://github.com/DimathJayasinghe/poker-credits/releases/latest).
+
+| Platform | File |
+| :--- | :--- |
+| Windows | `poker-credits-windows-x64-setup.exe` (installer) or the `.zip` |
+| Android | `poker-credits-android.apk` (allow installs from unknown sources) |
+| Linux | `poker-credits-linux-x64.tar.gz` |
+
+Each release lists `SHA256SUMS` so you can verify the files.
+
+## How to play
+
+1. One person taps **Host a game** on the table device (a tablet, laptop or TV), enters a name and the blinds, and taps **Start hosting**.
+2. Everyone else opens **Join**, picks the game or types the room code, and enters a name. Scanning the QR code on the table also works.
+3. Deal real cards. The app tracks whose turn it is and the money. At showdown the host taps the winner of each pot.
+
+Lock your phone or lose Wi-Fi for a moment and you come back into the same hand.
+
+## Under the hood
+
+- **App:** Flutter for Android, iOS, Windows, macOS and Linux. It holds no poker rules.
+- **Engine:** `crates/poker_engine`, a pure and deterministic Rust library. All rules live here.
+- **Server:** `crates/poker_server_core`, a tokio and axum WebSocket server with one task per room, a crash journal and rate limits. It runs inside the app (host mode) or as a standalone binary in `server/` (cloud mode).
+- **Protocol:** versioned JSON over WebSocket, specified in [`docs/API_AND_EVENTS.md`](docs/API_AND_EVENTS.md).
+
+## Build from source
+
+You need [FVM](https://fvm.app) (Flutter is pinned in `.fvmrc`) and Rust (pinned in `rust-toolchain.toml`).
+
+```bash
+# Rust: format, lint, test
+cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
+
+# App
+cd app
+fvm flutter pub get
+fvm flutter analyze && fvm flutter test
+fvm flutter run -d linux        # or windows, android, ios
+```
+
+Machine setup and helper scripts: [`docs/DEV_SETUP.md`](docs/DEV_SETUP.md). To run the standalone server: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Documentation
 
-| Document | Purpose |
+| | |
 | :--- | :--- |
-| [STATUS](docs/STATUS.md) | Where we are, next step, open questions. **Start here when resuming.** |
-| [Decisions (ADRs)](docs/DECISIONS.md) | Why Flutter + Rust, workspace layout, protocol, crash strategy, LAN join. |
-| [UI Design](docs/UI_DESIGN.md) | Neo-brutalist design system: tokens, components, screens, accessibility. |
-| [Dev Setup](docs/DEV_SETUP.md) | Toolchains, Claude Code plugins, graphify, git hooks, check scripts. |
-| [Architecture](docs/ARCHITECTURE.md) | Components, diagrams, Hold'em state machine, side-pot algorithm, network modes, platform setup. |
-| [Resilience & Crash Handling](docs/RESILIENCE_AND_CRASH_HANDLING.md) | What we copy from LocalSend and what we add: error app, panic supervision, journal, reconnect/resume. |
-| [API & Protocol](docs/API_AND_EVENTS.md) | WebSocket JSON messages, resume handshake, error codes, HTTP endpoints, versioning. |
-| [Game Logic & Rules](docs/GAME_LOGIC_AND_RULES.md) | Betting rules, heads-up, side pots, odd chips, showdown. |
-| [Security & Edge Cases](docs/SECURITY_AND_EDGE_CASES.md) | Threat model, tokens, rate limits, backgrounding, short all-in, undo. |
-| [Coding Standards](docs/CODING_STANDARDS.md) | Rust and Dart standards, lints, patterns, testing. |
-| [Agent Coding Guide](docs/AGENT_CODING_GUIDE.md) | Strict phase-by-phase instructions for implementation agents. |
-| [Implementation Plan](pocker_credit_plan.md) | Stack, structure, race conditions, phases, verification. |
+| [STATUS](docs/STATUS.md) | Current state and what is next |
+| [Architecture](docs/ARCHITECTURE.md) | Components, state machine, pot algorithm |
+| [Game rules](docs/GAME_LOGIC_AND_RULES.md) | Betting, side pots, showdown as implemented |
+| [Protocol](docs/API_AND_EVENTS.md) | Wire messages and HTTP endpoints |
+| [Security](docs/SECURITY_AND_EDGE_CASES.md) | Threat model and limits |
+| [Decisions](docs/DECISIONS.md) | Why things are the way they are |
+| [UI design](docs/UI_DESIGN.md) | The visual system |
 
----
+## Security note
 
-## Tech Stack
-
-```
-App:            Flutter (pinned via .fvmrc), Refena state, dart_mappable, neo-brutalist widget set
-Web:            deferred; web-ready by construction (platform seam, web build in CI)
-Server:         Rust, tokio + axum WebSocket, one actor task per room
-Engine:         poker_engine (pure, deterministic, property-tested)
-Bridge:         flutter_rust_bridge + cargokit (embeds the server in the app)
-Protocol:       JSON over WebSocket, versioned, golden fixtures shared by Rust and Dart tests
-Persistence:    atomic JSON snapshot + write-ahead action journal
-Reference:      LocalSend (~/Documents/dev_projects/localsend) for layout and crash handling
-```
-
----
-
-## Repository Structure (target)
-
-```
-pocker-credits/
-├── Cargo.toml  rust-toolchain.toml  .fvmrc  pubspec.yaml
-├── docs/                       # specs, ADRs, status
-├── protocol/fixtures/v1/       # golden JSON messages
-├── crates/
-│   ├── poker_engine/           # pure rules
-│   └── poker_server_core/      # rooms, protocol, store, supervisor
-├── server/                     # cloud binary + Dockerfile
-├── packages/
-│   ├── poker_protocol/         # Dart wire models
-│   └── poker_bridge/           # flutter_rust_bridge glue
-└── app/                        # Flutter app
-```
-
-
----
-
-## Commands (once Phase 0 is done)
-
-```bash
-# One-time machine setup check (see docs/DEV_SETUP.md)
-bash tool/setup_dev.sh
-
-# Rust
-cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
-
-# Flutter (always through fvm)
-fvm flutter pub get
-fvm dart run build_runner build
-fvm flutter analyze && fvm flutter test
-fvm flutter run -d linux            # or windows / android / ios
-
-# Bridge codegen (from packages/poker_bridge)
-flutter_rust_bridge_codegen generate
-```
-
----
-
-## Key Gameplay Features
-
-1. **Fast onboarding**: the table shows a QR code; players scan it in the app (or type address and room code).
-2. **Automated blinds and button**: dealer, small blind, big blind, dead button and heads-up rules handled by the engine.
-3. **Automated main and side pots**: unequal all-ins produce tiered pots.
-4. **Showdown tap**: host taps the winner(s) for each pot; split pots and odd chips handled.
-5. **Reliable reconnects**: lock your phone, come back, you are in the same hand. If the host app is killed, the room restores from its journal.
-6. **Wake lock and haptics**: table stays awake; your phone buzzes on your turn.
+Host mode uses plain `ws://` on the local network, so play on a network you trust (home Wi-Fi or your own hotspot), not on public Wi-Fi. Cloud mode must sit behind TLS. Details are in the security document above.
