@@ -127,6 +127,25 @@ class Kick extends ClientMessage with KickMappable {
   final String playerId;
 }
 
+/// Host: move a player to another seat between hands; an occupied seat is swapped with.
+@MappableClass(discriminatorValue: 'MOVE_SEAT')
+class MoveSeat extends ClientMessage with MoveSeatMappable {
+  const MoveSeat({required this.playerId, required this.seatIndex});
+
+  final String playerId;
+
+  /// Target seat, 0 to 9, clockwise.
+  final int seatIndex;
+}
+
+/// Player: move myself to a free seat between hands.
+@MappableClass(discriminatorValue: 'CHOOSE_SEAT')
+class ChooseSeat extends ClientMessage with ChooseSeatMappable {
+  const ChooseSeat({required this.seatIndex});
+
+  final int seatIndex;
+}
+
 /// Host: change the settings (lobby only).
 @MappableClass(discriminatorValue: 'ROOM_CONFIGURE')
 class RoomConfigure extends ClientMessage with RoomConfigureMappable {

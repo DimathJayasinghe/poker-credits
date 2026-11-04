@@ -35,6 +35,8 @@ const Map<String, Type> clientTypes = {
   'RESUME_GAME': ResumeGame,
   'APPROVE_REBUY': ApproveRebuy,
   'KICK': Kick,
+  'MOVE_SEAT': MoveSeat,
+  'CHOOSE_SEAT': ChooseSeat,
   'ROOM_CONFIGURE': RoomConfigure,
   'END_GAME': EndGame,
   'REQUEST_REBUY': RequestRebuy,

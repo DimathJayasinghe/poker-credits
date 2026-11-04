@@ -58,7 +58,7 @@ fn client_fixtures_round_trip() {
         );
         count += 1;
     }
-    assert_eq!(count, 22);
+    assert_eq!(count, 24);
 }
 
 #[test]
@@ -106,6 +106,8 @@ fn every_client_message_type_has_a_fixture() {
         "RESUME_GAME",
         "APPROVE_REBUY",
         "KICK",
+        "MOVE_SEAT",
+        "CHOOSE_SEAT",
         "ROOM_CONFIGURE",
         "END_GAME",
         "REQUEST_REBUY",

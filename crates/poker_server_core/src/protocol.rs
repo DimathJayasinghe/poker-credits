@@ -146,6 +146,19 @@ pub enum ClientMessage {
         /// Player to remove.
         player_id: String,
     },
+    /// Host: move a player to another seat between hands. An occupied target seat is swapped
+    /// with, so the host can reorder the table to match who sits where.
+    MoveSeat {
+        /// Player to move.
+        player_id: String,
+        /// Target seat, `0..10`, clockwise.
+        seat_index: u8,
+    },
+    /// Player: move myself to a free seat between hands.
+    ChooseSeat {
+        /// Target seat, `0..10`, clockwise.
+        seat_index: u8,
+    },
     /// Host: change settings between hands.
     RoomConfigure {
         /// New settings.

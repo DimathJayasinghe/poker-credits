@@ -68,6 +68,12 @@ fn internal(text: &str) -> RoomError {
     RoomError::new(ErrorCode::InternalError, text)
 }
 
+/// The most rooms `GET /v1/lobbies` lists.
+pub const MAX_LISTED_LOBBIES: usize = 16;
+
+/// How long one room may take to describe itself for the lobby list.
+const LOBBY_REPLY_WAIT: Duration = Duration::from_millis(300);
+
 impl Registry {
     /// An empty registry. With a `data_dir`, rooms are persisted and can be restored.
     #[must_use]
@@ -129,6 +135,32 @@ impl Registry {
     pub async fn room_info(&self, code: &str) -> Option<RoomInfo> {
         let (handle, _) = self.lookup(code).ok()?;
         handle.info().await.ok()
+    }
+
+    /// Rooms still in their lobby with a free seat, newest facts first by code order, for the
+    /// join screen's "games on this Wi-Fi" list. At most [`MAX_LISTED_LOBBIES`]; a room that does
+    /// not answer in time is left out rather than holding the list up.
+    pub async fn open_lobbies(&self) -> Vec<(String, RoomInfo)> {
+        let codes: Vec<String> = self
+            .rooms()
+            .keys()
+            .take(MAX_LISTED_LOBBIES * 4)
+            .cloned()
+            .collect();
+        let mut open = Vec::new();
+        for code in codes {
+            let info = tokio::time::timeout(LOBBY_REPLY_WAIT, self.room_info(&code))
+                .await
+                .ok()
+                .flatten();
+            if let Some(info) = info.filter(|i| !i.in_progress && i.player_count < i.max_players) {
+                open.push((code, info));
+            }
+            if open.len() >= MAX_LISTED_LOBBIES {
+                break;
+            }
+        }
+        open
     }
 
     /// The configured limits.

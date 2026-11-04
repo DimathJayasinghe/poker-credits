@@ -127,6 +127,14 @@ No extra fields. Deals the next hand from `LOBBY` or `NEXT_HAND_PREP`.
 ### 3.7 Host admin messages
 `UNDO`, `PAUSE { reason? }`, `RESUME_GAME`, `APPROVE_REBUY { playerId, amount }`, `KICK { playerId }`, `ROOM_CONFIGURE { config }` (lobby only), `END_GAME`. All require the connection to be authenticated as `HOST`; otherwise `HOST_ONLY_ACTION`.
 
+### 3.7a Seat order: `MOVE_SEAT` (host) and `CHOOSE_SEAT` (player)
+`{ "type":"MOVE_SEAT", "playerId":"p_2", "seatIndex":4 }` (host) and `{ "type":"CHOOSE_SEAT", "seatIndex":7 }` (any seated player, for themselves). Seats `0..9` run clockwise, and the seat order is the turn order, so the seating must match who sits where in the room.
+- Only between hands (`LOBBY` or `NEXT_HAND_PREP`); during a hand the answer is `HAND_IN_PROGRESS` and nothing changes.
+- `MOVE_SEAT` onto an occupied seat **swaps** the two players. `CHOOSE_SEAT` onto an occupied seat is refused with `SEAT_OCCUPIED`: a guest never displaces anyone.
+- Moving to your own seat is a no-op (safe to retry). A spectator, or an unknown player, is refused.
+- The dealer button and blind markers stay on their *seats* (a physical button stays on its chair), so after a swap the button may belong to a different person.
+- The answer is the usual `ACK`; everybody learns the new order from the next `STATE_UPDATE`.
+
 ### 3.8 `REQUEST_REBUY` (player)
 `{ "type":"REQUEST_REBUY", "amount":1000 }`. Applied only at `NEXT_HAND_PREP`; otherwise queued as `pendingRebuy` (see RC-005).
 
@@ -317,6 +325,12 @@ Room codes are never listed, in either mode: a player needs the code from the QR
 { "exists":true, "playerCount":3, "maxPlayers":10, "isFull":false, "inProgress":true }
 ```
 An unknown or frozen room answers `200` with `exists:false` and zeros. Rate limited per IP (default 2 per second, burst 10; `429` beyond that). Room codes are guessable (32^4 ≈ 1M), see security doc 6.6 for the matching limits on the WebSocket.
+
+### `GET /v1/lobbies`
+```json
+{ "lobbies":[ { "roomCode":"KQ7M", "hostName":"Dimath", "playerCount":3, "maxPlayers":10 } ] }
+```
+The open games of a **host (LAN) server**, for the join screen's "Games on this Wi-Fi" list: only rooms still in their lobby with a free seat, at most 16, sorted by room code. A **cloud server always answers `{"lobbies":[]}`**, so a public server never reveals room codes. Rate limited per IP like `/v1/room/{code}`. The app scans its /24 networks for it (ports 7878 and 7879) and treats the answer as untrusted: a malformed entry is dropped, the host name is cut to 20 printable characters, counts are clamped, and bodies over 8 KiB are ignored.
 
 ### `GET /` and static assets (later, Phase 7)
 When `POKER_WEB_DIR` is set (cloud) or web assets are embedded (host mode), the server serves the built Flutter web player at `/`. The web client opens `ws(s)://<same host>/v1/ws` derived from its own URL. No protocol change. Chips and timestamps stay below 2^53-1 so JavaScript clients are exact (ADR-014).

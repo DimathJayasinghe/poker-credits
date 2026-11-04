@@ -46,6 +46,11 @@ impl RoomState {
             Op::DisconnectTimeout { player_id, at_ms } => {
                 self.op_disconnect_timeout(&player_id, at_ms, out)
             }
+            Op::ChooseSeat {
+                player_id,
+                seat_index,
+                at_ms,
+            } => self.op_choose_seat(&player_id, seat_index, at_ms, out),
             Op::SetSittingOut {
                 player_id,
                 sitting_out,
@@ -194,6 +199,11 @@ impl RoomState {
                         .filter(|p| p.sat_out_since_ms.is_some())
                     {
                         player.hands_sat_out = player.hands_sat_out.saturating_add(1);
+                    }
+                }
+                Event::SeatMoved { player_id, to, .. } => {
+                    if let Some(player) = self.players.get_mut(player_id.as_str()) {
+                        player.seat = Some(to.get());
                     }
                 }
                 Event::PlayerAdded { .. }
@@ -383,6 +393,32 @@ impl RoomState {
                 busted_since_ms: None,
             },
         );
+        Ok(())
+    }
+
+    /// A guest picks a seat for themselves. They may only take a free one: displacing somebody
+    /// is the host's call.
+    fn op_choose_seat(&mut self, id: &str, seat_index: u8, at_ms: u64, out: &mut Outcome) -> Done {
+        self.require_seated(id)?;
+        if self
+            .player_at_seat(SeatIndex::new(seat_index)?)
+            .is_some_and(|p| p.id != id)
+        {
+            return Err(RoomError::new(ErrorCode::SeatOccupied, "seat is taken"));
+        }
+        self.move_seat(id, seat_index, at_ms, out)
+    }
+
+    /// Moves a seated player to `seat_index` (swapping if it is taken). The engine refuses while a
+    /// hand is in progress, so the turn order never changes under a running hand.
+    fn move_seat(&mut self, id: &str, seat_index: u8, at_ms: u64, out: &mut Outcome) -> Done {
+        self.require_seated(id)?;
+        let command = Command::MoveSeat {
+            player_id: engine_id(id),
+            seat: SeatIndex::new(seat_index)?,
+        };
+        self.engine_step(command, at_ms, out)?;
+        self.finish(at_ms, out);
         Ok(())
     }
 
@@ -622,6 +658,10 @@ impl RoomState {
                 self.op_approve_rebuy(&player_id, amount, out)?;
             }
             HostCommand::Kick { player_id } => self.op_kick(&player_id, at_ms, out)?,
+            HostCommand::MoveSeat {
+                player_id,
+                seat_index,
+            } => self.move_seat(&player_id, seat_index, at_ms, out)?,
             HostCommand::Configure { config } => {
                 let blinds = blinds_mode(&config)?;
                 self.engine_step(Command::Configure { blinds }, at_ms, out)?;

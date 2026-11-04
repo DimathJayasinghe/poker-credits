@@ -831,3 +831,97 @@ async fn host_mode_refuses_room_creation_over_the_network_and_resumes_a_detached
     assert!(!player.player_id.is_empty());
     server.stop().await;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Lobby list (`GET /v1/lobbies`)
+// ---------------------------------------------------------------------------------------------
+
+async fn boot_host_mode() -> ServerHandle {
+    poker_server_core::start(ServerConfig {
+        bind: "127.0.0.1:0".parse().unwrap(),
+        data_dir: None,
+        limits: Limits::default(),
+        timings: Timings::default(),
+        mode: ServerMode::Host,
+        server_name: "Host".into(),
+        events: None,
+    })
+    .await
+    .unwrap()
+}
+
+async fn lobbies(addr: std::net::SocketAddr) -> Vec<Value> {
+    let (status, body) = http_get(addr, "/v1/lobbies").await;
+    assert_eq!(status, 200);
+    let parsed: Value = serde_json::from_str(&body).unwrap();
+    parsed["lobbies"].as_array().unwrap().clone()
+}
+
+#[tokio::test]
+async fn a_host_server_lists_its_open_lobby_with_the_host_name_and_seat_count() {
+    let server = boot_host_mode().await;
+    let addr = server.local_addr();
+    assert!(lobbies(addr).await.is_empty(), "no room, nothing to list");
+
+    let config = serde_json::from_value(config_json()).unwrap();
+    let room = server
+        .registry()
+        .create_room_detached("Dimath".into(), config)
+        .unwrap();
+    let listed = lobbies(addr).await;
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0]["roomCode"], room.room_code.as_str());
+    assert_eq!(listed[0]["hostName"], "Dimath");
+    assert_eq!(listed[0]["playerCount"], 1);
+    assert_eq!(listed[0]["maxPlayers"], 10);
+
+    join_as(addr, &room.room_code, "Alice", None).await;
+    assert_eq!(lobbies(addr).await[0]["playerCount"], 2);
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn a_cloud_server_never_lists_its_rooms() {
+    let server = boot().await;
+    let addr = server.local_addr();
+    let _host = create(addr).await;
+    assert!(
+        lobbies(addr).await.is_empty(),
+        "codes stay secret on a public server"
+    );
+    let (_, body) = http_get(addr, "/v1/lobbies").await;
+    assert!(!body.contains("roomCode"));
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn a_full_table_is_not_listed() {
+    let server = boot_host_mode().await;
+    let addr = server.local_addr();
+    let config = serde_json::from_value(config_json()).unwrap();
+    let room = server
+        .registry()
+        .create_room_detached("Host".into(), config)
+        .unwrap();
+    let mut guests = Vec::new();
+    for index in 0..9 {
+        guests.push(join_as(addr, &room.room_code, &format!("Guest{index}"), None).await);
+    }
+    assert!(lobbies(addr).await.is_empty(), "ten of ten seats are taken");
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn the_lobby_list_is_rate_limited_per_address() {
+    let limits = Limits {
+        http_rate_per_second: 1,
+        http_burst: 2,
+        ..Limits::default()
+    };
+    let server = boot_with(limits, None).await;
+    let addr = server.local_addr();
+    assert_eq!(http_get(addr, "/v1/lobbies").await.0, 200);
+    assert_eq!(http_get(addr, "/v1/lobbies").await.0, 200);
+    assert_eq!(http_get(addr, "/v1/lobbies").await.0, 429);
+    server.stop().await;
+}

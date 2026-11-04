@@ -55,5 +55,6 @@ pub(crate) fn router(state: Arc<NetState>) -> Router {
         .route("/health", get(http::health))
         .route("/v1/info", get(http::info))
         .route("/v1/room/{code}", get(http::room))
+        .route("/v1/lobbies", get(http::lobbies))
         .with_state(state)
 }

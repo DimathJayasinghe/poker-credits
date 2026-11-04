@@ -637,3 +637,161 @@ fn rc005_a_top_up_during_a_hand_applies_to_the_following_hand() {
         "p_2 got the 500 on top of what the hand left them"
     );
 }
+
+// ---------------------------------------------------------------------------------------------
+// Seat order
+// ---------------------------------------------------------------------------------------------
+
+fn seat_of(room: &RoomState, id: &str) -> Option<u8> {
+    room.players.get(id).and_then(|p| p.seat)
+}
+
+fn choose(id: &str, seat_index: u8, at_ms: u64) -> Op {
+    Op::ChooseSeat {
+        player_id: id.into(),
+        seat_index,
+        at_ms,
+    }
+}
+
+#[test]
+fn a_player_can_pick_a_free_seat_before_the_game_starts() {
+    let (mut room, _) = table_of_three();
+    let version = room.state_version;
+    room.apply(choose("p_2", 6, 10), &Timings::default())
+        .unwrap();
+    assert_eq!(seat_of(&room, "p_2"), Some(6));
+    assert!(room.state_version > version, "clients must see the change");
+    assert_eq!(room.game.table.seats.len(), 3);
+}
+
+#[test]
+fn a_player_cannot_take_a_seat_someone_holds() {
+    let (mut room, _) = table_of_three();
+    let before = seat_of(&room, "p_3");
+    let err = room
+        .apply(choose("p_2", before.unwrap(), 10), &Timings::default())
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::SeatOccupied);
+    assert_eq!(seat_of(&room, "p_3"), before);
+}
+
+#[test]
+fn choosing_your_own_seat_again_is_harmless() {
+    let (mut room, _) = table_of_three();
+    let own = seat_of(&room, "p_2").unwrap();
+    room.apply(choose("p_2", own, 10), &Timings::default())
+        .unwrap();
+    assert_eq!(seat_of(&room, "p_2"), Some(own));
+}
+
+#[test]
+fn a_seat_outside_the_table_is_rejected() {
+    let (mut room, _) = table_of_three();
+    let err = room
+        .apply(choose("p_2", 10, 10), &Timings::default())
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::BadRequest);
+    assert_eq!(seat_of(&room, "p_2"), Some(1));
+}
+
+#[test]
+fn a_spectator_cannot_take_a_seat_this_way() {
+    let (mut room, _) = table_of_three();
+    let t = Timings::default();
+    room.apply(join("p_9", "Eve", true, 5), &t).unwrap();
+    assert!(room.apply(choose("p_9", 5, 10), &t).is_err());
+    assert_eq!(seat_of(&room, "p_9"), None);
+}
+
+#[test]
+fn the_host_swaps_two_players_and_both_records_follow() {
+    let (mut room, _) = table_of_three();
+    let (a, b) = (
+        seat_of(&room, "p_2").unwrap(),
+        seat_of(&room, "p_3").unwrap(),
+    );
+    room.apply(
+        host(
+            HostCommand::MoveSeat {
+                player_id: "p_2".into(),
+                seat_index: b,
+            },
+            10,
+        ),
+        &Timings::default(),
+    )
+    .unwrap();
+    assert_eq!(seat_of(&room, "p_2"), Some(b));
+    assert_eq!(seat_of(&room, "p_3"), Some(a));
+    // The engine table and the room's own records agree.
+    for (id, wanted) in [("p_2", b), ("p_3", a)] {
+        let engine_seat = room
+            .game
+            .table
+            .seats
+            .iter()
+            .find(|s| s.player_id.as_str() == id)
+            .unwrap();
+        assert_eq!(engine_seat.index.get(), wanted);
+    }
+}
+
+#[test]
+fn only_the_host_may_move_somebody_else() {
+    let (mut room, _) = table_of_three();
+    let err = room
+        .apply(
+            Op::Host {
+                by: "p_2".into(),
+                command: HostCommand::MoveSeat {
+                    player_id: "p_3".into(),
+                    seat_index: 7,
+                },
+                at_ms: 10,
+            },
+            &Timings::default(),
+        )
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::HostOnlyAction);
+}
+
+#[test]
+fn nobody_moves_during_a_hand_and_nothing_changes() {
+    let (mut room, _) = table_of_three();
+    let t = Timings::default();
+    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    let seats: Vec<_> = ["p_1", "p_2", "p_3"].map(|id| seat_of(&room, id)).to_vec();
+    let version = room.state_version;
+    assert!(room.apply(choose("p_2", 8, 1100), &t).is_err());
+    assert!(
+        room.apply(
+            host(
+                HostCommand::MoveSeat {
+                    player_id: "p_3".into(),
+                    seat_index: 9,
+                },
+                1200,
+            ),
+            &t,
+        )
+        .is_err()
+    );
+    let after: Vec<_> = ["p_1", "p_2", "p_3"].map(|id| seat_of(&room, id)).to_vec();
+    assert_eq!(seats, after);
+    assert_eq!(
+        room.state_version, version,
+        "a refused move must not bump the version"
+    );
+}
+
+#[test]
+fn the_new_order_survives_a_snapshot_round_trip() {
+    let (mut room, _) = table_of_three();
+    room.apply(choose("p_3", 9, 10), &Timings::default())
+        .unwrap();
+    let json = serde_json::to_string(&room).unwrap();
+    let restored: RoomState = serde_json::from_str(&json).unwrap();
+    assert_eq!(restored, room);
+    assert_eq!(seat_of(&restored, "p_3"), Some(9));
+}

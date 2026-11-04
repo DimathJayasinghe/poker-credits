@@ -488,6 +488,12 @@ impl RoomActor {
 
     fn info(&self) -> RoomInfo {
         RoomInfo {
+            host_name: self
+                .state
+                .players
+                .get(&self.state.host_id)
+                .map(|host| host.name.clone())
+                .unwrap_or_default(),
             player_count: self.state.game.table.seats.len(),
             max_players: usize::from(MAX_SEATS),
             in_progress: self.state.game.table.phase != Phase::Lobby,
@@ -703,26 +709,11 @@ impl RoomActor {
                 action,
                 at_ms,
             },
-            ClientMessage::StartHand => host(HostCommand::StartHand),
-            ClientMessage::BeginShowdown => host(HostCommand::BeginShowdown),
-            ClientMessage::ResolveShowdown { allocations } => {
-                host(HostCommand::ResolveShowdown { allocations })
-            }
-            ClientMessage::Undo => host(HostCommand::Undo),
-            ClientMessage::Pause { reason } => host(HostCommand::Pause { reason }),
-            ClientMessage::ResumeGame => host(HostCommand::ResumeGame),
-            ClientMessage::ApproveRebuy {
-                player_id: target,
-                amount,
-            } => host(HostCommand::ApproveRebuy {
-                player_id: target,
-                amount,
-            }),
-            ClientMessage::Kick { player_id: target } => {
-                host(HostCommand::Kick { player_id: target })
-            }
-            ClientMessage::RoomConfigure { config } => host(HostCommand::Configure { config }),
-            ClientMessage::EndGame => host(HostCommand::EndGame),
+            ClientMessage::ChooseSeat { seat_index } => Op::ChooseSeat {
+                player_id: player_id.clone(),
+                seat_index,
+                at_ms,
+            },
             ClientMessage::RequestRebuy { amount } => Op::RequestRebuy {
                 player_id: player_id.clone(),
                 amount,
@@ -750,6 +741,24 @@ impl RoomActor {
                 player_id: player_id.clone(),
                 at_ms,
             },
+            ClientMessage::StartHand
+            | ClientMessage::BeginShowdown
+            | ClientMessage::ResolveShowdown { .. }
+            | ClientMessage::Undo
+            | ClientMessage::Pause { .. }
+            | ClientMessage::ResumeGame
+            | ClientMessage::ApproveRebuy { .. }
+            | ClientMessage::Kick { .. }
+            | ClientMessage::MoveSeat { .. }
+            | ClientMessage::RoomConfigure { .. }
+            | ClientMessage::EndGame => {
+                let Some(command) = host_command(message) else {
+                    let error = RoomError::new(ErrorCode::BadRequest, "not a host message");
+                    self.reply_error(conn, req_id, &error);
+                    return;
+                };
+                host(command)
+            }
             ClientMessage::CreateRoom { .. }
             | ClientMessage::JoinRoom { .. }
             | ClientMessage::Resume { .. } => {
@@ -779,6 +788,34 @@ impl RoomActor {
             Err(error) => self.reply_error(conn, req_id, &error),
         }
     }
+}
+
+/// The host command a host-only message stands for; `None` for any other message.
+fn host_command(message: ClientMessage) -> Option<HostCommand> {
+    Some(match message {
+        ClientMessage::ResolveShowdown { allocations } => {
+            HostCommand::ResolveShowdown { allocations }
+        }
+        ClientMessage::Pause { reason } => HostCommand::Pause { reason },
+        ClientMessage::ApproveRebuy { player_id, amount } => {
+            HostCommand::ApproveRebuy { player_id, amount }
+        }
+        ClientMessage::Kick { player_id } => HostCommand::Kick { player_id },
+        ClientMessage::MoveSeat {
+            player_id,
+            seat_index,
+        } => HostCommand::MoveSeat {
+            player_id,
+            seat_index,
+        },
+        ClientMessage::RoomConfigure { config } => HostCommand::Configure { config },
+        ClientMessage::BeginShowdown => HostCommand::BeginShowdown,
+        ClientMessage::Undo => HostCommand::Undo,
+        ClientMessage::ResumeGame => HostCommand::ResumeGame,
+        ClientMessage::EndGame => HostCommand::EndGame,
+        ClientMessage::StartHand => HostCommand::StartHand,
+        _ => return None,
+    })
 }
 
 fn snapshot_worthy(event: &Event) -> bool {

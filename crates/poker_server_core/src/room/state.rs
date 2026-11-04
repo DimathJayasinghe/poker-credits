@@ -152,6 +152,13 @@ pub enum HostCommand {
         /// Player to remove.
         player_id: String,
     },
+    /// Move a player to another seat, swapping with whoever sits there.
+    MoveSeat {
+        /// Player to move.
+        player_id: String,
+        /// Target seat.
+        seat_index: u8,
+    },
     /// Change settings between hands.
     Configure {
         /// New settings.
@@ -214,6 +221,15 @@ pub enum Op {
     DisconnectTimeout {
         /// The player on turn.
         player_id: String,
+        /// Server time.
+        at_ms: u64,
+    },
+    /// A player moves themselves to a free seat between hands.
+    ChooseSeat {
+        /// Player.
+        player_id: String,
+        /// Target seat.
+        seat_index: u8,
         /// Server time.
         at_ms: u64,
     },
@@ -529,6 +545,7 @@ impl Op {
             | Op::Host { at_ms, .. }
             | Op::Timeout { at_ms }
             | Op::DisconnectTimeout { at_ms, .. }
+            | Op::ChooseSeat { at_ms, .. }
             | Op::SetSittingOut { at_ms, .. }
             | Op::LeaveTable { at_ms, .. }
             | Op::RequestRebuy { at_ms, .. }

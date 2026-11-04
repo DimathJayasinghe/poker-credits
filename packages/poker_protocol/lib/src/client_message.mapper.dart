@@ -171,6 +171,8 @@ class ClientMessageMapper extends ClassMapperBase<ClientMessage> {
       ResumeGameMapper.ensureInitialized();
       ApproveRebuyMapper.ensureInitialized();
       KickMapper.ensureInitialized();
+      MoveSeatMapper.ensureInitialized();
+      ChooseSeatMapper.ensureInitialized();
       RoomConfigureMapper.ensureInitialized();
       EndGameMapper.ensureInitialized();
       RequestRebuyMapper.ensureInitialized();
@@ -1777,6 +1779,268 @@ class _KickCopyWithImpl<$R, $Out> extends ClassCopyWithBase<$R, Kick, $Out>
   @override
   KickCopyWith<$R2, Kick, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t) =>
       _KickCopyWithImpl<$R2, $Out2>($value, $cast, t);
+}
+
+class MoveSeatMapper extends SubClassMapperBase<MoveSeat> {
+  MoveSeatMapper._();
+
+  static MoveSeatMapper? _instance;
+  static MoveSeatMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = MoveSeatMapper._());
+      ClientMessageMapper.ensureInitialized().addSubMapper(_instance!);
+    }
+    return _instance!;
+  }
+
+  @override
+  final String id = 'MoveSeat';
+
+  static String _$playerId(MoveSeat v) => v.playerId;
+  static const Field<MoveSeat, String> _f$playerId = Field(
+    'playerId',
+    _$playerId,
+  );
+  static int _$seatIndex(MoveSeat v) => v.seatIndex;
+  static const Field<MoveSeat, int> _f$seatIndex = Field(
+    'seatIndex',
+    _$seatIndex,
+  );
+
+  @override
+  final MappableFields<MoveSeat> fields = const {
+    #playerId: _f$playerId,
+    #seatIndex: _f$seatIndex,
+  };
+  @override
+  final bool ignoreNull = true;
+
+  @override
+  final String discriminatorKey = 'type';
+  @override
+  final dynamic discriminatorValue = 'MOVE_SEAT';
+  @override
+  late final ClassMapperBase superMapper =
+      ClientMessageMapper.ensureInitialized();
+
+  static MoveSeat _instantiate(DecodingData data) {
+    return MoveSeat(
+      playerId: data.dec(_f$playerId),
+      seatIndex: data.dec(_f$seatIndex),
+    );
+  }
+
+  @override
+  final Function instantiate = _instantiate;
+
+  static MoveSeat fromMap(Map<String, dynamic> map) {
+    return ensureInitialized().decodeMap<MoveSeat>(map);
+  }
+
+  static MoveSeat fromJson(String json) {
+    return ensureInitialized().decodeJson<MoveSeat>(json);
+  }
+}
+
+mixin MoveSeatMappable {
+  String toJson() {
+    return MoveSeatMapper.ensureInitialized().encodeJson<MoveSeat>(
+      this as MoveSeat,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return MoveSeatMapper.ensureInitialized().encodeMap<MoveSeat>(
+      this as MoveSeat,
+    );
+  }
+
+  MoveSeatCopyWith<MoveSeat, MoveSeat, MoveSeat> get copyWith =>
+      _MoveSeatCopyWithImpl<MoveSeat, MoveSeat>(
+        this as MoveSeat,
+        $identity,
+        $identity,
+      );
+  @override
+  String toString() {
+    return MoveSeatMapper.ensureInitialized().stringifyValue(this as MoveSeat);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return MoveSeatMapper.ensureInitialized().equalsValue(
+      this as MoveSeat,
+      other,
+    );
+  }
+
+  @override
+  int get hashCode {
+    return MoveSeatMapper.ensureInitialized().hashValue(this as MoveSeat);
+  }
+}
+
+extension MoveSeatValueCopy<$R, $Out> on ObjectCopyWith<$R, MoveSeat, $Out> {
+  MoveSeatCopyWith<$R, MoveSeat, $Out> get $asMoveSeat =>
+      $base.as((v, t, t2) => _MoveSeatCopyWithImpl<$R, $Out>(v, t, t2));
+}
+
+abstract class MoveSeatCopyWith<$R, $In extends MoveSeat, $Out>
+    implements ClientMessageCopyWith<$R, $In, $Out> {
+  @override
+  $R call({String? playerId, int? seatIndex});
+  MoveSeatCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
+}
+
+class _MoveSeatCopyWithImpl<$R, $Out>
+    extends ClassCopyWithBase<$R, MoveSeat, $Out>
+    implements MoveSeatCopyWith<$R, MoveSeat, $Out> {
+  _MoveSeatCopyWithImpl(super.value, super.then, super.then2);
+
+  @override
+  late final ClassMapperBase<MoveSeat> $mapper =
+      MoveSeatMapper.ensureInitialized();
+  @override
+  $R call({String? playerId, int? seatIndex}) => $apply(
+    FieldCopyWithData({
+      if (playerId != null) #playerId: playerId,
+      if (seatIndex != null) #seatIndex: seatIndex,
+    }),
+  );
+  @override
+  MoveSeat $make(CopyWithData data) => MoveSeat(
+    playerId: data.get(#playerId, or: $value.playerId),
+    seatIndex: data.get(#seatIndex, or: $value.seatIndex),
+  );
+
+  @override
+  MoveSeatCopyWith<$R2, MoveSeat, $Out2> $chain<$R2, $Out2>(
+    Then<$Out2, $R2> t,
+  ) => _MoveSeatCopyWithImpl<$R2, $Out2>($value, $cast, t);
+}
+
+class ChooseSeatMapper extends SubClassMapperBase<ChooseSeat> {
+  ChooseSeatMapper._();
+
+  static ChooseSeatMapper? _instance;
+  static ChooseSeatMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = ChooseSeatMapper._());
+      ClientMessageMapper.ensureInitialized().addSubMapper(_instance!);
+    }
+    return _instance!;
+  }
+
+  @override
+  final String id = 'ChooseSeat';
+
+  static int _$seatIndex(ChooseSeat v) => v.seatIndex;
+  static const Field<ChooseSeat, int> _f$seatIndex = Field(
+    'seatIndex',
+    _$seatIndex,
+  );
+
+  @override
+  final MappableFields<ChooseSeat> fields = const {#seatIndex: _f$seatIndex};
+  @override
+  final bool ignoreNull = true;
+
+  @override
+  final String discriminatorKey = 'type';
+  @override
+  final dynamic discriminatorValue = 'CHOOSE_SEAT';
+  @override
+  late final ClassMapperBase superMapper =
+      ClientMessageMapper.ensureInitialized();
+
+  static ChooseSeat _instantiate(DecodingData data) {
+    return ChooseSeat(seatIndex: data.dec(_f$seatIndex));
+  }
+
+  @override
+  final Function instantiate = _instantiate;
+
+  static ChooseSeat fromMap(Map<String, dynamic> map) {
+    return ensureInitialized().decodeMap<ChooseSeat>(map);
+  }
+
+  static ChooseSeat fromJson(String json) {
+    return ensureInitialized().decodeJson<ChooseSeat>(json);
+  }
+}
+
+mixin ChooseSeatMappable {
+  String toJson() {
+    return ChooseSeatMapper.ensureInitialized().encodeJson<ChooseSeat>(
+      this as ChooseSeat,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return ChooseSeatMapper.ensureInitialized().encodeMap<ChooseSeat>(
+      this as ChooseSeat,
+    );
+  }
+
+  ChooseSeatCopyWith<ChooseSeat, ChooseSeat, ChooseSeat> get copyWith =>
+      _ChooseSeatCopyWithImpl<ChooseSeat, ChooseSeat>(
+        this as ChooseSeat,
+        $identity,
+        $identity,
+      );
+  @override
+  String toString() {
+    return ChooseSeatMapper.ensureInitialized().stringifyValue(
+      this as ChooseSeat,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return ChooseSeatMapper.ensureInitialized().equalsValue(
+      this as ChooseSeat,
+      other,
+    );
+  }
+
+  @override
+  int get hashCode {
+    return ChooseSeatMapper.ensureInitialized().hashValue(this as ChooseSeat);
+  }
+}
+
+extension ChooseSeatValueCopy<$R, $Out>
+    on ObjectCopyWith<$R, ChooseSeat, $Out> {
+  ChooseSeatCopyWith<$R, ChooseSeat, $Out> get $asChooseSeat =>
+      $base.as((v, t, t2) => _ChooseSeatCopyWithImpl<$R, $Out>(v, t, t2));
+}
+
+abstract class ChooseSeatCopyWith<$R, $In extends ChooseSeat, $Out>
+    implements ClientMessageCopyWith<$R, $In, $Out> {
+  @override
+  $R call({int? seatIndex});
+  ChooseSeatCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
+}
+
+class _ChooseSeatCopyWithImpl<$R, $Out>
+    extends ClassCopyWithBase<$R, ChooseSeat, $Out>
+    implements ChooseSeatCopyWith<$R, ChooseSeat, $Out> {
+  _ChooseSeatCopyWithImpl(super.value, super.then, super.then2);
+
+  @override
+  late final ClassMapperBase<ChooseSeat> $mapper =
+      ChooseSeatMapper.ensureInitialized();
+  @override
+  $R call({int? seatIndex}) =>
+      $apply(FieldCopyWithData({if (seatIndex != null) #seatIndex: seatIndex}));
+  @override
+  ChooseSeat $make(CopyWithData data) =>
+      ChooseSeat(seatIndex: data.get(#seatIndex, or: $value.seatIndex));
+
+  @override
+  ChooseSeatCopyWith<$R2, ChooseSeat, $Out2> $chain<$R2, $Out2>(
+    Then<$Out2, $R2> t,
+  ) => _ChooseSeatCopyWithImpl<$R2, $Out2>($value, $cast, t);
 }
 
 class RoomConfigureMapper extends SubClassMapperBase<RoomConfigure> {

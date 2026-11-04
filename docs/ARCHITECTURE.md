@@ -72,7 +72,7 @@ Pure Rust: no async, no I/O, no clock, no RNG, no global state.
 - Default features only; `cargo test` works in the crate directory with no flags.
 
 ### 3.2 Server core (`crates/poker_server_core`)
-- `start(ServerConfig) -> ServerHandle` binds axum, serves `/v1/ws`, `/health`, `/v1/info`, `/v1/room/{code}`.
+- `start(ServerConfig) -> ServerHandle` binds axum, serves `/v1/ws`, `/health`, `/v1/info`, `/v1/room/{code}`, `/v1/lobbies`.
 - **Room actor**: one tokio task per room owns the state; processes inbox messages and the turn-timer deadline in a single `select!` loop (see `RESILIENCE_AND_CRASH_HANDLING.md` 3.2).
 - **Supervisor**: restarts a panicked room from snapshot + journal.
 - **Sessions**: random 128-bit tokens, constant-time compare, stored hashed in the snapshot.

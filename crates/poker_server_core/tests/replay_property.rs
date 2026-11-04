@@ -108,7 +108,7 @@ fn member_op(state: &RoomState, arg: u8, at_ms: u64) -> Option<Op> {
         .filter(|p| p.id != state.host_id)
         .nth(usize::from(arg) % 3)?;
     let player_id = guest.id.clone();
-    Some(match arg % 5 {
+    Some(match arg % 7 {
         0 => Op::RequestRebuy {
             player_id,
             amount: 100,
@@ -127,7 +127,19 @@ fn member_op(state: &RoomState, arg: u8, at_ms: u64) -> Option<Op> {
             sitting_out: arg.is_multiple_of(2),
             at_ms,
         },
-        _ => Op::LeaveTable { player_id, at_ms },
+        4 => Op::LeaveTable { player_id, at_ms },
+        5 => Op::ChooseSeat {
+            player_id,
+            seat_index: arg % 10,
+            at_ms,
+        },
+        _ => host_op(
+            HostCommand::MoveSeat {
+                player_id,
+                seat_index: arg % 10,
+            },
+            at_ms,
+        ),
     })
 }
 

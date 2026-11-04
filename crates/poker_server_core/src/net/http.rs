@@ -9,7 +9,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 
-use super::NetState;
+use super::{NetState, ServerMode};
 use crate::PROTOCOL_VERSION;
 
 #[derive(Serialize)]
@@ -38,6 +38,52 @@ struct RoomLookup {
     max_players: usize,
     is_full: bool,
     in_progress: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Lobby {
+    room_code: String,
+    host_name: String,
+    player_count: usize,
+    max_players: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Lobbies {
+    lobbies: Vec<Lobby>,
+}
+
+/// `GET /v1/lobbies`: the open lobbies of a host-embedded server, for the join screen on the same
+/// Wi-Fi. Only rooms still in their lobby with a free seat are listed, and only by a server
+/// running in `HOST` mode: a cloud server never lists its rooms (codes stay secrets there).
+pub(crate) async fn lobbies(
+    State(net): State<Arc<NetState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+) -> Response {
+    if !net.http_limiter.check(addr.ip()) {
+        return StatusCode::TOO_MANY_REQUESTS.into_response();
+    }
+    if net.mode != ServerMode::Host {
+        return Json(Lobbies {
+            lobbies: Vec::new(),
+        })
+        .into_response();
+    }
+    let lobbies = net
+        .registry
+        .open_lobbies()
+        .await
+        .into_iter()
+        .map(|(room_code, info)| Lobby {
+            room_code,
+            host_name: info.host_name,
+            player_count: info.player_count,
+            max_players: info.max_players,
+        })
+        .collect();
+    Json(Lobbies { lobbies }).into_response()
 }
 
 /// `GET /health`

@@ -115,8 +115,10 @@ pub struct JoinOk {
 }
 
 /// Public facts about a room, for `GET /v1/room/{code}`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RoomInfo {
+    /// The host's display name.
+    pub host_name: String,
     /// Seated players.
     pub player_count: usize,
     /// Seats at the table.
