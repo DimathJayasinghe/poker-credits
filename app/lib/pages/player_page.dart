@@ -274,83 +274,97 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
     }
 
     final check = room.presenceCheck;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        _TopBar(roomCode: view.roomCode, link: session.link, onBack: _onBack),
-        if (!live) _linkBanner(session.link),
-        if (view.paused) const BrutalBanner(message: Strings.gamePaused, kind: BrutalBannerKind.warning),
-        if (room.lastError != null) BrutalBanner(message: errorText(room.lastError!.code), kind: BrutalBannerKind.error),
-        if (pending != null) BrutalBanner(message: pending.approved ? Strings.topUpApproved : '${Strings.topUpPending}: ${pending.amount}'),
-        if (check != null && check.subjectPlayerId != seat.playerId) _presenceStrip(check),
-        Padding(
-          padding: const EdgeInsets.all(BrutalMetrics.gapM),
-          child: _StackBlock(seat: seat),
-        ),
-        Expanded(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  TurnBlock(myTurn: myTurn, title: title, detail: detail),
-                  const SizedBox(height: BrutalMetrics.gapM),
-                  Text(
-                    '${Strings.pot.toUpperCase()} ${view.totalPot}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 28, color: c.ink),
-                  ),
-                  if (room.ticker.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: BrutalMetrics.gapS),
-                      child: Text(
-                        '> ${describeAction(room.ticker.last)}'.toUpperCase(),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, color: c.muted),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapM, 0, BrutalMetrics.gapM, BrutalMetrics.gapM),
+    // At huge text sizes the whole controller scrolls, so the action buttons stay reachable; at
+    // normal sizes it fills the screen and the buttons sit at the bottom.
+    return CustomScrollView(
+      slivers: <Widget>[
+        SliverFillRemaining(
+          hasScrollBody: false,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              if (myPrompt != null) ...<Widget>[
-                ActionButtons(
-                  legal: myPrompt.legal,
-                  enabled: live && !inFlight,
-                  onFold: () => _act(const FoldAction()),
-                  onCheck: () => _act(const CheckAction()),
-                  onCall: () => _act(const CallAction()),
-                  onRaise: () => _raise(myPrompt.legal),
-                ),
-                const SizedBox(height: BrutalMetrics.gapM),
-              ],
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: BrutalButton(label: Strings.topUp, minHeight: _secondaryHeight, onPressed: live ? () => _topUp(null) : null),
-                  ),
-                  const SizedBox(width: BrutalMetrics.gapS),
-                  Expanded(
-                    child: BrutalButton(
-                      label: seat.isSittingOut ? Strings.imBack : Strings.sitOut,
-                      minHeight: _secondaryHeight,
-                      onPressed: live ? () => _send(SetSittingOut(sittingOut: !seat.isSittingOut)) : null,
+              _TopBar(roomCode: view.roomCode, link: session.link, onBack: _onBack),
+              if (!live) _linkBanner(session.link),
+              if (view.paused) const BrutalBanner(message: Strings.gamePaused, kind: BrutalBannerKind.warning),
+              if (room.lastError != null) BrutalBanner(message: errorText(room.lastError!.code), kind: BrutalBannerKind.error),
+              if (pending != null) BrutalBanner(message: pending.approved ? Strings.topUpApproved : '${Strings.topUpPending}: ${pending.amount}'),
+              if (check != null && check.subjectPlayerId != seat.playerId) _presenceStrip(check),
+              Padding(
+                padding: const EdgeInsets.all(BrutalMetrics.gapM),
+                child: _StackBlock(seat: seat),
+              ),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        TurnBlock(myTurn: myTurn, title: title, detail: detail),
+                        const SizedBox(height: BrutalMetrics.gapM),
+                        Text(
+                          '${Strings.pot.toUpperCase()} ${view.totalPot}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 28, color: c.ink),
+                        ),
+                        if (room.ticker.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: BrutalMetrics.gapS),
+                            child: Text(
+                              '> ${describeAction(room.ticker.last)}'.toUpperCase(),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, color: c.muted),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: BrutalMetrics.gapS),
-                  Expanded(
-                    child: BrutalButton(label: Strings.leave, kind: BrutalButtonKind.danger, minHeight: _secondaryHeight, onPressed: _leaveTable),
-                  ),
-                ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapM, 0, BrutalMetrics.gapM, BrutalMetrics.gapM),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    if (myPrompt != null) ...<Widget>[
+                      ActionButtons(
+                        legal: myPrompt.legal,
+                        enabled: live && !inFlight,
+                        onFold: () => _act(const FoldAction()),
+                        onCheck: () => _act(const CheckAction()),
+                        onCall: () => _act(const CallAction()),
+                        onRaise: () => _raise(myPrompt.legal),
+                      ),
+                      const SizedBox(height: BrutalMetrics.gapM),
+                    ],
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: BrutalButton(label: Strings.topUp, minHeight: _secondaryHeight, onPressed: live ? () => _topUp(null) : null),
+                        ),
+                        const SizedBox(width: BrutalMetrics.gapS),
+                        Expanded(
+                          child: BrutalButton(
+                            label: seat.isSittingOut ? Strings.imBack : Strings.sitOut,
+                            minHeight: _secondaryHeight,
+                            onPressed: live ? () => _send(SetSittingOut(sittingOut: !seat.isSittingOut)) : null,
+                          ),
+                        ),
+                        const SizedBox(width: BrutalMetrics.gapS),
+                        Expanded(
+                          child: BrutalButton(
+                            label: Strings.leave,
+                            kind: BrutalButtonKind.danger,
+                            minHeight: _secondaryHeight,
+                            onPressed: _leaveTable,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -450,9 +464,15 @@ class _StackBlock extends StatelessWidget {
             ),
             if (seat.streetBet > 0) ...<Widget>[
               const SizedBox(width: BrutalMetrics.gapM),
-              Text(
-                '${Strings.yourBet.toUpperCase()} ${seat.streetBet}',
-                style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 18, color: c.ink),
+              // Shrinks rather than pushing the row wider than the screen at huge text sizes.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    '${Strings.yourBet.toUpperCase()} ${seat.streetBet}',
+                    style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 18, color: c.ink),
+                  ),
+                ),
               ),
             ],
           ],

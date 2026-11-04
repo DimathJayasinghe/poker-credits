@@ -138,7 +138,7 @@ Settings persist in a small JSON file (`path_provider`, behind a platform seam; 
 ## 6. Accessibility
 - Contrast: body 7:1 or better; `muted` 4.5:1 or better; checked by `test/theme/contrast_test.dart` for both themes.
 - Semantics label on every actionable cell; a 3 px `accent`-contrast focus outline with offset for keyboard use.
-- Text scales to 2.0 without clipping or overflow on Home, Join, Player, Table, Guide and Settings (widget tests fail on any overflow).
+- Text scales to 3.0 without clipping or overflow on Home, Join, Host, Player and Settings, and to 2.0 on the host Table (a shared display with fixed geometry; it clamps there on purpose). The Player screen scrolls as a whole at huge sizes so the action buttons stay reachable. Widget tests (`test/pages/text_scale_test.dart`, `home_page_test.dart`) fail on any overflow at 1.0, 2.0 and 3.0 on 320x640, 390x844 and 1280x800.
 - Colour never carries meaning alone (section 2). Reduced motion honoured. Texture can be switched off.
 
 ## 7. Implementation rules

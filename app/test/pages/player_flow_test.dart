@@ -538,7 +538,12 @@ void main() {
     harness.network.refuseConnections = false;
     await tester.pump();
     await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+    // The next attempt comes after a jittered backoff delay (up to about 12 s), so wait for the
+    // event rather than for a fixed time.
+    for (var t = 0; t < 30 && harness.network.opened.length <= opened; t++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+    await tester.pump();
     expect(harness.network.uris.last.toString(), 'ws://192.168.1.23:7878/v1/ws');
     expect(harness.network.opened.length, greaterThan(opened));
     expect(find.byType(PlayerPage), findsOneWidget, reason: 'the table stays on screen while the new address connects');

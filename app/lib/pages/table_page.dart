@@ -36,8 +36,12 @@ import 'package:refena_flutter/refena_flutter.dart';
 /// Slots around the table; the engine seats at most 10 players.
 const int tableSeats = 10;
 
-/// The Table display: dark by default, landscape, readable from across the room. The host sees
-/// the controls; with [watching] it is the read-only spectator view (no controls, no seat menu).
+/// Largest text scale the host table honours (see [TablePage.build]).
+const double _maxTextScale = 2;
+
+/// The Table display: follows the app theme, landscape or tablet, readable from across the room.
+/// The host sees the controls; with [watching] it is the read-only spectator view (no controls,
+/// no seat menu).
 class TablePage extends StatefulWidget {
   const TablePage({super.key, this.watching = false});
 
@@ -204,7 +208,13 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _onBack();
       },
-      child: PaperScaffold(body: _body(context, session, host)),
+      // The table is a shared display with fixed geometry (an oval of seats around the pot), so its
+      // text stops growing at 200 %. Every other screen scales to 300 %, and dialogs and sheets
+      // opened from here are outside this clamp.
+      child: MediaQuery.withClampedTextScaling(
+        maxScaleFactor: _maxTextScale,
+        child: PaperScaffold(body: Builder(builder: (context) => _body(context, session, host))),
+      ),
     );
   }
 
