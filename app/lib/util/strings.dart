@@ -15,6 +15,7 @@ abstract final class Strings {
   static const String back = 'Back';
   static const String navPlay = 'Play';
   static const String navSettings = 'Settings';
+  static const String navGuide = 'Guide';
   static const String switchTheme = 'Switch light and dark';
 
   // Play (home)
@@ -205,4 +206,28 @@ abstract final class Strings {
   static const String actionRejected = 'The server did not accept that';
   static const String turnLeft = 'left';
   static const String amount = 'Amount';
+
+  // Guide (docs/UI_DESIGN.md section 5); the teaching text itself is in util/guide_content.dart.
+  static const String guideTitle = 'Guide';
+  static const String guideIntro = 'New to poker? Start here.';
+  static const String guideIntroBody = 'Everything you need for a game night with real cards, in plain words. No account, no internet needed.';
+  static const String guideSectionNight = 'How a night works';
+  static const String guideSectionHands = 'Hand rankings';
+  static const String guideSectionFlow = 'How a hand plays';
+  static const String guideSectionWords = 'Words on the buttons';
+  static const String guideSectionRules = 'Rules the app keeps';
+  static const String guideSectionDrops = 'If the connection drops';
+  static const String guideSectionManners = 'Table manners';
+  static const String guideHandsIntro = 'Strongest first. Make the best five cards from your two and the five shared ones.';
+  static const String guideJump = 'Jump to';
+  static const String guideHelp = 'Guide';
+  static const String guideOpen = 'Open the guide';
+  static const String guideOpenFull = 'Open the full guide';
+  static const String guideQuickTitle = 'Quick guide';
+  static const String guideTabHands = 'Hands';
+  static const String guideTabHand = 'A hand';
+  static const String guideTabWords = 'Words';
+  static const String guideTabRules = 'Rules';
+  static const String guideTabDrops = 'Drops';
+  static const String guideRankLabel = 'Rank';
 }

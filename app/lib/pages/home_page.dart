@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/model/hosting.dart';
+import 'package:poker_credits/pages/guide_page.dart';
 import 'package:poker_credits/pages/host_page.dart';
 import 'package:poker_credits/pages/join_page.dart';
 import 'package:poker_credits/pages/settings_page.dart';
@@ -192,13 +193,14 @@ class _HomePageState extends State<HomePage> with Refena {
         : play;
     return PaperScaffold(
       body: AppShell(
-        destinations: const <AppDestination>[AppDestination(Strings.navPlay), AppDestination(Strings.navSettings)],
+        destinations: const <AppDestination>[AppDestination(Strings.navPlay), AppDestination(Strings.navGuide), AppDestination(Strings.navSettings)],
         index: _tab,
         onSelect: (i) => setState(() => _tab = i),
         body: IndexedStack(
           index: _tab,
           children: <Widget>[
             body,
+            const GuideView(),
             SettingsView(
               onGameForgotten: () => setState(() {
                 _hosted = null;

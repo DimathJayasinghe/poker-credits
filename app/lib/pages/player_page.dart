@@ -11,6 +11,7 @@ import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/describe.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/widget/guide/guide_sheet.dart';
 import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
 import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
@@ -430,6 +431,7 @@ class _TopBar extends StatelessWidget {
           ),
           BrutalTag(link.isLive ? 'Live' : Strings.reconnecting, kind: link.isLive ? BrutalTagKind.neutral : BrutalTagKind.signal),
           const SizedBox(width: BrutalMetrics.gapM),
+          const GuideCell(),
         ],
       ),
     );
