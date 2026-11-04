@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
 import 'package:poker_credits/widget/brutal/brutal_number.dart';
 import 'package:poker_credits/widget/brutal/brutal_tag.dart';
 import 'package:poker_protocol/poker_protocol.dart';
@@ -57,13 +58,13 @@ class SeatPlate extends StatelessWidget {
       label: _semantics(),
       excludeSemantics: true,
       onTap: onTap,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: BrutalPressable(
         onTap: onTap,
-        child: DecoratedBox(
+        builder: (context, pressed) => AnimatedContainer(
+          duration: BrutalTheme.duration(context, BrutalMetrics.fast),
           decoration: BoxDecoration(
             color: fill,
-            border: Border.all(color: c.line, width: BrutalMetrics.border),
+            border: Border.all(color: c.line, width: pressed ? BrutalMetrics.borderHeavy : BrutalMetrics.border),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

@@ -12,6 +12,7 @@ import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/describe.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
 import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
@@ -94,6 +95,17 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
       await ref.notifier(hostProvider).stop();
     }
     if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  /// Back (the arrow, the system gesture or key). A spectator, or a screen that has already
+  /// ended, leaves at once; the host is asked first because leaving ends the game for everybody.
+  void _onBack() {
+    final session = ref.read(sessionProvider);
+    if (widget.watching || session.link.failure != null || session.room.ended != null) {
+      _leave();
+    } else {
+      _endGame();
+    }
   }
 
   Future<void> _endGame() async {
@@ -187,7 +199,13 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
     final session = context.ref.watch(sessionProvider);
     final host = context.ref.watch(hostProvider);
     // Follows the app theme (Settings): the table is no longer forced dark.
-    return PaperScaffold(body: _body(context, session, host));
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onBack();
+      },
+      child: PaperScaffold(body: _body(context, session, host)),
+    );
   }
 
   Widget _body(BuildContext context, SessionState session, HostState host) {
@@ -246,7 +264,7 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        _TopBar(view: view, watching: widget.watching),
+        _TopBar(view: view, watching: widget.watching, onBack: _onBack),
         if (!session.link.isLive) _linkBanner(session.link),
         if (view.paused) const BrutalBanner(message: Strings.gamePaused, kind: BrutalBannerKind.warning),
         if (room.presenceCheck != null && session.isHost) _presenceStrip(room.presenceCheck!),
@@ -416,10 +434,11 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.view, required this.watching});
+  const _TopBar({required this.view, required this.watching, required this.onBack});
 
   final RoomView view;
   final bool watching;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -431,19 +450,29 @@ class _TopBar extends StatelessWidget {
           bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
-      // Wraps onto a second line on a narrow phone instead of overflowing.
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: BrutalMetrics.gapM,
+      child: Row(
         children: <Widget>[
-          Text('${Strings.room.toUpperCase()} ${view.roomCode}', style: style(24)),
-          Text('${Strings.hand.toUpperCase()} ${view.handNumber}   ${phaseLabel(view.phase).toUpperCase()}', style: style(22)),
-          if (watching)
-            const BrutalTag(Strings.watching)
-          else if (view.spectatorCount > 0)
-            Text('${Strings.watching.toUpperCase()} ${view.spectatorCount}', style: style(16)),
+          BackCell(onTap: onBack),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS, vertical: BrutalMetrics.gapS),
+              // Wraps onto a second line on a narrow phone instead of overflowing.
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: BrutalMetrics.gapM,
+                children: <Widget>[
+                  Text('${Strings.room.toUpperCase()} ${view.roomCode}', style: style(24)),
+                  Text('${Strings.hand.toUpperCase()} ${view.handNumber}   ${phaseLabel(view.phase).toUpperCase()}', style: style(22)),
+                  if (watching)
+                    const BrutalTag(Strings.watching)
+                  else if (view.spectatorCount > 0)
+                    Text('${Strings.watching.toUpperCase()} ${view.spectatorCount}', style: style(16)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: BrutalMetrics.gapS),
         ],
       ),
     );

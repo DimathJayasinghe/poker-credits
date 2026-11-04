@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
+import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
 
 /// Visual variants of [BrutalButton]. Meaning rides on position and label, not on hue
 /// (docs/UI_DESIGN.md section 2):
@@ -36,25 +37,14 @@ class BrutalButton extends StatefulWidget {
 }
 
 class _BrutalButtonState extends State<BrutalButton> {
-  bool _pressed = false;
   bool _focused = false;
 
   bool get _enabled => widget.onPressed != null;
 
-  void _setPressed(bool value) {
-    if (_pressed != value) setState(() => _pressed = value);
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    var (Color fill, Color text) = switch (widget.kind) {
-      BrutalButtonKind.primary => (c.accent, c.onAccent),
-      BrutalButtonKind.info => (c.ink, c.paper),
-      BrutalButtonKind.danger || BrutalButtonKind.neutral => (c.surface, c.ink),
-    };
-    // Pressed: the cell inverts (ink becomes paper, anything else becomes ink).
-    if (_pressed && _enabled) (fill, text) = fill == c.ink ? (c.paper, c.ink) : (c.ink, c.paper);
+    final duration = BrutalTheme.duration(context, BrutalMetrics.fast);
     final border = widget.heavy ? BrutalMetrics.borderHeavy : BrutalMetrics.border;
 
     return Semantics(
@@ -73,53 +63,62 @@ class _BrutalButtonState extends State<BrutalButton> {
         actions: <Type, Action<Intent>>{
           ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) => widget.onPressed?.call()),
         },
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => _setPressed(true),
-          onTapUp: (_) => _setPressed(false),
-          onTapCancel: () => _setPressed(false),
+        child: BrutalPressable(
           onTap: widget.onPressed,
-          child: AnimatedContainer(
-            duration: BrutalTheme.duration(context, BrutalMetrics.fast),
-            constraints: BoxConstraints(minHeight: widget.minHeight, minWidth: BrutalMetrics.tap),
-            padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
-            decoration: BoxDecoration(
-              color: _enabled ? fill : c.muted.withValues(alpha: 0.18),
-              border: Border.all(color: _enabled ? c.line : c.muted, width: border),
-            ),
-            foregroundDecoration: _focused
-                ? BoxDecoration(
-                    border: Border.all(color: c.ink, width: 3, strokeAlign: BorderSide.strokeAlignOutside),
-                  )
-                : null,
-            alignment: Alignment.center,
-            child: Stack(
+          builder: (context, pressed) {
+            var (Color fill, Color text) = switch (widget.kind) {
+              BrutalButtonKind.primary => (c.accent, c.onAccent),
+              BrutalButtonKind.info => (c.ink, c.paper),
+              BrutalButtonKind.danger || BrutalButtonKind.neutral => (c.surface, c.ink),
+            };
+            // Pressed: the cell inverts (ink becomes paper, anything else becomes ink).
+            if (pressed) (fill, text) = fill == c.ink ? (c.paper, c.ink) : (c.ink, c.paper);
+            return AnimatedContainer(
+              duration: duration,
+              curve: Curves.easeOut,
+              constraints: BoxConstraints(minHeight: widget.minHeight, minWidth: BrutalMetrics.tap),
+              padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
+              decoration: BoxDecoration(
+                color: _enabled ? fill : c.muted.withValues(alpha: 0.18),
+                border: Border.all(color: _enabled ? c.line : c.muted, width: border),
+              ),
+              foregroundDecoration: _focused
+                  ? BoxDecoration(
+                      border: Border.all(color: c.ink, width: 3, strokeAlign: BorderSide.strokeAlignOutside),
+                    )
+                  : null,
               alignment: Alignment.center,
-              children: <Widget>[
-                if (widget.kind == BrutalButtonKind.danger && _enabled && !_pressed)
-                  Positioned(
-                    left: -BrutalMetrics.gapM,
-                    top: -BrutalMetrics.gapS,
-                    bottom: -BrutalMetrics.gapS,
-                    child: ColoredBox(
-                      color: c.accent,
-                      child: const SizedBox(width: BrutalMetrics.gapS),
+              child: Stack(
+                alignment: Alignment.center,
+                children: <Widget>[
+                  if (widget.kind == BrutalButtonKind.danger && _enabled)
+                    Positioned(
+                      left: -BrutalMetrics.gapM,
+                      top: -BrutalMetrics.gapS,
+                      bottom: -BrutalMetrics.gapS,
+                      child: AnimatedContainer(
+                        duration: duration,
+                        width: pressed ? 0 : BrutalMetrics.gapS,
+                        color: c.accent,
+                      ),
                     ),
+                  AnimatedDefaultTextStyle(
+                    duration: duration,
+                    curve: Curves.easeOut,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: BrutalFonts.display,
+                      fontSize: widget.heavy ? 22 : 17,
+                      height: 1.1,
+                      letterSpacing: 0.8,
+                      color: _enabled ? text : c.muted,
+                    ),
+                    child: Text(widget.label.toUpperCase()),
                   ),
-                Text(
-                  widget.label.toUpperCase(),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: BrutalFonts.display,
-                    fontSize: widget.heavy ? 22 : 17,
-                    height: 1.1,
-                    letterSpacing: 0.8,
-                    color: _enabled ? text : c.muted,
-                  ),
-                ),
-              ],
-            ),
-          ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );

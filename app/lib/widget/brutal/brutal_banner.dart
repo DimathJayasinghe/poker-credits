@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
+import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
 import 'package:poker_credits/theme/tokens.dart';
 
 /// Visual variants of [BrutalBanner].
@@ -58,24 +59,29 @@ class BrutalBanner extends StatelessWidget {
                 if (actionLabel != null && onAction != null)
                   Padding(
                     padding: const EdgeInsets.only(left: BrutalMetrics.gapS),
-                    child: GestureDetector(
+                    child: BrutalPressable(
                       onTap: onAction,
-                      child: Container(
-                        constraints: const BoxConstraints(minHeight: BrutalMetrics.tap),
-                        padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
-                        decoration: BoxDecoration(
-                          color: c.surface,
-                          border: Border.all(color: c.line, width: BrutalMetrics.border),
-                        ),
-                        child: Center(
-                          widthFactor: 1,
-                          heightFactor: 1,
-                          child: Text(
-                            actionLabel!.toUpperCase(),
-                            style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 14, color: c.ink),
+                      builder: (context, pressed) {
+                        final duration = BrutalTheme.duration(context, BrutalMetrics.fast);
+                        return AnimatedContainer(
+                          duration: duration,
+                          constraints: const BoxConstraints(minHeight: BrutalMetrics.tap),
+                          padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
+                          decoration: BoxDecoration(
+                            color: pressed ? c.ink : c.surface,
+                            border: Border.all(color: c.line, width: BrutalMetrics.border),
                           ),
-                        ),
-                      ),
+                          child: Center(
+                            widthFactor: 1,
+                            heightFactor: 1,
+                            child: AnimatedDefaultTextStyle(
+                              duration: duration,
+                              style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 14, color: pressed ? c.paper : c.ink),
+                              child: Text(actionLabel!.toUpperCase()),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
               ],

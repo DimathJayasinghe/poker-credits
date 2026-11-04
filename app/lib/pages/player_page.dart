@@ -12,6 +12,7 @@ import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/describe.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
+import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
 import 'package:poker_credits/widget/brutal/brutal_number.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
@@ -126,6 +127,18 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
     await _exit();
   }
 
+  /// Back (the arrow, the system gesture or key): asks first while seated, because leaving gives
+  /// the seat up; leaves straight away when there is no game to lose.
+  void _onBack() {
+    final session = ref.read(sessionProvider);
+    final inGame = session.link.failure == null && session.room.ended == null && session.room.view != null && session.mySeat != null;
+    if (inGame) {
+      _leaveTable();
+    } else {
+      _exit();
+    }
+  }
+
   Future<void> _exit() async {
     await ref.read(joinProvider).leave();
     if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
@@ -148,9 +161,15 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
   Widget build(BuildContext context) {
     final session = context.ref.watch(sessionProvider);
     // One thumb column: on a tablet or TV it stays phone-sized in the middle.
-    return PaperScaffold(
-      body: Center(
-        child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: _body(context, session)),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onBack();
+      },
+      child: PaperScaffold(
+        body: Center(
+          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: _body(context, session)),
+        ),
       ),
     );
   }
@@ -258,7 +277,7 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        _TopBar(roomCode: view.roomCode, link: session.link),
+        _TopBar(roomCode: view.roomCode, link: session.link, onBack: _onBack),
         if (!live) _linkBanner(session.link),
         if (view.paused) const BrutalBanner(message: Strings.gamePaused, kind: BrutalBannerKind.warning),
         if (room.lastError != null) BrutalBanner(message: errorText(room.lastError!.code), kind: BrutalBannerKind.error),
@@ -366,10 +385,11 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.roomCode, required this.link});
+  const _TopBar({required this.roomCode, required this.link, required this.onBack});
 
   final String roomCode;
   final LinkState link;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -380,15 +400,22 @@ class _TopBar extends StatelessWidget {
           bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
       child: Row(
         children: <Widget>[
-          Text(
-            '${Strings.room.toUpperCase()} $roomCode',
-            style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 22, letterSpacing: 0.8, color: c.ink),
+          BackCell(onTap: onBack),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS),
+              child: Text(
+                '${Strings.room.toUpperCase()} $roomCode',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 22, letterSpacing: 0.8, color: c.ink),
+              ),
+            ),
           ),
-          const Spacer(),
           BrutalTag(link.isLive ? 'Live' : Strings.reconnecting, kind: link.isLive ? BrutalTagKind.neutral : BrutalTagKind.signal),
+          const SizedBox(width: BrutalMetrics.gapM),
         ],
       ),
     );

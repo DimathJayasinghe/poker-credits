@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
+import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
 
 /// Two to four equal cells; the chosen one is inverted. For small choices such as the theme.
 class BrutalSegmented<T> extends StatelessWidget {
@@ -37,30 +38,35 @@ class BrutalSegmented<T> extends StatelessWidget {
                     label: options[i].$2,
                     excludeSemantics: true,
                     onTap: () => onChanged(options[i].$1),
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
+                    child: BrutalPressable(
                       onTap: () => onChanged(options[i].$1),
-                      child: Container(
-                        constraints: const BoxConstraints(minHeight: BrutalMetrics.tap),
-                        color: options[i].$1 == value ? c.ink : Colors.transparent,
-                        padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS, vertical: BrutalMetrics.gapS),
-                        alignment: Alignment.center,
-                        // Shrinks to fit its cell rather than overflowing at large text sizes.
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            options[i].$2.toUpperCase(),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: BrutalFonts.mono,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              letterSpacing: 1.2,
-                              color: options[i].$1 == value ? c.paper : c.ink,
+                      builder: (context, pressed) {
+                        final solid = options[i].$1 == value || pressed;
+                        final duration = BrutalTheme.duration(context, BrutalMetrics.fast);
+                        return AnimatedContainer(
+                          duration: duration,
+                          constraints: const BoxConstraints(minHeight: BrutalMetrics.tap),
+                          color: solid ? c.ink : c.paper.withValues(alpha: 0),
+                          padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS, vertical: BrutalMetrics.gapS),
+                          alignment: Alignment.center,
+                          // Shrinks to fit its cell rather than overflowing at large text sizes.
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: AnimatedDefaultTextStyle(
+                              duration: duration,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: BrutalFonts.mono,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                letterSpacing: 1.2,
+                                color: solid ? c.paper : c.ink,
+                              ),
+                              child: Text(options[i].$2.toUpperCase()),
                             ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                   ),
                 ),

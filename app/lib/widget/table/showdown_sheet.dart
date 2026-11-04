@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
+import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
@@ -112,29 +113,31 @@ class _WinnerChip extends StatelessWidget {
       label: label,
       excludeSemantics: true,
       onTap: onTap,
-      child: GestureDetector(
+      child: BrutalPressable(
         onTap: onTap,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: BrutalMetrics.tap, minWidth: BrutalMetrics.tap),
-          padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
-          decoration: BoxDecoration(
-            color: selected ? c.accent : c.surface,
-            border: Border.all(color: c.ink, width: BrutalMetrics.border),
-          ),
-          child: Center(
-            widthFactor: 1,
-            heightFactor: 1,
-            child: Text(
-              '${selected ? '[x] ' : '[ ] '}${label.toUpperCase()}',
-              style: TextStyle(
-                fontFamily: BrutalFonts.mono,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: selected ? c.onAccent : c.ink,
+        builder: (context, pressed) {
+          final duration = BrutalTheme.duration(context, BrutalMetrics.fast);
+          final Color fill = pressed ? c.ink : (selected ? c.accent : c.surface);
+          final Color text = pressed ? c.paper : (selected ? c.onAccent : c.ink);
+          return AnimatedContainer(
+            duration: duration,
+            constraints: const BoxConstraints(minHeight: BrutalMetrics.tap, minWidth: BrutalMetrics.tap),
+            padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
+            decoration: BoxDecoration(
+              color: fill,
+              border: Border.all(color: c.line, width: BrutalMetrics.border),
+            ),
+            child: Center(
+              widthFactor: 1,
+              heightFactor: 1,
+              child: AnimatedDefaultTextStyle(
+                duration: duration,
+                style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 16, color: text),
+                child: Text('${selected ? '[x] ' : '[ ] '}${label.toUpperCase()}'),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

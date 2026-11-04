@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/main.dart';
 import 'package:poker_credits/pages/table_page.dart';
+import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/player/raise_slider.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
@@ -243,6 +244,43 @@ void main() {
     expect(find.byType(TablePage), findsNothing);
     expect(harness.host.stopped, 1);
     expect(harness.keepAlive.stopped, 1, reason: 'the background service ends with the game');
+    await _close(tester);
+  });
+
+  testWidgets('the host table has a back arrow that asks before ending the game for everybody', (tester) async {
+    final harness = TestHarness();
+    await _openTable(tester, harness, _betting());
+    expect(find.byType(BackCell), findsOneWidget);
+    await tester.tap(find.byType(BackCell));
+    await tester.pumpAndSettle();
+    expect(find.text('END THE GAME?'), findsOneWidget);
+    await tester.tap(find.text('CANCEL'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TablePage), findsOneWidget);
+    expect(harness.network.last.sent.whereType<EndGame>(), isEmpty);
+    expect(harness.host.stopped, 0);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('END THE GAME?'), findsOneWidget, reason: 'the system back asks too');
+    await tester.tap(find.text('END GAME').last);
+    await tester.pumpAndSettle();
+    expect(harness.network.last.sent.last, isA<EndGame>());
+    expect(harness.host.stopped, 1);
+    expect(find.byType(TablePage), findsNothing);
+    await _close(tester);
+  });
+
+  testWidgets('when the room is gone the back arrow just leaves', (tester) async {
+    final harness = TestHarness();
+    await _openTable(tester, harness, _betting());
+    harness.network.last.serverSends(const ErrorMessage(code: ErrorCode.roomNotFound, message: 'gone'));
+    await tester.pump();
+    await tester.pump();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(TablePage), findsNothing, reason: 'no confirmation for a game that is already over');
+    expect(harness.host.stopped, 1);
     await _close(tester);
   });
 

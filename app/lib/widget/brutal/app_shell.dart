@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
+import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/brutal_row.dart';
 
@@ -18,23 +19,65 @@ class TopBarCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    final cell = Container(
+    Widget cell(bool pressed) => AnimatedContainer(
+      duration: BrutalTheme.duration(context, BrutalMetrics.fast),
       width: width,
       alignment: Alignment.center,
       decoration: BoxDecoration(
+        color: pressed ? c.ink : c.paper.withValues(alpha: 0),
         border: Border(
           left: BorderSide(color: c.line, width: BrutalMetrics.border),
         ),
       ),
-      child: child,
+      // Icons and text in the cell follow the inversion.
+      child: IconTheme(
+        data: IconThemeData(color: pressed ? c.paper : c.ink),
+        child: DefaultTextStyle.merge(
+          style: TextStyle(color: pressed ? c.paper : c.ink),
+          child: child,
+        ),
+      ),
     );
-    if (onTap == null) return cell;
+    if (onTap == null) return cell(false);
     return Semantics(
       button: true,
       label: semanticLabel,
       excludeSemantics: true,
       onTap: onTap,
-      child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: onTap, child: cell),
+      child: BrutalPressable(onTap: onTap, builder: (context, pressed) => cell(pressed)),
+    );
+  }
+}
+
+/// The back arrow cell at the left of a top bar. Pressing inverts it.
+class BackCell extends StatelessWidget {
+  const BackCell({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = BrutalTheme.of(context).colors;
+    return Semantics(
+      button: true,
+      label: Strings.back,
+      excludeSemantics: true,
+      onTap: onTap,
+      child: BrutalPressable(
+        onTap: onTap,
+        builder: (context, pressed) => AnimatedContainer(
+          duration: BrutalTheme.duration(context, BrutalMetrics.fast),
+          width: 56,
+          height: 56,
+          color: pressed ? c.ink : c.paper.withValues(alpha: 0),
+          child: Center(
+            child: Transform.rotate(
+              angle: -3 * math.pi / 4, // points left
+              child: NavArrow(color: pressed ? c.paper : c.ink),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -72,25 +115,7 @@ class AppTopBar extends StatelessWidget {
               ),
             )
           else
-            Semantics(
-              button: true,
-              label: Strings.back,
-              excludeSemantics: true,
-              onTap: onBack,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onBack,
-                child: SizedBox(
-                  width: 56,
-                  child: Center(
-                    child: Transform.rotate(
-                      angle: -math.pi / 2,
-                      child: NavArrow(color: c.ink),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            BackCell(onTap: onBack!),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
@@ -201,31 +226,38 @@ class _NavCell extends StatelessWidget {
       label: label,
       excludeSemantics: true,
       onTap: onTap,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: BrutalPressable(
         onTap: onTap,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: BrutalMetrics.tapPlayer),
-          padding: EdgeInsets.symmetric(horizontal: rail ? BrutalMetrics.gapL : BrutalMetrics.gapS, vertical: BrutalMetrics.gapM),
-          color: selected ? c.ink : Colors.transparent,
-          alignment: rail ? Alignment.centerLeft : Alignment.center,
-          // Chrome shrinks to fit its cell instead of growing without bound with the OS text size.
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
+        builder: (context, pressed) {
+          // The chosen cell is solid ink; a cell being pressed goes to ink too, so the change is
+          // visible before the page switches.
+          final solid = selected || pressed;
+          final duration = BrutalTheme.duration(context, BrutalMetrics.fast);
+          return AnimatedContainer(
+            duration: duration,
+            constraints: const BoxConstraints(minHeight: BrutalMetrics.tapPlayer),
+            padding: EdgeInsets.symmetric(horizontal: rail ? BrutalMetrics.gapL : BrutalMetrics.gapS, vertical: BrutalMetrics.gapM),
+            color: solid ? c.ink : c.paper.withValues(alpha: 0),
             alignment: rail ? Alignment.centerLeft : Alignment.center,
-            child: Text(
-              label.toUpperCase(),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: BrutalFonts.mono,
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                letterSpacing: 2,
-                color: selected ? c.paper : c.ink,
+            // Chrome shrinks to fit its cell instead of growing without bound with the OS text size.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: rail ? Alignment.centerLeft : Alignment.center,
+              child: AnimatedDefaultTextStyle(
+                duration: duration,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: BrutalFonts.mono,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  letterSpacing: 2,
+                  color: solid ? c.paper : c.ink,
+                ),
+                child: Text(label.toUpperCase()),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

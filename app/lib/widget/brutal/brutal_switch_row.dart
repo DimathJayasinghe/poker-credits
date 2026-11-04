@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
+import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
 
 /// A setting you turn on or off: label and one-line explanation on the left, a square switch on
 /// the right. The whole row is the tap target.
@@ -20,13 +21,14 @@ class BrutalSwitchRow extends StatelessWidget {
       label: caption == null ? label : '$label. $caption',
       excludeSemantics: true,
       onTap: () => onChanged(!value),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: BrutalPressable(
         onTap: () => onChanged(!value),
-        child: Container(
+        builder: (context, pressed) => AnimatedContainer(
+          duration: BrutalTheme.duration(context, BrutalMetrics.fast),
           constraints: const BoxConstraints(minHeight: 64),
           padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
           decoration: BoxDecoration(
+            color: pressed ? c.ink.withValues(alpha: 0.08) : c.paper.withValues(alpha: 0),
             border: Border(
               bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
             ),
@@ -57,7 +59,12 @@ class BrutalSwitchRow extends StatelessWidget {
                   color: value ? c.ink : c.surface,
                   border: Border.all(color: c.line, width: BrutalMetrics.border),
                 ),
-                child: ColoredBox(color: value ? c.paper : c.ink, child: const SizedBox.square(dimension: 18)),
+                child: AnimatedContainer(
+                  duration: BrutalTheme.duration(context, BrutalMetrics.fast),
+                  width: pressed ? 24 : 18,
+                  height: 18,
+                  color: value ? c.paper : c.ink,
+                ),
               ),
             ],
           ),

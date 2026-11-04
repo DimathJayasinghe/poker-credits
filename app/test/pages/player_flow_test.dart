@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_keypad.dart';
 import 'package:poker_credits/main.dart';
 import 'package:poker_credits/model/hosting.dart';
@@ -362,6 +363,29 @@ void main() {
     await _close(tester);
   });
 
+  testWidgets('the back arrow and the system back both ask before giving up the seat', (tester) async {
+    final harness = await _joined(tester);
+    expect(find.byType(BackCell), findsOneWidget, reason: 'the player screen has a visible back button');
+    await tester.tap(find.byType(BackCell));
+    await tester.pumpAndSettle();
+    expect(find.text('LEAVE THE TABLE?'), findsOneWidget);
+    await tester.tap(find.text('CANCEL'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PlayerPage), findsOneWidget, reason: 'cancel stays at the table');
+    expect(harness.network.last.sent.whereType<LeaveTable>(), isEmpty);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('LEAVE THE TABLE?'), findsOneWidget, reason: 'the system back asks too');
+    await tester.tap(find.text('LEAVE TABLE').last);
+    await tester.pumpAndSettle();
+    expect(harness.network.last.sent.last, isA<LeaveTable>());
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.byType(PlayerPage), findsNothing);
+    await _close(tester);
+  });
+
   testWidgets('a removed player sees why, with a way out', (tester) async {
     final harness = await _joined(tester);
     harness.network.last.serverSends(StateUpdate(stateVersion: 2, view: roomView(seats: <SeatView>[seatView(0, 'Dimath'), seatView(2, 'Bob')])));
@@ -393,6 +417,29 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byType(PlayerPage), findsOneWidget);
     expect(findNumber(940), findsOneWidget, reason: 'same seat as before the app was killed');
+    await _close(tester);
+  });
+
+  testWidgets('a spectator can go back at once, no question asked', (tester) async {
+    tester.view
+      ..physicalSize = const Size(1280, 800)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = TestHarness();
+    await _openJoin(tester, harness);
+    await _fillAndJoin(tester, button: 'WATCH ONLY');
+    harness.network.last
+      ..serverSends(const Joined(playerId: 'p_w', role: Role.spectator, sessionToken: 'watch-token'))
+      ..serverSends(snapshot(version: 1, serverTime: harness.clock.millisecondsSinceEpoch, view: _betting()));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(BackCell), findsOneWidget);
+    await tester.tap(find.byType(BackCell));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+    expect(find.byType(TablePage), findsNothing);
+    expect(find.text('HOST A GAME'), findsOneWidget, reason: 'back on the home screen');
     await _close(tester);
   });
 

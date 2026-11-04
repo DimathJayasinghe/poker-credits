@@ -54,7 +54,7 @@ Scale (logical px, scaled by the OS text setting): 12 label, 14 body, 18 lead, 2
 | `gap` | 4, 8, 16, 24, 32, 48 |
 | `tap` | min 48 x 48; 56 high on the player action row |
 
-Pressed state: the cell inverts (`ink` fill with `paper` text, or `accent` darkens). No offset movement, no ripple. Disabled: 45 % opacity with a diagonal hatch.
+Pressed state: the cell inverts (`ink` fill with `paper` text, or `accent` darkens), eased over `fast`, and **held for at least 140 ms** so a quick tap still shows it (`BrutalPressable` does this for every tappable cell; do not add a bare `GestureDetector`). No offset movement, no ripple. Disabled: 45 % opacity with a diagonal hatch.
 
 ### Motion
 `fast` 90 ms, `base` 160 ms `easeOut`, `max` 280 ms. Motion only answers an action (press, open, change). One exception: the home title's echo layers draw in once, 400 ms, on first launch of the app session. Reduced motion (OS flag) makes everything 0 ms.
@@ -88,6 +88,8 @@ All widgets are plain Flutter (`DecoratedBox`, `CustomPaint`); no platform widge
 | **SETTINGS** | Appearance, table, you, data, about (section 6). |
 
 Game screens (Table, Player, Spectator) are full screen routes without the bar, so nothing competes with the game.
+
+**Back rule:** every pushed route has a visible back arrow (`BackCell`, a left arrow) in its top bar, and the system back does the same thing. On Player it asks "Leave the table?" (leaving gives the seat up); on the host Table it asks "End the game?" (it ends the game for everybody); a spectator, or a game that has already ended, leaves at once. Join cancels a connection attempt; Host is locked while the server starts.
 
 ## 5. Screens
 

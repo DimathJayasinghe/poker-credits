@@ -5,6 +5,7 @@ import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
+import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
 
@@ -52,14 +53,9 @@ class _ScanPageState extends State<ScanPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.all(BrutalMetrics.gapM),
-              child: Text(
-                Strings.scanTitle.toUpperCase(),
-                style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 28, height: 1.1, color: c.ink),
-              ),
-            ),
+            AppTopBar(title: Strings.scanTitle, onBack: () => Navigator.of(context).maybePop()),
             if (_problem != null) BrutalBanner(message: _problem!, kind: BrutalBannerKind.error),
+            const SizedBox(height: BrutalMetrics.gapM),
             Expanded(
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
