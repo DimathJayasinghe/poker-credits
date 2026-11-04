@@ -101,6 +101,42 @@ impl WsClient {
         let _ = self.stream.write_all(&frame).await;
     }
 
+    /// Sends one frame exactly as described, for protocol abuse: any opcode, payload, `fin` bit,
+    /// reserved bits, masking and even a length field that lies about the payload.
+    pub async fn send_frame(
+        &mut self,
+        first: u8,
+        payload: &[u8],
+        masked: bool,
+        claimed: Option<u64>,
+    ) {
+        let mask = [0xa5, 0x5a, 0x0f, 0xf0];
+        let len = claimed.unwrap_or_else(|| u64::try_from(payload.len()).unwrap());
+        let flag = if masked { 0x80 } else { 0 };
+        let mut frame = vec![first];
+        if len < 126 {
+            frame.push(flag | u8::try_from(len).unwrap());
+        } else if let Ok(short) = u16::try_from(len) {
+            frame.push(flag | 0x7e);
+            frame.extend_from_slice(&short.to_be_bytes());
+        } else {
+            frame.push(flag | 0x7f);
+            frame.extend_from_slice(&len.to_be_bytes());
+        }
+        if masked {
+            frame.extend_from_slice(&mask);
+            frame.extend(payload.iter().enumerate().map(|(i, b)| b ^ mask[i % 4]));
+        } else {
+            frame.extend_from_slice(payload);
+        }
+        let _ = self.stream.write_all(&frame).await;
+    }
+
+    /// Writes bytes to the socket untouched.
+    pub async fn send_raw(&mut self, bytes: &[u8]) {
+        let _ = self.stream.write_all(bytes).await;
+    }
+
     pub async fn send(&mut self, message: Value) {
         self.send_text(&message.to_string()).await;
     }
