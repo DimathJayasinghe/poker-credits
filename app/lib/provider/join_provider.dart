@@ -25,6 +25,9 @@ class JoinService {
   /// Looks for the device that hosts [roomCode] on the local network.
   HostSearch find(String roomCode) => _ref.read(hostFinderProvider).search(roomCode);
 
+  /// Lists the open games on the local network.
+  LobbyBrowse browse() => _ref.read(hostFinderProvider).browse();
+
   /// Opens a socket to [link] and sends `JOIN_ROOM`. Any earlier attempt is dropped first (a
   /// fixable error such as a bad name is retried this way, with the fields corrected).
   void join({required JoinLink link, required String name, bool spectator = false}) {

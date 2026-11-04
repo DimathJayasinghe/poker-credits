@@ -138,6 +138,20 @@ abstract final class Strings {
   static const String presenceHint = 'Players are asked first; your answer is final.';
   static const String yes = 'Yes';
   static const String no = 'No';
+  // Seat order.
+  static const String seatsButton = 'Seats';
+  static const String seatsTitle = 'Seat order';
+  static const String seatsFree = 'Free';
+  static const String seatsYou = 'You';
+  static const String seatsLocked = 'Seats are locked while a hand is being played. Change them between hands.';
+  static const String seatsHintGuest = 'Tap a free seat to move there. Seat 1 is at the bottom of the table screen and the numbers run clockwise.';
+  static const String seatsHintHost =
+      'Tap a player, then a seat. A free seat moves them there; a taken seat swaps the two. Numbers run clockwise from the bottom of the table screen.';
+  static const String seatsPicked = 'Now tap the seat they should take.';
+  static const String seatsClockwise = 'Clockwise from seat 1';
+  static const String seatsMove = 'Change seat';
+  static String seatLabel(int number) => 'Seat $number';
+  static String seatsOrderLine(List<String> names) => names.join(' > ');
   static const String lobbyHint = 'Players join with the room code. Press start when everyone is seated.';
   static const String hostingUnavailable = 'Hosting unavailable on this device';
 
@@ -145,6 +159,13 @@ abstract final class Strings {
   static const String joinGame = 'Join a game';
   static const String joinTitle = 'Join a game';
   static const String joinCode = 'Room code';
+  // Open games on the Wi-Fi.
+  static const String nearbyTitle = 'Games on this Wi-Fi';
+  static const String nearbyLooking = 'Looking for open games';
+  static const String nearbyNone = 'No open games found. Ask the host for the room code, or search again.';
+  static const String nearbyAgain = 'Search again';
+  static const String nearbyPick = 'Tap a game, then your name, then join.';
+  static String nearbySeats(String code, int count, int max) => 'Room $code, $count of $max seats taken';
   static const String searchingHost = 'Looking for the game on this Wi-Fi';
   static const String hostNotFound =
       'No game with that code found on this Wi-Fi. Check the code, and that you are on the same Wi-Fi as the host (not a guest network). Or enter the host address';

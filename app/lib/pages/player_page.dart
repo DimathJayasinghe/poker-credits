@@ -10,6 +10,7 @@ import 'package:poker_credits/provider/settings_provider.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/describe.dart';
+import 'package:poker_credits/util/seat_order.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/guide/guide_sheet.dart';
 import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
@@ -21,6 +22,7 @@ import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_dialog.dart';
 import 'package:poker_credits/widget/brutal/brutal_sheet.dart';
 import 'package:poker_credits/widget/brutal/brutal_tag.dart';
+import 'package:poker_credits/widget/table/seat_order_sheet.dart';
 import 'package:poker_credits/widget/player/action_buttons.dart';
 import 'package:poker_credits/widget/player/raise_slider.dart';
 import 'package:poker_credits/widget/player/rebuy_sheet.dart';
@@ -294,6 +296,14 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
                 padding: const EdgeInsets.all(BrutalMetrics.gapM),
                 child: _StackBlock(seat: seat),
               ),
+              if (!seatsLocked(view.phase))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapM, 0, BrutalMetrics.gapM, BrutalMetrics.gapM),
+                  child: BrutalButton(
+                    label: '${Strings.seatLabel(seatNumber(seat.seatIndex))}: ${Strings.seatsMove}',
+                    onPressed: live ? () => showSeatOrderSheet(context, isHost: false) : null,
+                  ),
+                ),
               Expanded(
                 child: Center(
                   child: Padding(

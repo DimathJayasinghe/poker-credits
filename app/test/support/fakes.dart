@@ -190,6 +190,16 @@ class FakeHostFinder implements HostFinder {
   final List<String> searched = <String>[];
   final List<FakeSearch> pending = <FakeSearch>[];
 
+  /// Every scan for open games, in the order they were started.
+  final List<FakeBrowse> browses = <FakeBrowse>[];
+
+  @override
+  LobbyBrowse browse() {
+    final browse = FakeBrowse();
+    browses.add(browse);
+    return browse;
+  }
+
   @override
   bool get isSupported => supported;
 
@@ -203,6 +213,32 @@ class FakeHostFinder implements HostFinder {
       search.complete(found);
     }
     return search;
+  }
+}
+
+/// A scan the test drives by hand: call [show] to make games appear, [finish] to end it.
+class FakeBrowse implements LobbyBrowse {
+  final StreamController<List<DiscoveredLobby>> _updates = StreamController<List<DiscoveredLobby>>.broadcast();
+  final Completer<void> _done = Completer<void>();
+  bool cancelled = false;
+
+  @override
+  Stream<List<DiscoveredLobby>> get lobbies => _updates.stream;
+
+  @override
+  Future<void> get done => _done.future;
+
+  void show(List<DiscoveredLobby> lobbies) => _updates.add(lobbies);
+
+  void finish() {
+    if (!_done.isCompleted) _done.complete();
+    unawaited(_updates.close());
+  }
+
+  @override
+  void cancel() {
+    cancelled = true;
+    finish();
   }
 }
 

@@ -18,6 +18,7 @@ class SeatPlate extends StatelessWidget {
     this.isSmallBlind = false,
     this.isBigBlind = false,
     this.turnFraction,
+    this.seatNumber,
     this.onTap,
   });
 
@@ -30,6 +31,10 @@ class SeatPlate extends StatelessWidget {
   /// Fraction of the turn clock left (1 = full), drawn as a bar under the plate.
   final double? turnFraction;
   final VoidCallback? onTap;
+
+  /// Shown at the right of the name between hands, so the screen can be checked against who sits
+  /// where in the room. Hidden during a hand.
+  final int? seatNumber;
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +81,23 @@ class SeatPlate extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Text(seat.name.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: nameStyle),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(seat.name.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: nameStyle),
+                        ),
+                        if (seatNumber != null)
+                          Text(
+                            '${seatNumber!}',
+                            style: TextStyle(
+                              fontFamily: BrutalFonts.mono,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: isActive ? text : c.muted,
+                            ),
+                          ),
+                      ],
+                    ),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
@@ -126,7 +147,7 @@ class SeatPlate extends StatelessWidget {
   }
 
   String _semantics() {
-    final parts = <String>[seat.name, '${seat.chips} chips'];
+    final parts = <String>[if (seatNumber != null) Strings.seatLabel(seatNumber!), seat.name, '${seat.chips} chips'];
     if (seat.streetBet > 0) parts.add('bet ${seat.streetBet}');
     if (isActive) parts.add('acting');
     if (seat.hasFolded) parts.add('folded');

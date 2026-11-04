@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:poker_credits/model/join_link.dart';
 import 'package:poker_credits/pages/player_page.dart';
@@ -8,6 +10,7 @@ import 'package:poker_credits/platform/qr_scanner.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/join_provider.dart';
 import 'package:poker_credits/provider/settings_provider.dart';
+import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/describe.dart';
 import 'package:poker_credits/util/strings.dart';
@@ -16,6 +19,7 @@ import 'package:poker_credits/widget/brutal/brutal_banner.dart';
 import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_credits/widget/brutal/brutal_card.dart';
+import 'package:poker_credits/widget/brutal/brutal_row.dart';
 import 'package:poker_credits/widget/brutal/brutal_text_field.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -54,8 +58,54 @@ class _JoinPageState extends State<JoinPage> with Refena {
   bool _notFound = false;
   HostSearch? _search;
 
+  /// The scan for open games on the Wi-Fi, and what it has found so far.
+  LobbyBrowse? _browse;
+  StreamSubscription<List<DiscoveredLobby>>? _browseUpdates;
+  List<DiscoveredLobby> _nearby = const <DiscoveredLobby>[];
+  bool _scanning = false;
+  bool _scanStarted = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Once, and not when the room code came from a scanned code or a link: that player knows
+    // where they are going.
+    if (_scanStarted) return;
+    _scanStarted = true;
+    if (widget.initial == null && ref.read(joinProvider).canFind) _scanNearby();
+  }
+
+  void _scanNearby() {
+    _browse?.cancel();
+    unawaited(_browseUpdates?.cancel());
+    final browse = ref.read(joinProvider).browse();
+    _browse = browse;
+    _nearby = const <DiscoveredLobby>[];
+    _scanning = true;
+    _browseUpdates = browse.lobbies.listen((lobbies) {
+      if (mounted && _browse == browse) setState(() => _nearby = lobbies);
+    });
+    unawaited(
+      browse.done.then((_) {
+        if (mounted && _browse == browse) setState(() => _scanning = false);
+      }),
+    );
+  }
+
+  /// Fills the form from an open game; the player adds a name and presses Join.
+  void _pickNearby(DiscoveredLobby lobby) {
+    setState(() {
+      _code.text = lobby.roomCode;
+      _known = JoinLink(hostAndPort: lobby.hostAndPort, roomCode: lobby.roomCode);
+      _notFound = false;
+      _showAddress = false;
+    });
+  }
+
   @override
   void dispose() {
+    _browse?.cancel();
+    unawaited(_browseUpdates?.cancel());
     _search?.cancel();
     for (final controller in <TextEditingController>[_code, _address, _name]) {
       controller.dispose();
@@ -152,6 +202,48 @@ class _JoinPageState extends State<JoinPage> with Refena {
     });
   }
 
+  Widget _nearbyCard(bool busy) {
+    final c = BrutalTheme.of(context).colors;
+    final picked = JoinLink.normalizeRoomCode(_code.text);
+    return BrutalCard(
+      header: Strings.nearbyTitle,
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          for (final lobby in _nearby)
+            BrutalRow(
+              label: lobby.hostName.isEmpty ? lobby.roomCode : lobby.hostName,
+              caption: Strings.nearbySeats(lobby.roomCode, lobby.playerCount, lobby.maxPlayers),
+              emphasis: picked == lobby.roomCode,
+              onTap: busy ? null : () => _pickNearby(lobby),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(BrutalMetrics.gapM),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                if (_scanning && _nearby.isEmpty)
+                  Text(
+                    Strings.nearbyLooking.toUpperCase(),
+                    style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 13, color: c.muted),
+                  )
+                else if (!_scanning && _nearby.isEmpty)
+                  Text(Strings.nearbyNone, style: TextStyle(fontSize: 14, height: 1.4, color: c.muted))
+                else if (_nearby.isNotEmpty)
+                  Text(Strings.nearbyPick, style: TextStyle(fontSize: 13, height: 1.4, color: c.muted)),
+                if (!_scanning) ...<Widget>[
+                  const SizedBox(height: BrutalMetrics.gapM),
+                  BrutalButton(label: Strings.nearbyAgain, onPressed: busy ? null : () => setState(_scanNearby)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = context.ref.watch(sessionProvider);
@@ -199,6 +291,10 @@ class _JoinPageState extends State<JoinPage> with Refena {
                         const SizedBox(height: BrutalMetrics.gapM),
                       ] else if (connecting) ...<Widget>[
                         const BrutalBanner(message: Strings.connecting),
+                        const SizedBox(height: BrutalMetrics.gapM),
+                      ],
+                      if (canFind) ...<Widget>[
+                        _nearbyCard(busy),
                         const SizedBox(height: BrutalMetrics.gapM),
                       ],
                       if (qrScanSupported) ...<Widget>[

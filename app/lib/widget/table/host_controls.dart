@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:poker_credits/theme/tokens.dart';
+import 'package:poker_credits/util/seat_order.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_protocol/poker_protocol.dart';
@@ -13,6 +14,7 @@ class HostControls extends StatelessWidget {
     required this.enabled,
     required this.onSend,
     required this.onPickWinners,
+    required this.onSeats,
     required this.onEndGame,
   });
 
@@ -22,6 +24,7 @@ class HostControls extends StatelessWidget {
   final bool enabled;
   final void Function(ClientMessage message) onSend;
   final VoidCallback onPickWinners;
+  final VoidCallback onSeats;
   final VoidCallback onEndGame;
 
   @override
@@ -54,18 +57,25 @@ class HostControls extends StatelessWidget {
       ),
       _ => null,
     };
+    final betweenHands = !seatsLocked(phase);
+    // A button fills the width it is given, so in a row of buttons each one is sized to its label.
+    Widget fit(Widget button) => IntrinsicWidth(
+      child: ConstrainedBox(constraints: const BoxConstraints(minWidth: 112), child: button),
+    );
     return Wrap(
       spacing: BrutalMetrics.gapM,
       runSpacing: BrutalMetrics.gapS,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: <Widget>[
-        ?primary,
+        if (primary != null) fit(primary),
+        if (betweenHands) fit(BrutalButton(label: Strings.seatsButton, onPressed: enabled ? onSeats : null)),
         if (view.paused)
-          BrutalButton(label: Strings.resume, kind: BrutalButtonKind.info, onPressed: send(const ResumeGame()))
+          fit(BrutalButton(label: Strings.resume, kind: BrutalButtonKind.info, onPressed: send(const ResumeGame())))
         else if (inHand)
-          BrutalButton(label: Strings.pause, onPressed: send(const Pause())),
-        if (inHand || phase == WirePhase.allInRunout || phase == WirePhase.showdown) BrutalButton(label: Strings.undo, onPressed: send(const Undo())),
-        BrutalButton(label: Strings.endGame, kind: BrutalButtonKind.danger, onPressed: enabled ? onEndGame : null),
+          fit(BrutalButton(label: Strings.pause, onPressed: send(const Pause()))),
+        if (inHand || phase == WirePhase.allInRunout || phase == WirePhase.showdown)
+          fit(BrutalButton(label: Strings.undo, onPressed: send(const Undo()))),
+        fit(BrutalButton(label: Strings.endGame, kind: BrutalButtonKind.danger, onPressed: enabled ? onEndGame : null)),
       ],
     );
   }

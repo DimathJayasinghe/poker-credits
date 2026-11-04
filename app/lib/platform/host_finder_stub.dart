@@ -13,6 +13,20 @@ final class _NoFinder implements HostFinder {
 
   @override
   HostSearch search(String roomCode) => _Done();
+
+  @override
+  LobbyBrowse browse() => _NoBrowse();
+}
+
+final class _NoBrowse implements LobbyBrowse {
+  @override
+  Stream<List<DiscoveredLobby>> get lobbies => const Stream<List<DiscoveredLobby>>.empty();
+
+  @override
+  Future<void> get done async {}
+
+  @override
+  void cancel() {}
 }
 
 final class _Done implements HostSearch {

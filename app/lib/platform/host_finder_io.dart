@@ -47,6 +47,9 @@ final class LanHostFinder implements HostFinder {
   @override
   HostSearch search(String roomCode) => _Search(this, roomCode)..start();
 
+  @override
+  LobbyBrowse browse() => _Browse(this)..start();
+
   /// Every other address of the /24 around each of the device's own addresses (at most three
   /// networks), in order of how likely the network is the LAN.
   static Future<List<String>> _lanCandidates() async {
@@ -158,6 +161,107 @@ final class _Search implements HostSearch {
       return body is Map<String, dynamic> && body['exists'] == true;
     } on Object {
       return false;
+    }
+  }
+}
+
+/// Asks every candidate address for its open games (`GET /v1/lobbies`) and reports each game as
+/// soon as it is found. Unlike a search by code it does not stop at the first answer.
+final class _Browse implements LobbyBrowse {
+  _Browse(this._finder);
+
+  final LanHostFinder _finder;
+  final StreamController<List<DiscoveredLobby>> _updates = StreamController<List<DiscoveredLobby>>.broadcast();
+  final Completer<void> _done = Completer<void>();
+  final List<DiscoveredLobby> _found = <DiscoveredLobby>[];
+  HttpClient? _client;
+  Timer? _deadline;
+  bool _cancelled = false;
+
+  @override
+  Stream<List<DiscoveredLobby>> get lobbies => _updates.stream;
+
+  @override
+  Future<void> get done => _done.future;
+
+  void start() {
+    _deadline = Timer(_finder.deadline, cancel);
+    unawaited(_run());
+  }
+
+  @override
+  void cancel() {
+    if (_cancelled) return;
+    _cancelled = true;
+    _finish();
+  }
+
+  void _finish() {
+    _deadline?.cancel();
+    _client?.close(force: true);
+    _client = null;
+    if (!_done.isCompleted) _done.complete();
+    unawaited(_updates.close());
+  }
+
+  Future<void> _run() async {
+    try {
+      final candidates = await _finder._candidates();
+      if (_cancelled) return;
+      final client = HttpClient()..connectionTimeout = _finder.probeTimeout;
+      _client = client;
+      _log.info('browsing ${candidates.length} addresses for open games');
+      for (final port in _finder.ports) {
+        await _scan(client, candidates, port);
+        if (_cancelled) return;
+      }
+    } on Object catch (error) {
+      _log.warning('browse failed: ${error.runtimeType}');
+    }
+    if (!_cancelled) _finish();
+  }
+
+  Future<void> _scan(HttpClient client, List<String> hosts, int port) async {
+    var next = 0;
+    Future<void> worker() async {
+      while (!_cancelled) {
+        final index = next++;
+        if (index >= hosts.length) return;
+        await _probe(client, hosts[index], port);
+      }
+    }
+
+    await Future.wait(<Future<void>>[for (var i = 0; i < _finder.concurrency; i++) worker()]);
+  }
+
+  Future<void> _probe(HttpClient client, String host, int port) async {
+    try {
+      final request = await client.getUrl(Uri(scheme: 'http', host: host, port: port, path: '/v1/lobbies')).timeout(_finder.probeTimeout);
+      final response = await request.close().timeout(_finder.probeTimeout);
+      if (response.statusCode != HttpStatus.ok) {
+        await response.drain<void>().timeout(_finder.probeTimeout);
+        return;
+      }
+      final bytes = <int>[];
+      await for (final chunk in response.timeout(_finder.probeTimeout)) {
+        bytes.addAll(chunk);
+        if (bytes.length > 8192) return;
+      }
+      final body = jsonDecode(utf8.decode(bytes, allowMalformed: true));
+      final list = body is Map<String, dynamic> ? body['lobbies'] : null;
+      if (list is! List) return;
+      final hostAndPort = '$host:$port';
+      var grew = false;
+      for (final entry in list.take(16)) {
+        final lobby = DiscoveredLobby.tryParse(entry, hostAndPort);
+        if (lobby != null && !_found.contains(lobby)) {
+          _found.add(lobby);
+          grew = true;
+        }
+      }
+      if (grew && !_cancelled && !_updates.isClosed) _updates.add(List<DiscoveredLobby>.unmodifiable(_found));
+    } on Object {
+      return;
     }
   }
 }

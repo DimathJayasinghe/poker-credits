@@ -79,7 +79,7 @@ Pressed state: the cell inverts (`ink` fill with `paper` text, or `accent` darke
 All widgets are plain Flutter (`DecoratedBox`, `CustomPaint`); no platform widgets.
 
 ## 4. Information architecture
-**Status: PLAY and SETTINGS are built; GUIDE is specified but not built yet.** Three destinations in a bottom bar on phones and a left rail on wide screens (>= 840 px):
+**Status: PLAY, GUIDE and SETTINGS are built.** The GUIDE tab also opens as a quick-guide sheet from the `?` cell on the Player and host Table top bars. Three destinations in a bottom bar on phones and a left rail on wide screens (>= 840 px):
 
 | Destination | Purpose |
 | :--- | :--- |
@@ -116,6 +116,12 @@ Top bar cells: room code | hand and street | Pause | Undo. Centre: the `felt` pa
 
 ### Player (portrait, one thumb)
 Top bar: room, connection state. Hero cell: stack in Anton 64, bet beside it. Middle: whose turn (quiet `surface` cell) or, when acting, a full-width accent YOUR TURN cell with the countdown. Bottom third: FOLD (outlined), CHECK or CALL n (ink), RAISE (accent); raise opens the slider sheet. Haptics unchanged.
+
+**Seat order.** Seats run clockwise and are numbered 1 to 10 (seat 1 at the bottom of the table screen). Between hands the Player screen shows "Seat N: change seat" and the host controls show "Seats"; both open the seat sheet: ten numbered cells, free ones tappable for a guest, and for the host a pick-then-place move (a taken seat swaps). Names are listed clockwise under the grid so the room can check the order out loud. During a hand the sheet only explains that seats are locked.
+
+**Table layout rule.** The oval is used only when ten plates fit around the pot without touching (`FeltLayout.ovalFits`, about five plate heights at the current text size); otherwise the plates go into a grid in seat order, and when the controls would squeeze even that, the middle of the page scrolls as a whole with the player's own buttons first. Nothing is ever drawn over anything else. `test/pages/table_layout_test.dart` fails on any overlap.
+
+**Landing table.** The felt panel draws one fixed-shape table (aspect 1.7) scaled to fit and centred, never stretched to the panel.
 
 ### Spectator
 The table view without controls, with a WATCHING tag in the top bar.

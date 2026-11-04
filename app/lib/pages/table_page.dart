@@ -11,6 +11,7 @@ import 'package:poker_credits/provider/settings_provider.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/describe.dart';
+import 'package:poker_credits/util/seat_order.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/guide/guide_sheet.dart';
 import 'package:poker_credits/widget/brutal/app_shell.dart';
@@ -30,6 +31,7 @@ import 'package:poker_credits/widget/table/host_controls.dart';
 import 'package:poker_credits/widget/table/pot_display.dart';
 import 'package:poker_credits/widget/table/qr_panel.dart';
 import 'package:poker_credits/widget/table/seat_plate.dart';
+import 'package:poker_credits/widget/table/seat_order_sheet.dart';
 import 'package:poker_credits/widget/table/showdown_sheet.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -272,6 +274,107 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
     final mine = _myPrompt(session, view);
     _alertOnce(session, view, mine);
     final inFlight = _sentSeq == room.nextActionSeq && room.lastError == null;
+    Widget felt({required bool shrink}) => FeltLayout(
+      shrinkWrap: shrink,
+      seatCount: tableSeats,
+      occupied: seatsByIndex.keys.toSet(),
+      center: view.phase == WirePhase.lobby
+          ? QrPanel(roomCode: view.roomCode, addresses: host.joinAddresses)
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                PotDisplay(total: view.totalPot, pots: view.pots),
+                if (acting != null) ...<Widget>[
+                  const SizedBox(height: BrutalMetrics.gapM),
+                  Text(
+                    '> ${Strings.acting.toUpperCase()}: ${acting.name.toUpperCase()}${remaining == null ? '' : '  ${clock(remaining)}'}',
+                    style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 20, color: c.onFelt),
+                  ),
+                ],
+              ],
+            ),
+      seatBuilder: (context, index, width) {
+        final seat = seatsByIndex[index]!;
+        final isActive = view.activeSeat == index;
+        final fraction = isActive && remaining != null && limit != null ? _fraction(remaining, room, view) : null;
+        return SeatPlate(
+          seat: seat,
+          isActive: isActive,
+          isDealer: view.dealerSeat == index,
+          isSmallBlind: view.smallBlindSeat == index,
+          isBigBlind: view.bigBlindSeat == index,
+          turnFraction: fraction,
+          seatNumber: seatsLocked(view.phase) ? null : seatNumber(index),
+          onTap: session.isHost && seat.playerId != myId ? () => _seatMenu(seat) : null,
+        );
+      },
+    );
+    final actionBlock = <Widget>[
+      if (mine != null)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text(
+                    '${Strings.yourTurn}${remaining == null ? '' : '  ${clock(remaining)}'}'.toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 24, color: c.accent),
+                  ),
+                  const SizedBox(height: BrutalMetrics.gapS),
+                  ActionButtons(
+                    legal: mine.legal,
+                    enabled: session.link.isLive && !inFlight,
+                    onFold: () => _act(const FoldAction()),
+                    onCheck: () => _act(const CheckAction()),
+                    onCall: () => _act(const CallAction()),
+                    onRaise: () => _raise(mine.legal),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+    ];
+    final hostBlock = <Widget>[
+      if (session.isHost) ...<Widget>[
+        for (final rebuy in view.pendingRebuys.where((r) => !r.approved)) _rebuyStrip(view, rebuy),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
+          child: Row(
+            children: <Widget>[
+              if (view.phase == WirePhase.lobby)
+                Expanded(
+                  child: Text(
+                    Strings.lobbyHint.toUpperCase(),
+                    style: TextStyle(color: c.muted, fontWeight: FontWeight.bold),
+                  ),
+                )
+              else
+                const Spacer(),
+              Flexible(
+                flex: 2,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: HostControls(
+                    view: view,
+                    enabled: session.link.isLive,
+                    onSend: _send,
+                    onPickWinners: () => _pickWinners(view),
+                    onSeats: () => showSeatOrderSheet(context, isHost: true),
+                    onEndGame: _endGame,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -280,107 +383,49 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
         if (view.paused) const BrutalBanner(message: Strings.gamePaused, kind: BrutalBannerKind.warning),
         if (room.presenceCheck != null && session.isHost) _presenceStrip(room.presenceCheck!),
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.all(BrutalMetrics.gapM),
-            child: FeltLayout(
-              seatCount: tableSeats,
-              occupied: seatsByIndex.keys.toSet(),
-              center: view.phase == WirePhase.lobby
-                  ? QrPanel(roomCode: view.roomCode, addresses: host.joinAddresses)
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        PotDisplay(total: view.totalPot, pots: view.pots),
-                        if (acting != null) ...<Widget>[
-                          const SizedBox(height: BrutalMetrics.gapM),
-                          Text(
-                            '> ${Strings.acting.toUpperCase()}: ${acting.name.toUpperCase()}${remaining == null ? '' : '  ${clock(remaining)}'}',
-                            style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 20, color: c.onFelt),
-                          ),
-                        ],
-                      ],
-                    ),
-              seatBuilder: (context, index, width) {
-                final seat = seatsByIndex[index]!;
-                final isActive = view.activeSeat == index;
-                final fraction = isActive && remaining != null && limit != null ? _fraction(remaining, room, view) : null;
-                return SeatPlate(
-                  seat: seat,
-                  isActive: isActive,
-                  isDealer: view.dealerSeat == index,
-                  isSmallBlind: view.smallBlindSeat == index,
-                  isBigBlind: view.bigBlindSeat == index,
-                  turnFraction: fraction,
-                  onTap: session.isHost && seat.playerId != myId ? () => _seatMenu(seat) : null,
+          child: LayoutBuilder(
+            builder: (context, box) {
+              // Roomy: the oval fills what the controls leave. Cramped: the whole middle scrolls
+              // and the controls come first, so nothing is ever drawn over anything else.
+              if (_cramped(context, box, myTurn: mine != null, host: session.isHost)) {
+                return SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      ...actionBlock,
+                      Padding(padding: const EdgeInsets.all(BrutalMetrics.gapM), child: felt(shrink: true)),
+                      ...hostBlock,
+                    ],
+                  ),
                 );
-              },
-            ),
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Expanded(
+                    child: Padding(padding: const EdgeInsets.all(BrutalMetrics.gapM), child: felt(shrink: false)),
+                  ),
+                  ...actionBlock,
+                  ...hostBlock,
+                ],
+              );
+            },
           ),
         ),
-        if (mine != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    Text(
-                      '${Strings.yourTurn}${remaining == null ? '' : '  ${clock(remaining)}'}'.toUpperCase(),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 24, color: c.accent),
-                    ),
-                    const SizedBox(height: BrutalMetrics.gapS),
-                    ActionButtons(
-                      legal: mine.legal,
-                      enabled: session.link.isLive && !inFlight,
-                      onFold: () => _act(const FoldAction()),
-                      onCheck: () => _act(const CheckAction()),
-                      onCall: () => _act(const CallAction()),
-                      onRaise: () => _raise(mine.legal),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        if (session.isHost) ...<Widget>[
-          for (final rebuy in view.pendingRebuys.where((r) => !r.approved)) _rebuyStrip(view, rebuy),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
-            child: Row(
-              children: <Widget>[
-                if (view.phase == WirePhase.lobby)
-                  Expanded(
-                    child: Text(
-                      Strings.lobbyHint.toUpperCase(),
-                      style: TextStyle(color: c.muted, fontWeight: FontWeight.bold),
-                    ),
-                  )
-                else
-                  const Spacer(),
-                Flexible(
-                  flex: 2,
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: HostControls(
-                      view: view,
-                      enabled: session.link.isLive,
-                      onSend: _send,
-                      onPickWinners: () => _pickWinners(view),
-                      onEndGame: _endGame,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
         ActionTicker(actions: room.ticker),
       ],
     );
+  }
+
+  /// Rough height of what sits under the table while it is shown: the turn buttons and the host
+  /// controls. Only used to decide when the oval no longer fits next to them.
+  static const double _turnBlockHeight = 150;
+  static const double _hostBlockHeight = 90;
+
+  bool _cramped(BuildContext context, BoxConstraints box, {required bool myTurn, required bool host}) {
+    final chrome = (myTurn ? _turnBlockHeight : 0) + (host ? _hostBlockHeight : 0) + 2 * BrutalMetrics.gapM;
+    if (box.maxWidth < FeltLayout.narrowWidth) return box.maxHeight < 420 + chrome;
+    return box.maxHeight < FeltLayout.minOvalHeight(context) + chrome;
   }
 
   /// Share of the turn clock left. The server sends a deadline, not the length, so the bar

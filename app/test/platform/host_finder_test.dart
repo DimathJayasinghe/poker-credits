@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/platform/host_finder_io.dart';
 
 /// Answers `GET /v1/room/{code}` like the Poker Credits server: 200 with `exists`.
@@ -96,5 +97,114 @@ void main() {
     expect(list, contains('10.0.2.2'));
     expect(list.toSet(), hasLength(list.length));
     expect(LanHostFinder.candidatesAround(<String>[]), isEmpty);
+  });
+
+  group('browsing for open games', () {
+    Future<HttpServer> lobbyHost(Object? body, {int status = 200}) async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) {
+        request.response
+          ..statusCode = status
+          ..headers.contentType = ContentType.json
+          ..write(body is String ? body : jsonEncode(body));
+        unawaited(request.response.close());
+      });
+      addTearDown(() => server.close(force: true));
+      return server;
+    }
+
+    Map<String, Object?> entry(String code, {String host = 'Dimath', int players = 3, int max = 10}) => <String, Object?>{
+      'roomCode': code,
+      'hostName': host,
+      'playerCount': players,
+      'maxPlayers': max,
+    };
+
+    Future<List<DiscoveredLobby>> lastList(LobbyBrowse browse) async {
+      var latest = <DiscoveredLobby>[];
+      final sub = browse.lobbies.listen((list) => latest = list);
+      await browse.done;
+      await sub.cancel();
+      return latest;
+    }
+
+    test('lists every open game, from every host that answers', () async {
+      final one = await lobbyHost(<String, Object?>{
+        'lobbies': <Object?>[entry('KQ7M'), entry('ABCD', host: 'Sam', players: 5)],
+      });
+      final two = await lobbyHost(<String, Object?>{
+        'lobbies': <Object?>[entry('WXYZ', host: 'Ann', players: 1)],
+      });
+      final browse = _finder(<String>['127.0.0.1'], <int>[one.port, two.port]).browse();
+      final found = await lastList(browse);
+      expect(found.map((l) => l.roomCode), unorderedEquals(<String>['KQ7M', 'ABCD', 'WXYZ']));
+      final sam = found.firstWhere((l) => l.roomCode == 'ABCD');
+      expect((sam.hostName, sam.playerCount, sam.maxPlayers, sam.hostAndPort), ('Sam', 5, 10, '127.0.0.1:${one.port}'));
+    });
+
+    test('an empty list, an unreachable network and a non-200 all end with nothing', () async {
+      final empty = await lobbyHost(<String, Object?>{'lobbies': <Object?>[]});
+      final refused = await lobbyHost('{}', status: 404);
+      final closed = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final deadPort = closed.port;
+      await closed.close();
+      final browse = _finder(<String>['127.0.0.1', '127.0.0.9'], <int>[empty.port, refused.port, deadPort]).browse();
+      expect(await lastList(browse), isEmpty);
+    });
+
+    test('hostile answers are ignored: wrong shapes, bad codes, oversize bodies, too many entries', () async {
+      final bad = <Object?>[
+        'hello',
+        <Object?>[1],
+        <String, Object?>{'lobbies': 'x'},
+        <String, Object?>{
+          'lobbies': <Object?>[
+            1,
+            null,
+            entry('no'),
+            entry('KQ7M', max: 99),
+            <String, Object?>{'roomCode': 'KQ7M'},
+            <String, Object?>{'roomCode': 5, 'hostName': 'x', 'playerCount': 1, 'maxPlayers': 10},
+          ],
+        },
+        '{"lobbies":[],"x":"${'a' * 9000}"}',
+      ];
+      for (final body in bad) {
+        final server = await lobbyHost(body);
+        expect(await lastList(_finder(<String>['127.0.0.1'], <int>[server.port]).browse()), isEmpty, reason: 'hostile answer #${bad.indexOf(body)}');
+      }
+    });
+
+    test('names from the network are cleaned and counts are kept in range', () {
+      final lobby = DiscoveredLobby.tryParse(
+        <String, Object?>{'roomCode': 'kq7m', 'hostName': '  ${'x' * 40}\u0007  ', 'playerCount': 99, 'maxPlayers': 10},
+        '10.0.0.2:7878',
+      )!;
+      expect(lobby.roomCode, 'KQ7M');
+      expect(lobby.hostName, 'x' * 20);
+      expect(lobby.playerCount, 10);
+      expect(
+        DiscoveredLobby.tryParse(<String, Object?>{'roomCode': 'KQ7M', 'hostName': 'a', 'playerCount': -3, 'maxPlayers': 10}, 'h:1')!.playerCount,
+        0,
+      );
+    });
+
+    test('the same game answered twice is listed once', () async {
+      final server = await lobbyHost(<String, Object?>{
+        'lobbies': <Object?>[entry('KQ7M'), entry('KQ7M')],
+      });
+      expect(await lastList(_finder(<String>['127.0.0.1'], <int>[server.port, server.port]).browse()), hasLength(1));
+    });
+
+    test('cancel ends the scan at once and a silent host cannot stall it past the deadline', () async {
+      final silent = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(silent.close);
+      silent.listen((_) {});
+      final cancelled = _finder(<String>['127.0.0.1'], <int>[silent.port]).browse()..cancel();
+      await cancelled.done;
+      final watch = Stopwatch()..start();
+      await _finder(<String>['127.0.0.1'], <int>[silent.port], deadline: const Duration(milliseconds: 600)).browse().done;
+      expect(watch.elapsed, lessThan(const Duration(seconds: 3)));
+    });
   });
 }
