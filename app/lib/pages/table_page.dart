@@ -17,6 +17,9 @@ import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_dialog.dart';
 import 'package:poker_credits/widget/brutal/brutal_sheet.dart';
 import 'package:poker_credits/widget/brutal/brutal_tag.dart';
+import 'package:poker_credits/widget/player/action_buttons.dart';
+import 'package:poker_credits/widget/player/raise_slider.dart';
+import 'package:poker_credits/widget/player/turn_alert.dart';
 import 'package:poker_credits/widget/table/action_ticker.dart';
 import 'package:poker_credits/widget/table/felt_layout.dart';
 import 'package:poker_credits/widget/table/host_controls.dart';
@@ -43,6 +46,11 @@ class TablePage extends StatefulWidget {
 
 class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserver {
   Timer? _ticker;
+
+  /// The host also sits at the table: on their own turn the same server-driven buttons the Player
+  /// screen has appear here, so the host never has to time out of a hand.
+  final TurnAlertGate _gate = TurnAlertGate();
+  int? _sentSeq;
 
   @override
   void initState() {
@@ -99,7 +107,49 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
     }
   }
 
-  void _send(ClientMessage message) => ref.notifier(sessionProvider).send(message);
+  bool _send(ClientMessage message) => ref.notifier(sessionProvider).send(message);
+
+  void _act(PlayerAction action) {
+    final room = ref.read(sessionProvider).room;
+    ref.read(hapticsProvider).tap();
+    // Only a message that really left counts as sent (see PlayerPage._act).
+    if (_send(GameAction(actionSeq: room.nextActionSeq, action: action))) {
+      setState(() => _sentSeq = room.nextActionSeq);
+    }
+  }
+
+  void _raise(LegalActions legal) {
+    showBrutalSheet<void>(
+      context: context,
+      title: Strings.raise,
+      builder: (sheetContext) => RaiseSlider(
+        legal: legal,
+        onConfirm: (action) {
+          Navigator.of(sheetContext).pop();
+          _act(action);
+        },
+      ),
+    );
+  }
+
+  /// The host's own pending decision, or null: the prompt must be for this seat, be the live
+  /// turn and not be paused.
+  TurnPrompt? _myPrompt(SessionState session, RoomView view) {
+    final prompt = session.room.prompt;
+    final seat = session.mySeat;
+    if (widget.watching || !session.isHost || prompt == null || seat == null) return null;
+    if (prompt.playerId != seat.playerId || view.activeSeat != seat.seatIndex || view.paused) return null;
+    return prompt;
+  }
+
+  void _alertOnce(SessionState session, RoomView view, TurnPrompt? mine) {
+    if (mine == null || !_gate.shouldFire(prompt: mine, handNumber: view.handNumber)) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(hapticsProvider).yourTurn();
+      ref.read(soundProvider).yourTurn();
+    });
+  }
 
   void _pickWinners(RoomView view) {
     showBrutalSheet<void>(
@@ -193,6 +243,9 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
     final myId = host.room?.playerId;
     final seatsByIndex = <int, SeatView>{for (final seat in view.seats) seat.seatIndex: seat};
     final acting = view.activeSeat == null ? null : seatsByIndex[view.activeSeat!];
+    final mine = _myPrompt(session, view);
+    _alertOnce(session, view, mine);
+    final inFlight = _sentSeq == room.nextActionSeq && room.lastError == null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -238,6 +291,35 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
             ),
           ),
         ),
+        if (mine != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Text(
+                      '${Strings.yourTurn}${remaining == null ? '' : '  ${clock(remaining)}'}'.toUpperCase(),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 24, color: c.signal),
+                    ),
+                    const SizedBox(height: BrutalMetrics.gapS),
+                    ActionButtons(
+                      legal: mine.legal,
+                      enabled: session.link.isLive && !inFlight,
+                      onFold: () => _act(const FoldAction()),
+                      onCheck: () => _act(const CheckAction()),
+                      onCall: () => _act(const CallAction()),
+                      onRaise: () => _raise(mine.legal),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         if (session.isHost) ...<Widget>[
           for (final rebuy in view.pendingRebuys.where((r) => !r.approved)) _rebuyStrip(view, rebuy),
           Padding(

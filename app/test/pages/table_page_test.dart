@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/main.dart';
 import 'package:poker_credits/pages/table_page.dart';
+import 'package:poker_credits/widget/player/raise_slider.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
 import '../support/fakes.dart';
@@ -267,5 +268,79 @@ void main() {
     expect(harness.wakeLock.enabled, 1);
     await _close(tester);
     expect(harness.wakeLock.disabled, 1);
+  });
+
+  group('the host also plays', () {
+    const legal = LegalActions(
+      canFold: true,
+      canCheck: false,
+      canCall: true,
+      callAmount: 20,
+      canRaise: true,
+      minRaiseTo: 40,
+      maxRaiseTo: 940,
+    );
+    final seats = <SeatView>[seatView(0, 'Dimath', chips: 980).copyWith(playerId: 'p_host'), seatView(1, 'Bob', chips: 1000)];
+    RoomView betting({required int active}) => roomView(hand: 2, activeSeat: active, pot: 30, seats: seats, deadline: 1730000021000);
+
+    testWidgets('on their own turn the host sees the action buttons and acts once', (tester) async {
+      final harness = TestHarness();
+      await _openTable(tester, harness, betting(active: 0));
+      expect(find.textContaining('YOUR TURN'), findsNothing, reason: 'no prompt yet');
+
+      harness.network.last.serverSends(const TurnPrompt(playerId: 'p_host', seatIndex: 0, nextActionSeq: 7, legal: legal));
+      await tester.pump();
+      await tester.pump();
+      expect(find.textContaining('YOUR TURN'), findsOneWidget);
+      expect(harness.haptics.turns, 1);
+
+      await tester.ensureVisible(find.text('CALL 20'));
+      await tester.tap(find.text('CALL 20'));
+      await tester.pump();
+      final action = harness.network.last.sent.last as GameAction;
+      expect(action.actionSeq, 7);
+      expect(action.action, isA<CallAction>());
+
+      // A second tap before the server answers does not send again.
+      final sent = harness.network.last.sent.length;
+      await tester.tap(find.text('CALL 20'), warnIfMissed: false);
+      await tester.pump();
+      expect(harness.network.last.sent.length, sent);
+      await _close(tester);
+    });
+
+    testWidgets('raising goes through the same slider sheet', (tester) async {
+      final harness = TestHarness();
+      await _openTable(tester, harness, betting(active: 0));
+      harness.network.last.serverSends(const TurnPrompt(playerId: 'p_host', seatIndex: 0, nextActionSeq: 7, legal: legal));
+      await tester.pump();
+      await tester.pump();
+      await tester.tap(find.text('RAISE'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RaiseSlider), findsOneWidget);
+      await _close(tester);
+    });
+
+    testWidgets('it is not shown when another seat is on turn, or while paused', (tester) async {
+      final harness = TestHarness();
+      await _openTable(tester, harness, betting(active: 1));
+      harness.network.last.serverSends(const TurnPrompt(playerId: 'p_1', seatIndex: 1, nextActionSeq: 7, legal: legal));
+      await tester.pump();
+      await tester.pump();
+      expect(find.textContaining('YOUR TURN'), findsNothing);
+      expect(find.text('CALL 20'), findsNothing);
+      await _close(tester);
+    });
+
+    testWidgets('it stays usable on a phone-sized host screen', (tester) async {
+      final harness = TestHarness();
+      await _openTable(tester, harness, betting(active: 0), size: const Size(390, 844));
+      harness.network.last.serverSends(const TurnPrompt(playerId: 'p_host', seatIndex: 0, nextActionSeq: 7, legal: legal));
+      await tester.pump();
+      await tester.pump();
+      expect(tester.takeException(), isNull, reason: 'no overflow');
+      expect(find.text('CALL 20'), findsOneWidget);
+      await _close(tester);
+    });
   });
 }
