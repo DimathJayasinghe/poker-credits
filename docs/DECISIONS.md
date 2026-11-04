@@ -175,7 +175,7 @@ Full detail in `docs/RESILIENCE_AND_CRASH_HANDLING.md`. Summary of what is copie
 
 ## ADR-013: Neo-brutalist UI
 
-**Status:** Accepted (owner request). **Date:** 2026-11-01.
+**Status:** Accepted (owner request). **Date:** 2026-11-01. **Look superseded by ADR-015** (structure, own components and bundled fonts stand).
 
 **Decision:** The whole app uses a neo-brutalist visual language: flat saturated colours, 3-4 px black outlines, hard offset shadows with no blur, zero corner radius, heavy display type plus a monospace for labels and numbers, big blocky controls, snappy motion. Full spec: `docs/UI_DESIGN.md`.
 
@@ -203,3 +203,16 @@ Full detail in `docs/RESILIENCE_AND_CRASH_HANDLING.md`. Summary of what is copie
 
 **Consequences:** slightly more discipline (the platform seam) and one extra CI job from day one; adding the web build later is then packaging and UI polish, not a rewrite.
 
+## ADR-015: Editorial brutalism, light and dark themes, settings
+
+**Status:** Accepted (owner request, with two reference designs). **Date:** 2026-11-04.
+
+**Decision:** Replace the look of ADR-013 (3 px outlines, hard shadows, yellow/red/blue fills) with an editorial-brutalist one: a hairline cell grid, one condensed display face (Anton) with Space Mono for labels and data, paper grain, warm cream with a single vermilion accent, and a designed Night theme. Add a Settings screen (theme System/Light/Dark, texture, sound, vibration, screen-on, default name, forget saved game, about) and a Guide screen, behind a PLAY / GUIDE / SETTINGS bar. Settings persist in a small JSON file through `path_provider` behind the platform seam. Spec: `docs/UI_DESIGN.md`.
+
+**Why:** the first look was tiring to watch for a whole evening, and the app had one screen and nothing to come back to. The owner wants the references' look, both themes, and a settings area.
+
+**Consequences:**
+- Fold, call and raise no longer differ by hue (outlined, ink, accent) so meaning rides on position and label. Better for colour-blind players; the old `signal`/`danger`/`info` token names remain as aliases while components migrate.
+- **Anton is a new bundled font** (SIL OFL, `app/assets/fonts/`), outside the original approved list; Archivo Black is dropped. Anton has no tabular figures (digit `1` is narrower), so live numbers use `BrutalNumber`, which sets each digit in a fixed box.
+- Small text in the accent colour is not allowed in the Paper theme (4.4:1 on bare paper, lower under grain). Accent is for fills and large type; error text uses ink with an accent marker.
+- Every golden changes and is regenerated and inspected.
