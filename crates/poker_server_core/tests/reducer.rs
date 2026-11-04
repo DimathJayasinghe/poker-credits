@@ -795,3 +795,39 @@ fn the_new_order_survives_a_snapshot_round_trip() {
     assert_eq!(restored, room);
     assert_eq!(seat_of(&restored, "p_3"), Some(9));
 }
+
+#[test]
+fn once_the_game_has_run_guests_cannot_hop_seats_but_the_host_can_move_them() {
+    let (mut room, _) = table_of_three();
+    let t = Timings::default();
+    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    // Everybody folds until the hand is over and the table is between hands.
+    let mut at = 1100;
+    while room.game.legal_actions().is_some() {
+        act(&mut room, PlayerAction::Fold, at).unwrap();
+        at += 100;
+    }
+    assert_ne!(room.game.table.phase, poker_engine::Phase::Lobby);
+    let before = seat_of(&room, "p_2");
+
+    let err = room.apply(choose("p_2", 8, at), &t).unwrap_err();
+    assert_eq!(
+        err.code,
+        ErrorCode::HandInProgress,
+        "blinds cannot be dodged by moving"
+    );
+    assert_eq!(seat_of(&room, "p_2"), before);
+
+    room.apply(
+        host(
+            HostCommand::MoveSeat {
+                player_id: "p_2".into(),
+                seat_index: 8,
+            },
+            at + 10,
+        ),
+        &t,
+    )
+    .unwrap();
+    assert_eq!(seat_of(&room, "p_2"), Some(8));
+}

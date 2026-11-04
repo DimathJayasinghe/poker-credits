@@ -39,7 +39,14 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: dart format --output=none --set-exit-if-changed app packages
+      # Per package: the repository root also holds vendored build tooling (cargokit) whose own
+      # dependencies are not part of the workspace, and it is not ours to lint.
       - run: flutter analyze
+        working-directory: app
+      - run: flutter analyze
+        working-directory: packages/poker_protocol
+      - run: flutter analyze
+        working-directory: packages/poker_bridge
       # Each package runs from its own directory: the app tests load fonts and goldens by relative
       # path, and the protocol tests look for the shared fixtures.
       - name: App tests

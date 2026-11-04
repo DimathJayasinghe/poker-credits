@@ -396,10 +396,17 @@ impl RoomState {
         Ok(())
     }
 
-    /// A guest picks a seat for themselves. They may only take a free one: displacing somebody
-    /// is the host's call.
+    /// A guest picks a seat for themselves, only before the first hand is dealt and only a free
+    /// one: displacing somebody, or moving once the game is running, is the host's call. Moving
+    /// freely between hands would let a guest hop out of the big blind's way.
     fn op_choose_seat(&mut self, id: &str, seat_index: u8, at_ms: u64, out: &mut Outcome) -> Done {
         self.require_seated(id)?;
+        if self.game.table.phase != Phase::Lobby {
+            return Err(RoomError::new(
+                ErrorCode::HandInProgress,
+                "guests can only choose a seat before the game starts; ask the host",
+            ));
+        }
         if self
             .player_at_seat(SeatIndex::new(seat_index)?)
             .is_some_and(|p| p.id != id)

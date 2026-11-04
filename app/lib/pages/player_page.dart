@@ -296,7 +296,7 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
                 padding: const EdgeInsets.all(BrutalMetrics.gapM),
                 child: _StackBlock(seat: seat),
               ),
-              if (!seatsLocked(view.phase))
+              if (guestMayChooseSeat(view.phase))
                 Padding(
                   padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapM, 0, BrutalMetrics.gapM, BrutalMetrics.gapM),
                   child: BrutalButton(

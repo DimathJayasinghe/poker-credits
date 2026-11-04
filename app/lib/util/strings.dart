@@ -144,6 +144,7 @@ abstract final class Strings {
   static const String seatsFree = 'Free';
   static const String seatsYou = 'You';
   static const String seatsLocked = 'Seats are locked while a hand is being played. Change them between hands.';
+  static const String seatsHostOnly = 'The game has started, so only the host can move people between seats.';
   static const String seatsHintGuest = 'Tap a free seat to move there. Seat 1 is at the bottom of the table screen and the numbers run clockwise.';
   static const String seatsHintHost =
       'Tap a player, then a seat. A free seat moves them there; a taken seat swaps the two. Numbers run clockwise from the bottom of the table screen.';

@@ -7,6 +7,11 @@ int seatNumber(int seatIndex) => seatIndex + 1;
 /// The server refuses it too (`HAND_IN_PROGRESS`); this only decides whether the controls are on.
 bool seatsLocked(WirePhase phase) => phase != WirePhase.lobby && phase != WirePhase.nextHandPrep;
 
+/// A guest may choose their own seat only before the first hand: moving between hands would let
+/// them step out of the big blind's way. Once the game runs, moving people is the host's call.
+/// The server enforces it too; this decides whether the guest's controls are on.
+bool guestMayChooseSeat(WirePhase phase) => phase == WirePhase.lobby;
+
 /// Names in table order (seat 1 first, clockwise), for reading the order out loud and checking it
 /// against who actually sits where.
 List<String> clockwiseNames(Iterable<SeatView> seats) {
@@ -54,6 +59,7 @@ SeatTap seatTap({
   if (seatsLocked(phase)) return const SeatTapIgnored();
   final occupant = seats[target];
   if (!isHost) {
+    if (!guestMayChooseSeat(phase)) return const SeatTapIgnored();
     if (occupant != null) return const SeatTapIgnored();
     return SeatTapSend(ChooseSeat(seatIndex: target));
   }

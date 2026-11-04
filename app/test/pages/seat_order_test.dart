@@ -52,6 +52,12 @@ void main() {
       expect(seatsLocked(WirePhase.nextHandPrep), isFalse);
     });
 
+    test('after the first hand a guest cannot move, but the host still can', () {
+      expect(_tap(phase: WirePhase.nextHandPrep), isA<SeatTapIgnored>());
+      expect(guestMayChooseSeat(WirePhase.nextHandPrep), isFalse);
+      expect(_tap(host: true, phase: WirePhase.nextHandPrep, target: 2), isA<SeatTapSelect>());
+    });
+
     test('the host picks a player, then a seat', () {
       expect(_tap(host: true, target: 2), isA<SeatTapSelect>().having((t) => t.playerId, 'player', 'p_2'));
       expect(_tap(host: true, target: 5), isA<SeatTapIgnored>(), reason: 'an empty seat with nobody picked does nothing');
@@ -188,6 +194,19 @@ void main() {
       unawaited(showSeatOrderSheet(context, isHost: false));
       await tester.pumpAndSettle();
       expect(find.textContaining('Seats are locked'), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Seat 6, Free'));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(harness.network.last.sent.whereType<ChooseSeat>(), isEmpty);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('between hands a guest has no change-seat button and the sheet says only the host can move people', (tester) async {
+      final harness = await joined(tester, phase: WirePhase.nextHandPrep);
+      expect(find.text('SEAT 2: CHANGE SEAT'), findsNothing);
+      final context = tester.element(find.byType(PlayerPage));
+      unawaited(showSeatOrderSheet(context, isHost: false));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('only the host can move people'), findsOneWidget);
       await tester.tap(find.bySemanticsLabel('Seat 6, Free'));
       await tester.pump(const Duration(milliseconds: 200));
       expect(harness.network.last.sent.whereType<ChooseSeat>(), isEmpty);

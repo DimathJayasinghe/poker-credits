@@ -69,6 +69,8 @@ class _SeatOrderPickerState extends State<SeatOrderPicker> with Refena {
     final selected = seats.values.any((s) => s.playerId == _selected) ? _selected : null;
     final hint = locked
         ? Strings.seatsLocked
+        : !widget.isHost && !guestMayChooseSeat(view.phase)
+        ? Strings.seatsHostOnly
         : selected != null
         ? Strings.seatsPicked
         : widget.isHost
@@ -96,7 +98,7 @@ class _SeatOrderPickerState extends State<SeatOrderPicker> with Refena {
                       seat: seats[i],
                       isMine: seats[i]?.playerId == mine,
                       picked: seats[i] != null && seats[i]!.playerId == selected,
-                      enabled: !locked && _enabled(seats[i], mine, selected),
+                      enabled: !locked && (widget.isHost || guestMayChooseSeat(view.phase)) && _enabled(seats[i], mine, selected),
                       onTap: () => _tap(i, view, mine),
                     ),
                   ),

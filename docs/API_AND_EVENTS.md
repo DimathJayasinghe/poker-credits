@@ -129,7 +129,7 @@ No extra fields. Deals the next hand from `LOBBY` or `NEXT_HAND_PREP`.
 
 ### 3.7a Seat order: `MOVE_SEAT` (host) and `CHOOSE_SEAT` (player)
 `{ "type":"MOVE_SEAT", "playerId":"p_2", "seatIndex":4 }` (host) and `{ "type":"CHOOSE_SEAT", "seatIndex":7 }` (any seated player, for themselves). Seats `0..9` run clockwise, and the seat order is the turn order, so the seating must match who sits where in the room.
-- Only between hands (`LOBBY` or `NEXT_HAND_PREP`); during a hand the answer is `HAND_IN_PROGRESS` and nothing changes.
+- `MOVE_SEAT` (host) works in the lobby and between hands (`LOBBY` or `NEXT_HAND_PREP`). `CHOOSE_SEAT` (guest) works **only in `LOBBY`, before the first hand**: once the game runs, a guest who could change seats freely could step out of the big blind's way, so moving people is the host's call. Any other time the answer is `HAND_IN_PROGRESS` and nothing changes.
 - `MOVE_SEAT` onto an occupied seat **swaps** the two players. `CHOOSE_SEAT` onto an occupied seat is refused with `SEAT_OCCUPIED`: a guest never displaces anyone.
 - Moving to your own seat is a no-op (safe to retry). A spectator, or an unknown player, is refused.
 - The dealer button and blind markers stay on their *seats* (a physical button stays on its chair), so after a swap the button may belong to a different person.
