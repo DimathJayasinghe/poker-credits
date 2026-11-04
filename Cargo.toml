@@ -11,6 +11,7 @@ members = [
 version = "1.0.0"
 edition = "2024"
 publish = false
+license = "MIT"
 
 # Lint levels for every member (members opt in with `[lints] workspace = true`).
 # See docs/CODING_STANDARDS.md section 3.2.

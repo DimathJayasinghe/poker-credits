@@ -78,3 +78,7 @@ Machine setup and helper scripts: [`docs/DEV_SETUP.md`](docs/DEV_SETUP.md). To r
 ## Security note
 
 Host mode uses plain `ws://` on the local network, so play on a network you trust (home Wi-Fi or your own hotspot), not on public Wi-Fi. Cloud mode must sit behind TLS. Details are in the security document above.
+
+## License
+
+[MIT](LICENSE). The bundled fonts (Anton, Space Mono) are under the SIL Open Font License; their texts are next to the font files in `app/assets/fonts/`.
