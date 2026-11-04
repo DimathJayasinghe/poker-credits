@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
+import 'package:poker_credits/widget/brutal/scroll_fade.dart';
 
 /// Places seat plates around the pot. Slots are fixed per seat index so a player keeps their place
 /// on the screen for the whole game: that is what makes the screen match the room.
@@ -145,6 +146,10 @@ class FeltLayout extends StatelessWidget {
         const SizedBox(height: gap),
       ],
     );
-    return shrinkWrap ? content : SingleChildScrollView(child: content);
+    return shrinkWrap
+        ? content
+        : ScrollFade(
+            builder: (context, controller) => SingleChildScrollView(controller: controller, child: content),
+          );
   }
 }

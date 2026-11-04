@@ -386,15 +386,28 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
             builder: (context, box) {
               // Roomy: the oval fills what the controls leave. Cramped: the whole middle scrolls
               // and the controls come first, so nothing is ever drawn over anything else.
-              if (_cramped(context, box, myTurn: mine != null, host: session.isHost)) {
+              if (_cramped(context, box, myTurn: mine != null, host: session.isHost, lobby: view.phase == WirePhase.lobby)) {
+                // Short content sits with the controls at the bottom edge; long content scrolls.
                 return SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      ...actionBlock,
-                      Padding(padding: const EdgeInsets.all(BrutalMetrics.gapM), child: felt(shrink: true)),
-                      ...hostBlock,
-                    ],
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: box.maxHeight),
+                    // A phone keeps the controls at the bottom edge, in thumb reach. A wide screen
+                    // centres the whole block so a short table does not leave a hole in the middle.
+                    child: Column(
+                      mainAxisAlignment: box.maxWidth >= FeltLayout.narrowWidth ? MainAxisAlignment.center : MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                            ...actionBlock,
+                            Padding(padding: const EdgeInsets.all(BrutalMetrics.gapM), child: felt(shrink: true)),
+                          ],
+                        ),
+                        if (box.maxWidth >= FeltLayout.narrowWidth) const SizedBox(height: BrutalMetrics.gapM),
+                        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: hostBlock),
+                      ],
+                    ),
                   ),
                 );
               }
@@ -417,12 +430,18 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
   }
 
   /// Rough height of what sits under the table while it is shown: the turn buttons and the host
-  /// controls. Only used to decide when the oval no longer fits next to them.
+  /// controls. Only used to decide when the oval no longer fits next to them. The host controls
+  /// are the hint (lobby only), the full-width main button and one row of buttons, or two rows on
+  /// a phone.
   static const double _turnBlockHeight = 150;
-  static const double _hostBlockHeight = 190;
 
-  bool _cramped(BuildContext context, BoxConstraints box, {required bool myTurn, required bool host}) {
-    final chrome = (myTurn ? _turnBlockHeight : 0) + (host ? _hostBlockHeight : 0) + 2 * BrutalMetrics.gapM;
+  static double _hostBlockHeight({required double width, required bool lobby}) {
+    final rows = width < 480 ? 2 : 1;
+    return 16 + (lobby ? 44 : 0) + 56 + BrutalMetrics.gapS + rows * 48 + (rows - 1) * BrutalMetrics.gapS;
+  }
+
+  bool _cramped(BuildContext context, BoxConstraints box, {required bool myTurn, required bool host, required bool lobby}) {
+    final chrome = (myTurn ? _turnBlockHeight : 0) + (host ? _hostBlockHeight(width: box.maxWidth, lobby: lobby) : 0) + 2 * BrutalMetrics.gapM;
     if (box.maxWidth < FeltLayout.narrowWidth) return box.maxHeight < 420 + chrome;
     return box.maxHeight < FeltLayout.minOvalHeight(context) + chrome;
   }

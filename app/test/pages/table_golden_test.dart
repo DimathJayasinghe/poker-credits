@@ -37,6 +37,7 @@ Future<void> _open(WidgetTester tester, TestHarness harness, RoomView view, Size
   harness.network.last.serverSends(snapshot(version: 1, serverTime: harness.clock.millisecondsSinceEpoch, view: view));
   await tester.pump();
   await tester.pump();
+  await tester.pump(); // the scroll fade learns there is more below
 }
 
 void main() {
