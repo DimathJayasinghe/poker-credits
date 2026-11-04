@@ -689,6 +689,37 @@ async fn scanning_for_rooms_is_stopped_across_reconnects() {
 }
 
 #[tokio::test]
+async fn scanning_room_lookups_on_a_cloud_server_spends_the_failure_budget() {
+    let limits = Limits {
+        join_failures: 3,
+        http_burst: 100,
+        http_rate_per_second: 100,
+        ..Limits::default()
+    };
+    let server = boot_with(limits, None).await;
+    let addr = server.local_addr();
+    let host = create(addr).await;
+    assert_eq!(
+        http_get(addr, &format!("/v1/room/{}", host.code)).await.0,
+        200
+    );
+    for code in ["AAAA", "AAAB", "AAAC"] {
+        assert_eq!(http_get(addr, &format!("/v1/room/{code}")).await.0, 200);
+    }
+    // Three misses: blocked, for lookups of real rooms as well as for WebSocket joins.
+    assert_eq!(
+        http_get(addr, &format!("/v1/room/{}", host.code)).await.0,
+        429
+    );
+    let mut blocked = WsClient::connect(addr).await;
+    blocked
+        .send(json!({"v": 1, "type": "JOIN_ROOM", "roomCode": host.code, "name": "X", "spectator": false}))
+        .await;
+    assert_eq!(error_code(&blocked.recv().await.unwrap()), "RATE_LIMITED");
+    server.stop().await;
+}
+
+#[tokio::test]
 async fn successful_joins_do_not_count_against_the_failure_budget() {
     let limits = Limits {
         join_failures: 3,

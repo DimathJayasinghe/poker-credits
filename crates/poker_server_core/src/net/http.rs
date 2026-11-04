@@ -107,6 +107,11 @@ pub(crate) async fn info(State(net): State<Arc<NetState>>) -> Json<Info> {
 }
 
 /// `GET /v1/room/{code}`. Rate limited per IP because codes are guessable.
+///
+/// On a cloud server a lookup of a code that does not exist also counts as a failed join, so
+/// probing for rooms spends the same budget as probing over the WebSocket and a scanner is
+/// blocked after the same number of misses. A host-embedded (LAN) server does not count: its
+/// guests legitimately ask for codes that are not there (a typo, the wrong Wi-Fi).
 pub(crate) async fn room(
     State(net): State<Arc<NetState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -115,21 +120,29 @@ pub(crate) async fn room(
     if !net.http_limiter.check(addr.ip()) {
         return StatusCode::TOO_MANY_REQUESTS.into_response();
     }
-    let lookup = match net.registry.room_info(&code).await {
-        Some(info) => RoomLookup {
+    let counts_misses = net.mode == ServerMode::Cloud;
+    if counts_misses && !net.join_failures.allowed(addr.ip()) {
+        return StatusCode::TOO_MANY_REQUESTS.into_response();
+    }
+    let lookup = if let Some(info) = net.registry.room_info(&code).await {
+        RoomLookup {
             exists: true,
             player_count: info.player_count,
             max_players: info.max_players,
             is_full: info.player_count >= info.max_players,
             in_progress: info.in_progress,
-        },
-        None => RoomLookup {
+        }
+    } else {
+        if counts_misses {
+            net.join_failures.record_failure(addr.ip());
+        }
+        RoomLookup {
             exists: false,
             player_count: 0,
             max_players: 0,
             is_full: false,
             in_progress: false,
-        },
+        }
     };
     Json(lookup).into_response()
 }
