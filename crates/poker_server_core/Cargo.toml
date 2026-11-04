@@ -8,7 +8,7 @@ publish.workspace = true
 [dependencies]
 axum = { version = "0.8.9", features = ["ws"] }
 getrandom = "0.4.3"
-poker_engine = { version = "0.1.0", path = "../poker_engine" }
+poker_engine = { version = "1.0.0", path = "../poker_engine" }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"

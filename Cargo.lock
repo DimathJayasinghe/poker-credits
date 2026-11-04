@@ -942,7 +942,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "poker_engine"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "proptest",
  "serde",
@@ -952,7 +952,7 @@ dependencies = [
 
 [[package]]
 name = "poker_server"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "poker_server_core",
@@ -963,7 +963,7 @@ dependencies = [
 
 [[package]]
 name = "poker_server_core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "axum",
  "getrandom 0.4.3",
@@ -1154,7 +1154,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rust_lib_poker_bridge"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "flutter_rust_bridge",
  "poker_server_core",
