@@ -18,8 +18,8 @@ use crate::skill::Skill;
 use crate::strength::{preflop_adjust, preflop_strength};
 use crate::view::BotView;
 
-/// Longest a single equity estimate may run (spec section 8).
-const EQUITY_BUDGET: Duration = Duration::from_millis(8);
+/// Longest a single equity estimate may run by default (spec section 8).
+pub const EQUITY_BUDGET: Duration = Duration::from_millis(8);
 
 /// One bot's private state: who it is, how well it plays, its mood and its reads.
 #[derive(Clone, Debug)]
@@ -32,6 +32,9 @@ pub struct BotMind {
     pub mood: f32,
     /// What it has noticed about the others.
     pub notes: Notes,
+    /// Time limit for one equity estimate. `None` removes the limit, which makes decisions
+    /// exactly repeatable (tests); the default keeps a decision under a few milliseconds.
+    pub equity_budget: Option<Duration>,
 }
 
 impl BotMind {
@@ -43,6 +46,7 @@ impl BotMind {
             skill,
             mood: 0.0,
             notes: Notes::default(),
+            equity_budget: Some(EQUITY_BUDGET),
         }
     }
 }
@@ -207,7 +211,7 @@ fn preflop(
     let s = preflop_adjust(preflop_strength(view.hole), late_position(view), opponents)
         + shift
         + reads.strength_shift;
-    let play = 0.60 - 0.32 * p.looseness;
+    let play = 0.52 - 0.32 * p.looseness;
     let big = num(view.blinds.big_blind).max(1.0);
     let owed = num(view.to_call);
     let stack = num(view.my_chips());
@@ -236,7 +240,7 @@ fn preflop(
     }
     if !facing_raise {
         if s >= play {
-            return if rng.chance(0.35 + 0.65 * p.aggression) {
+            return if rng.chance(0.10 + 0.90 * p.aggression * p.aggression) {
                 (sized_raise(view, mind, rng, true, 1.0), closeness)
             } else if view.legal.can_call {
                 (PlayerAction::Call, closeness)
@@ -285,13 +289,15 @@ fn postflop(
     let raw = if skill.samples() == 0 {
         made_hand_tier(view.hole, &view.board, opponents)
     } else {
+        // A stream of its own, so the time budget cannot change how much of `rng` is consumed.
+        let mut sampler = BotRng::from_seed(rng.next_u64());
         equity(
             view.hole,
             &view.board,
             opponents,
             skill.samples(),
-            rng,
-            Some(EQUITY_BUDGET),
+            &mut sampler,
+            mind.equity_budget,
         )
     };
     let e = raw + shift + reads.strength_shift;

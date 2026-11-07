@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc ddc7e47f06548541625194ec76d92d82e0d8024430f0be690521adf035aaacc5 # shrinks to players = 2, seed = 9200489090510373201, salt = 4446895252294248213, skill = 2, street = 1

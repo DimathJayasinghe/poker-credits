@@ -33,3 +33,10 @@ dbg_macro = "deny"
 # Never set `panic = "abort"`: room crash recovery relies on unwinding (ADR-009, ADR-011).
 [profile.dev]
 debug = "line-tables-only"
+
+# The simulation tests play thousands of hands; optimise the two pure crates even in dev builds.
+[profile.dev.package.poker_engine]
+opt-level = 3
+
+[profile.dev.package.poker_bots]
+opt-level = 3
