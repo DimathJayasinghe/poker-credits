@@ -169,6 +169,9 @@ app/lib/pages/{host_page.dart,join_page.dart,player_page.dart,table_page.dart}
 ```
 Agent rules for this phase: all ranking and dealing in Rust; the shuffle is drawn in the actor and journaled, never in the reducer; no card text in logs or `Debug`; every new wire item gets a fixture on both sides first (principle 7); the no-leak oracle test must exist before the Player UI work starts.
 
+### Phase 9 (ADR-018): Single player with bots, proposed
+Spec: `docs/superpowers/specs/2026-11-07-single-player-bots-design.md` (read it whole; section 12 is the delivery order). Branch `feature/solo-bots`, one commit per step. Steps 1 to 3 (strategy crate, room integration, adaptation) are high risk: plan and review with the strongest model. Hard rules: the strategy gets only a per-seat `BotView`; no `rand` (hand-written PRNG); bots exempt from absence and vote-kick; no polling; solo server on `127.0.0.1`; tests `bot_view_invariance`, `no_seat_advantage`, skill ordering, absence exemption and a decision-time bench must exist before the UI work starts. Nothing is built yet.
+
 ## 4. Coding Principles for the Agent
 1. **No game logic in Dart.** The app renders `RoomView` and sends intents. It does not compute pots, turns or legality beyond using `TURN_PROMPT.legal`.
 2. **Idempotency.** Every `GAME_ACTION` carries `actionSeq`; the server enforces it.

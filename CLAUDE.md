@@ -31,6 +31,7 @@ Poker Credits: Flutter app + Rust engine/server for physical-card Texas Hold'em 
 | Dev setup, plugins, graphify | `docs/DEV_SETUP.md` |
 | Plan | `pocker_credit_plan.md` |
 | Virtual cards (ADR-016, built) | `docs/superpowers/specs/2026-11-07-virtual-cards-design.md` |
+| Single player with bots (ADR-018, designed) | `docs/superpowers/specs/2026-11-07-single-player-bots-design.md` |
 
 ## Reference repo
 `~/Documents/dev_projects/localsend` is the design model (layout, FRB bridge, lifecycle recovery, init error app). Read-only reference; its own AGENTS.md disallows AI contributions upstream.

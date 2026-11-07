@@ -195,3 +195,12 @@ Spec and mockups: `docs/superpowers/specs/2026-11-07-virtual-cards-design.md` se
 - **Seat plates** have one fixed height (`FeltLayout.plateHeightFor`); their content shrinks to fit rather than growing the plate. **Top bar cells** (`TopBarStat`) use a fixed value slot and a label whose text scale is clamped at 1.4, so ROOM, HAND and PHASE share their lines.
 - **Tests:** `screens_layout_test` sweeps Home, Settings, Guide, Support and the first-run screens over five sizes (320x568 to 1920x1080), three text sizes and both themes, and checks every pressable cell is at least 44 px; `launch_golden_test`, `walkthrough_golden_test`, `seat_plate_test`, `top_bar_test`.
 
+## 10. Single player (ADR-018, proposed, not built)
+
+Spec: `docs/superpowers/specs/2026-11-07-single-player-bots-design.md` section 9. Summary:
+- **Home:** third large action "Play alone" (caption "Against computer players, no network") and a "Resume solo game" row when a saved solo game exists.
+- **Setup (`SoloSetupPage`):** one screen, no scrolling on a phone at 1.0 text: Opponents stepper (1 to 9, default 4); Skill as three equal cells (Easy, Normal, Hard) with a one-line caption for the chosen one; a Stack and blinds summary row with Quick / Standard / Deep presets; the primary Start cell. Dense `BrutalRow`s, tokens only, type scale from section 2.
+- **Table:** the Player screen layout with every seat on the felt; host-only controls hidden; menu: Pause, Guide, Leave game. The acting bot's plate carries the normal turn marker (static, no spinner); an action line ("Maya raises to 60") goes in the action feed.
+- **Lifecycle:** the game pauses when the app is backgrounded and shows a short pause banner on return.
+- **End states:** a busted human sees Rebuy or Leave table; Leave shows a one-screen summary; a busted bot is replaced by a fresh one before the next hand.
+- The app tour gets a "Play alone" step and the Guide a "Play alone" section.

@@ -363,3 +363,7 @@ All additive, `v` stays 1: a client or server that does not know them ignores th
 * **Host showdown messages:** `BEGIN_SHOWDOWN` and `RESOLVE_SHOWDOWN` return `ILLEGAL_STATE` in virtual rooms; the server resolves the showdown itself (journaled as `Op::AutoShowdown`). `UNDO` is accepted only within the current betting street: once a card has been turned it is refused with `ILLEGAL_STATE`.
 * **`START_HAND` has no deck field.** The server shuffles from its own entropy; a client cannot choose the deck.
 * **HTTP:** `cardMode` is added to `GET /v1/room/{code}` and to each entry of `GET /v1/lobbies` so the Join page can tag virtual games. A host that does not say it means real cards.
+
+## 10. Single player additions (ADR-018, proposed, not built)
+
+`RoomConfig` gains optional fields with serde defaults, so old clients and fixtures are unaffected: `solo` (bool, default false), `bots` (u8, default 0), `botSkill` (`EASY` | `NORMAL` | `HARD`, default `NORMAL`). A solo room requires `cardMode: VIRTUAL`, `bots` 1 to 9, and is created only through the host path (`create_room_detached` / the bridge), never from a network `CREATE_ROOM`. No `isBot` is sent by default (owner question 2 in the spec); if a bot tag is wanted it is an additive `isBot` boolean on the player view. No new message types. Spec: `docs/superpowers/specs/2026-11-07-single-player-bots-design.md`.

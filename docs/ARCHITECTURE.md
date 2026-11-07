@@ -351,3 +351,11 @@ Where things live:
 | Hole cards in client state, `showsCards`, `RunoutPacer` | `app/lib/model/` |
 
 The Dart app holds no poker rule: it draws what the server sent (the cards, the categories and the winners all come from the engine). Details: `docs/superpowers/specs/2026-11-07-virtual-cards-design.md`.
+
+## 11. Single player with bots (ADR-018, proposed, not built)
+
+Spec: `docs/superpowers/specs/2026-11-07-single-player-bots-design.md`. A solo game is the host topology (section 6) with the server bound to `127.0.0.1` and no network client. New pieces:
+- `crates/poker_bots`: pure strategy (`BotView` in, `Decision {action, think_ms}` out), personalities, opponent notes, a small PRNG. Depends on `poker_engine` types only.
+- `crates/poker_server_core/src/room/bots.rs`: builds a `BotView` for one seat, owns each bot's `BotMind`, schedules bot actions. The actor adds the earliest bot due time to `next_wake_ms` and `run_due` submits the bot's `Op::Action` like it submits `Op::Timeout`. Illegal or failed decisions fall back to check or fold.
+- Bots are `Player`s with `is_bot` and no connection; `Absence` and vote-kick skip them. `Op::AddBot` journals a bot with its personality; decisions are journaled as normal actions, so replay never reruns bot logic.
+- Idle cost is zero: the actor sleeps between timers. The Flutter lifecycle pauses the room in the background.

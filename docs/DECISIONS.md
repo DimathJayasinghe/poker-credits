@@ -257,3 +257,21 @@ Full detail in `docs/RESILIENCE_AND_CRASH_HANDLING.md`. Summary of what is copie
 
 **Consequences:** `url_launcher` was added with the owner's approval (2026-11-07); Android declares a `VIEW https` query so it works on Android 11 and newer. The first run adds one screen of friction by design; a returning player sees only a half-length splash.
 
+## ADR-018: Single player mode with bots
+
+**Status:** Proposed 2026-11-07 (owner request); design in `docs/superpowers/specs/2026-11-07-single-player-bots-design.md`. Not built. Awaiting the owner's answers to its three questions and approval.
+
+**Context:** the owner wants to play alone against 1 to 9 computer players with a skill level chosen at the start. Requirements: feels like real players, fair, bots read each other and the human and adapt, bots are not clones, light on battery and CPU.
+
+**Decision:**
+1. Bots are seated players inside the room actor, not socket clients. Their think time is one more wake candidate in `next_wake_ms`; their action is an ordinary journaled `Op::Action`. No polling, no threads, no network.
+2. Strategy lives in a new pure-Rust crate `crates/poker_bots` (no async, no I/O, no dependency on the server crate). Dart holds no poker rules and no bot logic.
+3. Fairness by types: the strategy gets a per-seat `BotView` (own cards, board, pots, stacks, public history, showdown reveals) and never `RoomState`, the deck or other hole cards. Property tests prove the decision does not change when hidden cards change. Bots use the same shuffle as human games and are never rigged either way.
+4. Skill (Easy, Normal, Hard) changes only how well a bot uses the same information (equity samples, how fast it trusts reads, error rate). Personality (six archetypes plus jitter, mood, think speed) makes bots differ. Each bot keeps its own opponent notes; nothing is shared.
+5. Randomness: a hand-written PRNG seeded from `getrandom`; `rand` is not added.
+6. Solo is a hosted game on the device with the server bound to `127.0.0.1` only, cards in the app forced, the human's timer off by default, the game paused while the app is in the background.
+7. Bots are exempt from absence, presence and vote-kick rules.
+
+**Why:** reuses the whole tested table, journal and virtual-cards stack; the types make cheating impossible rather than forbidden; the actor already sleeps until its next timer, which is the cheapest possible scheduling.
+
+**Consequences:** new crate `poker_bots`; `RoomConfig` gains optional `solo`, `bots`, `bot_skill` fields (additive); a second session slot for a solo game; opponent notes reset after a restore; release 1.3.0.
