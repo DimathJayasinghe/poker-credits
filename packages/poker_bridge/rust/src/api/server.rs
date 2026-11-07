@@ -13,7 +13,9 @@ use flutter_rust_bridge::frb;
 use poker_server_core::config::{Limits, Timings};
 use poker_server_core::event::ServerEvent;
 use poker_server_core::protocol::{CardMode, RoomConfig, SoloConfig};
-use poker_server_core::{ServerConfig, ServerHandle, ServerMode, StartError};
+use poker_server_core::{
+    Fingerprint, Identity, ServerConfig, ServerHandle, ServerMode, StartError,
+};
 use tokio::sync::{Mutex, mpsc};
 
 use crate::frb_generated::StreamSink;
@@ -69,6 +71,8 @@ pub enum RsServerErrorKind {
     Bind,
     /// The data folder could not be created.
     DataDir,
+    /// The encryption certificate could not be made or stored.
+    Tls,
 }
 
 /// The server could not be started.
@@ -95,6 +99,7 @@ impl std::fmt::Display for RsServerError {
                     self.target, self.message
                 )
             }
+            RsServerErrorKind::Tls => write!(f, "cannot set up encryption: {}", self.message),
         }
     }
 }
@@ -113,6 +118,11 @@ impl From<StartError> for RsServerError {
                 kind: RsServerErrorKind::DataDir,
                 target: path.display().to_string(),
                 message: source.to_string(),
+            },
+            error @ (StartError::Tls(_) | StartError::PlaintextOnNetwork { .. }) => RsServerError {
+                kind: RsServerErrorKind::Tls,
+                target: String::new(),
+                message: error.to_string(),
             },
         }
     }
@@ -211,6 +221,8 @@ pub struct RsServerHandle {
     port: u16,
     /// Only this device can reach the server (a single-player game needs that).
     loopback_only: bool,
+    /// The pin a guest needs, when the server speaks TLS (it does whenever it is on the network).
+    fingerprint: Option<String>,
     inner: Mutex<Option<ServerHandle>>,
     /// Events wait here until Dart subscribes, so `Listening` is never missed.
     pending_events: std::sync::Mutex<Option<mpsc::Receiver<ServerEvent>>>,
@@ -222,6 +234,14 @@ impl RsServerHandle {
     #[must_use]
     pub fn port(&self) -> u16 {
         self.port
+    }
+
+    /// The certificate fingerprint guests pin (43 URL-safe base64 characters), or `None` for a
+    /// server that only this device can reach.
+    #[frb(sync, getter)]
+    #[must_use]
+    pub fn fingerprint(&self) -> Option<String> {
+        self.fingerprint.clone()
     }
 
     /// Creates a room and returns the host's credentials (host mode does not accept
@@ -318,10 +338,11 @@ pub(crate) async fn start_with_events(
     events: mpsc::Sender<ServerEvent>,
     receiver: mpsc::Receiver<ServerEvent>,
 ) -> Result<RsServerHandle, RsServerError> {
-    let server = poker_server_core::start(to_core(config, events)).await?;
+    let server = poker_server_core::start(to_core(config, events)?).await?;
     Ok(RsServerHandle {
         port: server.local_addr().port(),
         loopback_only: server.local_addr().ip().is_loopback(),
+        fingerprint: server.fingerprint().map(|pin| pin.to_string()),
         inner: Mutex::new(Some(server)),
         pending_events: std::sync::Mutex::new(Some(receiver)),
     })
@@ -363,14 +384,35 @@ impl TryFrom<RsRoomConfig> for RoomConfig {
     }
 }
 
-fn to_core(config: &RsServerConfig, events: mpsc::Sender<ServerEvent>) -> ServerConfig {
+/// File in the data folder that keeps the host's certificate and key between runs, so a guest's
+/// pin keeps matching after the app restarts (ADR-019).
+const IDENTITY_FILE: &str = "tls-identity.bin";
+
+/// A server on the network is always encrypted; one only this device can reach stays plain.
+fn to_core(
+    config: &RsServerConfig,
+    events: mpsc::Sender<ServerEvent>,
+) -> Result<ServerConfig, RsServerError> {
     let ip = if config.expose_on_lan {
         IpAddr::V4(Ipv4Addr::UNSPECIFIED)
     } else {
         IpAddr::V4(Ipv4Addr::LOCALHOST)
     };
     let data_dir = (!config.data_dir.trim().is_empty()).then(|| PathBuf::from(&config.data_dir));
-    ServerConfig {
+    let tls = if config.expose_on_lan {
+        let identity = match &data_dir {
+            Some(dir) => Identity::load_or_create(&dir.join(IDENTITY_FILE)),
+            None => Identity::generate(),
+        };
+        Some(identity.map_err(|error| RsServerError {
+            kind: RsServerErrorKind::Tls,
+            target: String::new(),
+            message: error.to_string(),
+        })?)
+    } else {
+        None
+    };
+    Ok(ServerConfig {
         bind: SocketAddr::new(ip, config.port),
         data_dir,
         limits: Limits::default(),
@@ -378,7 +420,18 @@ fn to_core(config: &RsServerConfig, events: mpsc::Sender<ServerEvent>) -> Server
         mode: ServerMode::Host,
         server_name: config.server_name.clone(),
         events: Some(events),
-    }
+        tls,
+    })
+}
+
+/// The pin for a certificate: SHA-256 of its DER bytes, as 43 URL-safe base64 characters.
+///
+/// Sync because Dart's `badCertificateCallback` must answer at once; it hands the certificate it
+/// was shown to this function and compares the result with the pin it holds.
+#[frb(sync)]
+#[must_use]
+pub fn cert_fingerprint(der: Vec<u8>) -> String {
+    Fingerprint::of_certificate(&der).to_string()
 }
 
 fn to_wire(event: &ServerEvent) -> RsServerEvent {
@@ -411,11 +464,18 @@ mod tests {
         let (tx, _rx) = mpsc::channel(1);
         assert!(
             to_core(&config(true), tx.clone())
+                .expect("config")
                 .bind
                 .ip()
                 .is_unspecified()
         );
-        assert!(to_core(&config(false), tx).bind.ip().is_loopback());
+        assert!(
+            to_core(&config(false), tx)
+                .expect("config")
+                .bind
+                .ip()
+                .is_loopback()
+        );
     }
 
     /// What crosses into Dart is a kind and one number. The hosted server's rooms (hands, cards,
@@ -438,10 +498,53 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn a_lan_server_is_encrypted_and_keeps_its_pin_across_restarts() {
+        let dir = std::env::temp_dir().join(format!("pc-bridge-tls-{}", std::process::id()));
+        let lan = RsServerConfig {
+            data_dir: dir.display().to_string(),
+            ..config(true)
+        };
+        let mut pins = Vec::new();
+        for _ in 0..2 {
+            let (tx, rx) = mpsc::channel(8);
+            let handle = start_with_events(&lan, tx, rx).await.expect("starts");
+            pins.push(handle.fingerprint().expect("a LAN server has a pin"));
+            handle.stop().await;
+        }
+        assert_eq!(pins[0], pins[1], "the same host keeps the same pin");
+        assert_eq!(pins[0].len(), 43);
+        let _cleanup = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_loopback_server_has_no_pin() {
+        let (tx, rx) = mpsc::channel(8);
+        let handle = start_with_events(&config(false), tx, rx)
+            .await
+            .expect("starts");
+        assert_eq!(handle.fingerprint(), None);
+        handle.stop().await;
+    }
+
+    #[test]
+    fn cert_fingerprint_is_sha256_in_43_url_safe_characters() {
+        // SHA-256 of the empty input is e3b0c442...; its URL-safe base64 is below.
+        assert_eq!(
+            cert_fingerprint(Vec::new()),
+            "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        );
+    }
+
     #[test]
     fn empty_data_dir_means_memory_only() {
         let (tx, _rx) = mpsc::channel(1);
-        assert!(to_core(&config(false), tx).data_dir.is_none());
+        assert!(
+            to_core(&config(false), tx)
+                .expect("config")
+                .data_dir
+                .is_none()
+        );
     }
 
     #[tokio::test]

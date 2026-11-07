@@ -533,6 +533,7 @@ async fn run_fuzz(victim_virtual: bool, attacker_virtual: bool) {
         mode: ServerMode::Cloud,
         server_name: "Fuzz".into(),
         events: None,
+        tls: None,
     })
     .await
     .unwrap();

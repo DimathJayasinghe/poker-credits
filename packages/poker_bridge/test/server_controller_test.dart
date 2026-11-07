@@ -23,6 +23,9 @@ class _FakeServer implements NativeServer {
   int get port => 7878;
 
   @override
+  String? get fingerprint => null;
+
+  @override
   Stream<RsServerEvent> events() => _controller.stream;
 
   @override

@@ -31,6 +31,7 @@ async fn boot_with(limits: Limits, data_dir: Option<PathBuf>) -> ServerHandle {
         mode: ServerMode::Cloud,
         server_name: "Test Server".into(),
         events: None,
+        tls: None,
     })
     .await
     .unwrap()
@@ -888,6 +889,7 @@ async fn host_mode_refuses_room_creation_over_the_network_and_resumes_a_detached
         mode: ServerMode::Host,
         server_name: "Host".into(),
         events: None,
+        tls: None,
     })
     .await
     .unwrap();
@@ -937,6 +939,7 @@ async fn boot_host_mode() -> ServerHandle {
         mode: ServerMode::Host,
         server_name: "Host".into(),
         events: None,
+        tls: None,
     })
     .await
     .unwrap()
@@ -969,6 +972,68 @@ async fn a_host_server_lists_its_open_lobby_with_the_host_name_and_seat_count() 
 
     join_as(addr, &room.room_code, "Alice", None).await;
     assert_eq!(lobbies(addr).await[0]["playerCount"], 2);
+    server.stop().await;
+}
+
+/// `GET path` with a chosen `Host` header: what a rebinding web page sends.
+async fn status_with_host(addr: SocketAddr, path: &str, host: &str) -> u16 {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+    let request = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n");
+    stream.write_all(request.as_bytes()).await.unwrap();
+    let mut raw = Vec::new();
+    stream.read_to_end(&mut raw).await.unwrap();
+    let text = String::from_utf8_lossy(&raw).into_owned();
+    text.split_whitespace().nth(1).unwrap().parse().unwrap()
+}
+
+#[tokio::test]
+async fn a_host_server_ignores_requests_that_name_it_by_somebody_elses_domain() {
+    let server = boot_host_mode().await;
+    let addr = server.local_addr();
+    for path in ["/health", "/v1/info", "/v1/lobbies", "/v1/room/ABCD"] {
+        assert_eq!(
+            status_with_host(addr, path, "rebind.evil.example:7878").await,
+            400,
+            "{path}"
+        );
+        assert_eq!(
+            status_with_host(addr, path, &addr.to_string()).await,
+            200,
+            "{path} by address"
+        );
+    }
+    // A real upgrade request under a foreign name is refused before the upgrade.
+    {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        stream
+            .write_all(
+                b"GET /v1/ws HTTP/1.1\r\nHost: rebind.evil.example\r\nUpgrade: websocket\r\n\
+                  Connection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\
+                  Sec-WebSocket-Version: 13\r\n\r\n",
+            )
+            .await
+            .unwrap();
+        let mut head = vec![0_u8; 64];
+        let n = stream.read(&mut head).await.unwrap();
+        assert!(String::from_utf8_lossy(&head[..n]).contains(" 400 "));
+    }
+    assert_eq!(
+        status_with_host(addr, "/health", "pixel-7.local").await,
+        200
+    );
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn a_cloud_server_answers_under_its_own_name() {
+    let server = boot().await;
+    let addr = server.local_addr();
+    assert_eq!(
+        status_with_host(addr, "/health", "poker.example.com").await,
+        200
+    );
     server.stop().await;
 }
 

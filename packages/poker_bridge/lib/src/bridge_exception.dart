@@ -12,6 +12,9 @@ enum BridgeFailureKind {
   /// The server refused the room; see [BridgeException.code].
   room,
 
+  /// The encryption certificate could not be made or stored.
+  tls,
+
   /// Anything else.
   unknown,
 }

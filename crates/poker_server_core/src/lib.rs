@@ -11,6 +11,7 @@ pub mod registry;
 pub mod room;
 pub mod store;
 mod supervisor;
+pub mod tls;
 pub mod util;
 
 /// Wire protocol version spoken by this build (`v` field of every message).
@@ -34,6 +35,7 @@ use std::time::Duration;
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 
+use axum::serve::ListenerExt as _;
 use config::{Limits, Timings};
 use event::ServerEvent;
 use net::NetState;
@@ -41,6 +43,8 @@ pub use net::ServerMode;
 use net::guards::{FailureLimiter, IpLimiter, KeyedRateLimiter};
 use registry::Registry;
 use room::actor::Clock;
+use tls::TlsListener;
+pub use tls::{Fingerprint, Identity, TlsError};
 
 /// How long [`ServerHandle::stop`] waits for rooms and sockets to wind down.
 const STOP_GRACE: Duration = Duration::from_secs(5);
@@ -62,6 +66,10 @@ pub struct ServerConfig {
     pub server_name: String,
     /// Optional event feed. Bounded; events are dropped when it is full.
     pub events: Option<mpsc::Sender<ServerEvent>>,
+    /// The certificate to serve (TLS 1.3 only). `None` serves plain HTTP, which is only for the
+    /// cloud binary behind a proxy and for loopback: a host server that listens on the network
+    /// without TLS refuses to start ([`StartError::PlaintextOnNetwork`]).
+    pub tls: Option<Identity>,
 }
 
 impl ServerConfig {
@@ -77,6 +85,7 @@ impl ServerConfig {
             mode: ServerMode::Host,
             server_name: "Poker Credits".to_owned(),
             events: None,
+            tls: None,
         }
     }
 }
@@ -100,12 +109,22 @@ pub enum StartError {
         /// Cause.
         source: std::io::Error,
     },
+    /// A host server was asked to listen on the network without encryption.
+    #[error("refusing to host on {addr} without TLS")]
+    PlaintextOnNetwork {
+        /// The requested address.
+        addr: SocketAddr,
+    },
+    /// The certificate was not accepted.
+    #[error(transparent)]
+    Tls(#[from] TlsError),
 }
 
 /// A running server.
 #[derive(Debug)]
 pub struct ServerHandle {
     local_addr: SocketAddr,
+    fingerprint: Option<Fingerprint>,
     registry: Registry,
     shutdown: watch::Sender<bool>,
     stop_listener: oneshot::Sender<()>,
@@ -118,6 +137,12 @@ impl ServerHandle {
     #[must_use]
     pub fn local_addr(&self) -> SocketAddr {
         self.local_addr
+    }
+
+    /// The pin guests need, when the server speaks TLS.
+    #[must_use]
+    pub fn fingerprint(&self) -> Option<Fingerprint> {
+        self.fingerprint
     }
 
     /// Access to the rooms, for the embedding app.
@@ -146,6 +171,9 @@ impl ServerHandle {
 /// # Errors
 /// [`StartError`] when the data folder or the address is unusable.
 pub async fn start(config: ServerConfig) -> Result<ServerHandle, StartError> {
+    if config.tls.is_none() && config.mode == ServerMode::Host && !config.bind.ip().is_loopback() {
+        return Err(StartError::PlaintextOnNetwork { addr: config.bind });
+    }
     if let Some(dir) = &config.data_dir {
         std::fs::create_dir_all(dir).map_err(|source| StartError::DataDir {
             path: dir.clone(),
@@ -193,16 +221,31 @@ pub async fn start(config: ServerConfig) -> Result<ServerHandle, StartError> {
     });
     let app = net::router(state).into_make_service_with_connect_info::<SocketAddr>();
     let (stop_listener, stop_rx) = oneshot::channel::<()>();
-    let task = tokio::spawn(async move {
-        let served = axum::serve(listener, app)
-            .with_graceful_shutdown(async {
-                let _ = stop_rx.await;
+    let fingerprint = config.tls.as_ref().map(Identity::fingerprint);
+    // The two listener types are different types, so each arm serves on its own.
+    macro_rules! serve {
+        ($listener:expr) => {
+            tokio::spawn(async move {
+                let served = axum::serve($listener, app)
+                    .with_graceful_shutdown(async {
+                        let _ = stop_rx.await;
+                    })
+                    .await;
+                if let Err(error) = served {
+                    tracing::error!(%error, "listener failed");
+                }
             })
-            .await;
-        if let Err(error) = served {
-            tracing::error!(%error, "listener failed");
+        };
+    }
+    let task = match &config.tls {
+        // The no-op tap makes this listener look like the plain one to axum, which is what gives
+        // the handlers `ConnectInfo<SocketAddr>` (the per-address limits depend on it).
+        Some(identity) => {
+            let listener = TlsListener::new(listener, identity)?.tap_io(|_| {});
+            serve!(listener)
         }
-    });
+        None => serve!(listener),
+    };
     if let Some(events) = &config.events {
         let _queued = events.try_send(ServerEvent::Listening(local_addr));
         if restored > 0 {
@@ -212,6 +255,7 @@ pub async fn start(config: ServerConfig) -> Result<ServerHandle, StartError> {
     tracing::info!(%local_addr, restored, "server listening");
     Ok(ServerHandle {
         local_addr,
+        fingerprint,
         registry,
         shutdown,
         stop_listener,

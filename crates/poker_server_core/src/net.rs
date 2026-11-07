@@ -7,6 +7,10 @@ pub mod ws;
 use std::sync::Arc;
 
 use axum::Router;
+use axum::extract::{Request, State};
+use axum::http::{HeaderValue, StatusCode, header};
+use axum::middleware::{self, Next};
+use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use tokio::sync::watch;
 
@@ -56,5 +60,30 @@ pub(crate) fn router(state: Arc<NetState>) -> Router {
         .route("/v1/info", get(http::info))
         .route("/v1/room/{code}", get(http::room))
         .route("/v1/lobbies", get(http::lobbies))
+        .layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            require_address_host,
+        ))
         .with_state(state)
+}
+
+/// A host server (the phone in the middle of a LAN game) only answers requests that name it by
+/// address, never by somebody's domain: see [`guards::host_header_allowed`]. The cloud server sits
+/// behind a proxy under its real name and is not restricted.
+async fn require_address_host(
+    State(state): State<Arc<NetState>>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if state.mode == ServerMode::Host {
+        let host = request
+            .headers()
+            .get(header::HOST)
+            .and_then(|value: &HeaderValue| value.to_str().ok());
+        if !guards::host_header_allowed(host) {
+            tracing::warn!("request refused: Host header is not an address");
+            return StatusCode::BAD_REQUEST.into_response();
+        }
+    }
+    next.run(request).await
 }

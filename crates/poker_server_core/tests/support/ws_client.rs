@@ -9,11 +9,18 @@
 )]
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Duration;
 
+use poker_server_core::Fingerprint;
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::crypto::{WebPkiSupportedAlgorithms, ring as ring_provider};
+use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use rustls::{DigitallySignedStruct, SignatureScheme};
 use serde_json::Value;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio_rustls::TlsConnector;
 
 /// How long a test waits for the server before it calls it a failure.
 const WAIT: Duration = Duration::from_secs(5);
@@ -26,15 +33,112 @@ pub enum Frame {
     Close,
 }
 
+/// Either a plain TCP stream or a TLS one.
+pub trait Conn: AsyncRead + AsyncWrite + Unpin + Send {}
+impl<T: AsyncRead + AsyncWrite + Unpin + Send> Conn for T {}
+
 pub struct WsClient {
-    stream: TcpStream,
+    stream: Box<dyn Conn>,
     buf: Vec<u8>,
+}
+
+/// What a guest does with a host's certificate: accept exactly the pinned one (or any, for a first
+/// contact), and check the handshake signature so the host must hold the key. TLS 1.3 only.
+#[derive(Debug)]
+struct Pinned {
+    pin: Option<Fingerprint>,
+    algorithms: WebPkiSupportedAlgorithms,
+}
+
+impl ServerCertVerifier for Pinned {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, rustls::Error> {
+        match self.pin {
+            Some(pin) if Fingerprint::of_certificate(end_entity) != pin => Err(
+                rustls::Error::General("certificate does not match the pin".into()),
+            ),
+            _ => Ok(ServerCertVerified::assertion()),
+        }
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        Err(rustls::Error::PeerIncompatible(
+            rustls::PeerIncompatible::Tls12NotOffered,
+        ))
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        rustls::crypto::verify_tls13_signature(message, cert, dss, &self.algorithms)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.algorithms.supported_schemes()
+    }
+}
+
+/// Opens a TLS connection the way the app does. `pin` is the fingerprint from the QR code;
+/// `None` accepts whatever certificate the host shows (trust on first use).
+pub async fn tls_connect(
+    addr: SocketAddr,
+    pin: Option<Fingerprint>,
+) -> std::io::Result<Box<dyn Conn>> {
+    tls_connect_with(addr, pin, &[&rustls::version::TLS13]).await
+}
+
+/// [`tls_connect`] with the protocol versions the client offers (to prove TLS 1.2 is refused).
+pub async fn tls_connect_with(
+    addr: SocketAddr,
+    pin: Option<Fingerprint>,
+    versions: &[&'static rustls::SupportedProtocolVersion],
+) -> std::io::Result<Box<dyn Conn>> {
+    let provider = Arc::new(ring_provider::default_provider());
+    let verifier = Pinned {
+        pin,
+        algorithms: provider.signature_verification_algorithms,
+    };
+    let mut config = rustls::ClientConfig::builder_with_provider(provider)
+        .with_protocol_versions(versions)
+        .unwrap()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(verifier))
+        .with_no_client_auth();
+    config.alpn_protocols = vec![b"http/1.1".to_vec()];
+    let tcp = TcpStream::connect(addr).await?;
+    let name = ServerName::IpAddress(addr.ip().into());
+    let tls = TlsConnector::from(Arc::new(config))
+        .connect(name, tcp)
+        .await?;
+    Ok(Box::new(tls))
 }
 
 /// Opens the TCP connection, sends the upgrade request and returns the stream with the status
 /// code and any bytes that followed the response headers.
-async fn handshake(addr: SocketAddr, origin: Option<&str>) -> (TcpStream, u16, Vec<u8>) {
-    let mut stream = TcpStream::connect(addr).await.unwrap();
+async fn handshake(addr: SocketAddr, origin: Option<&str>) -> (Box<dyn Conn>, u16, Vec<u8>) {
+    let stream = TcpStream::connect(addr).await.unwrap();
+    handshake_over(Box::new(stream), addr, origin).await
+}
+
+async fn handshake_over(
+    mut stream: Box<dyn Conn>,
+    addr: SocketAddr,
+    origin: Option<&str>,
+) -> (Box<dyn Conn>, u16, Vec<u8>) {
     let origin = origin.map_or_else(String::new, |o| format!("Origin: {o}\r\n"));
     let request = format!(
         "GET /v1/ws HTTP/1.1\r\nHost: {addr}\r\n{origin}Upgrade: websocket\r\nConnection: Upgrade\r\n\
@@ -67,6 +171,14 @@ impl WsClient {
     /// Connects and returns the HTTP status instead of asserting it (for refusals).
     pub async fn try_connect(addr: SocketAddr) -> Result<WsClient, u16> {
         Self::try_connect_from(addr, None).await
+    }
+
+    /// Connects over TLS, pinned to `pin`, and expects `101 Switching Protocols`.
+    pub async fn connect_tls(addr: SocketAddr, pin: Option<Fingerprint>) -> WsClient {
+        let stream = tls_connect(addr, pin).await.unwrap();
+        let (stream, status, buf) = handshake_over(stream, addr, None).await;
+        assert_eq!(status, 101, "expected an upgrade");
+        WsClient { stream, buf }
     }
 
     /// Like [`WsClient::try_connect`], sending an `Origin` header like a browser page would.

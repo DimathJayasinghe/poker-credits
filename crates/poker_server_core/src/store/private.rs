@@ -6,7 +6,7 @@ use std::io;
 use std::path::Path;
 
 /// Creates `dir` (and parents) and restricts `dir` itself to the owner.
-pub(super) fn create_dir(dir: &Path) -> io::Result<()> {
+pub(crate) fn create_dir(dir: &Path) -> io::Result<()> {
     fs::create_dir_all(dir)?;
     #[cfg(unix)]
     {
@@ -17,7 +17,7 @@ pub(super) fn create_dir(dir: &Path) -> io::Result<()> {
 }
 
 /// Open options for a store file: created readable and writable by the owner only.
-pub(super) fn options() -> OpenOptions {
+pub(crate) fn options() -> OpenOptions {
     // Only the unix branch below changes the options; elsewhere `mut` would be unused.
     #[cfg_attr(not(unix), allow(unused_mut))]
     let mut options = OpenOptions::new();
@@ -30,7 +30,7 @@ pub(super) fn options() -> OpenOptions {
 }
 
 /// Tightens a file that already existed (written by an older version) to owner-only.
-pub(super) fn restrict(file: &File) -> io::Result<()> {
+pub(crate) fn restrict(file: &File) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt as _;
@@ -39,4 +39,26 @@ pub(super) fn restrict(file: &File) -> io::Result<()> {
     #[cfg(not(unix))]
     let _ = file;
     Ok(())
+}
+
+/// Writes `bytes` to `path` so a reader never sees half a file: owner-only temp file, `fsync`,
+/// rename over the old one.
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    use std::io::Write as _;
+    if let Some(dir) = path.parent() {
+        create_dir(dir)?;
+    }
+    let mut temp = path.as_os_str().to_owned();
+    temp.push(".tmp");
+    let temp = std::path::PathBuf::from(temp);
+    let mut file = options()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&temp)?;
+    restrict(&file)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    drop(file);
+    fs::rename(&temp, path)
 }

@@ -25,6 +25,7 @@ Future<T> guardBridge<T>(Future<T> Function() call) async {
     throw BridgeException(switch (error.kind) {
       RsServerErrorKind.bind => BridgeFailureKind.bind,
       RsServerErrorKind.dataDir => BridgeFailureKind.dataDir,
+      RsServerErrorKind.tls => BridgeFailureKind.tls,
     }, error.toString());
   } on RsRoomError catch (error) {
     throw BridgeException(

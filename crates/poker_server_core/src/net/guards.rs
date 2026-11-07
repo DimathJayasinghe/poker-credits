@@ -50,6 +50,37 @@ pub fn origin_allowed(origin: Option<&str>, host: Option<&str>, allowed: &[Strin
     }
 }
 
+/// Whether a host server may answer a request with this `Host` header.
+///
+/// A web page can make a browser on the LAN talk to a phone at `192.168.1.5` by giving its own
+/// domain a short-lived DNS answer pointing there (DNS rebinding); the request then carries the
+/// attacker's name. Players reach a host by IP address (the QR code, the typed address, the
+/// search), so a host server answers only to an IP literal, `localhost` or a `.local` name, which
+/// no website can own.
+#[must_use]
+pub fn host_header_allowed(host: Option<&str>) -> bool {
+    let Some(authority) = host.map(str::trim) else {
+        return false;
+    };
+    if is_address_host(authority) {
+        return true;
+    }
+    let name = match authority.rsplit_once(':') {
+        Some((name, port)) if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) => name,
+        Some(_) => return false,
+        None => authority,
+    };
+    let name = name.trim_end_matches('.');
+    // `strip_suffix` on the lowercase form: this is a host name, not a file extension.
+    let lower = name.to_ascii_lowercase();
+    lower.strip_suffix(".local").is_some_and(|label| {
+        !label.is_empty()
+            && label
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'.')
+    })
+}
+
 /// Whether the host part of `authority` (`host` or `host:port`) is an IP literal or `localhost`.
 fn is_address_host(authority: &str) -> bool {
     let host = if let Some(rest) = authority.strip_prefix('[') {
@@ -464,7 +495,7 @@ mod tests {
 
 #[cfg(test)]
 mod origin_tests {
-    use super::origin_allowed;
+    use super::{host_header_allowed, origin_allowed};
 
     fn check(origin: Option<&str>, host: Option<&str>, allowed: &[&str]) -> bool {
         let allowed: Vec<String> = allowed.iter().map(|a| (*a).to_owned()).collect();
@@ -547,5 +578,35 @@ mod origin_tests {
             Some("10.0.0.2:7878"),
             &["https://play.example.com"]
         ));
+    }
+
+    #[test]
+    fn a_host_answers_only_to_addresses_and_local_names() {
+        for good in [
+            "192.168.1.5:7878",
+            "127.0.0.1",
+            "localhost:7878",
+            "LOCALHOST",
+            "[::1]:7878",
+            "[fe80::1]:7878",
+            "pixel-7.local:7878",
+            "Dimath-PC.LOCAL",
+        ] {
+            assert!(host_header_allowed(Some(good)), "{good}");
+        }
+        for bad in [
+            "evil.example",
+            "evil.example:7878",
+            "192.168.1.5.evil.example:7878",
+            "localhost.evil.example",
+            "x.local.evil.example",
+            "local",
+            ".local",
+            "",
+            "evil.example:80.local",
+        ] {
+            assert!(!host_header_allowed(Some(bad)), "{bad}");
+        }
+        assert!(!host_header_allowed(None), "no Host header at all");
     }
 }

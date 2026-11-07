@@ -12,6 +12,9 @@ final _log = Logger('poker_bridge');
 /// tested without the native library.
 abstract interface class NativeServer {
   int get port;
+
+  /// Fingerprint guests pin, or `null` for a server only this device can reach.
+  String? get fingerprint;
   Stream<RsServerEvent> events();
   Future<bool> isRunning();
   Future<void> stop();
@@ -28,6 +31,9 @@ class _RustServer implements NativeServer {
 
   @override
   int get port => _handle.port;
+
+  @override
+  String? get fingerprint => _handle.fingerprint;
 
   @override
   Stream<RsServerEvent> events() => _handle.subscribe();
@@ -65,6 +71,9 @@ class ServerController {
 
   /// The port in use, or `null` while no server is running.
   int? get port => _server?.port;
+
+  /// The pin guests need for the running server, or `null` when it is not on the network.
+  String? get fingerprint => _server?.fingerprint;
 
   bool get hasServer => _server != null;
 

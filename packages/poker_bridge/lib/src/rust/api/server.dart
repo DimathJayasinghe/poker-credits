@@ -16,6 +16,13 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 Future<RsServerHandle> startServer({required RsServerConfig config}) =>
     RustLib.instance.api.crateApiServerStartServer(config: config);
 
+/// The pin for a certificate: SHA-256 of its DER bytes, as 43 URL-safe base64 characters.
+///
+/// Sync because Dart's `badCertificateCallback` must answer at once; it hands the certificate it
+/// was shown to this function and compares the result with the pin it holds.
+String certFingerprint({required List<int> der}) =>
+    RustLib.instance.api.crateApiServerCertFingerprint(der: der);
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RsServerHandle>>
 abstract class RsServerHandle implements RustOpaqueInterface {
   /// Creates a room and returns the host's credentials (host mode does not accept
@@ -27,6 +34,10 @@ abstract class RsServerHandle implements RustOpaqueInterface {
     required String hostName,
     required RsRoomConfig config,
   });
+
+  /// The certificate fingerprint guests pin (43 URL-safe base64 characters), or `None` for a
+  /// server that only this device can reach.
+  String? get fingerprint;
 
   /// Whether [`RsServerHandle::stop`] has not been called yet.
   Future<bool> isRunning();
@@ -279,6 +290,9 @@ enum RsServerErrorKind {
 
   /// The data folder could not be created.
   dataDir,
+
+  /// The encryption certificate could not be made or stored.
+  tls,
 }
 
 /// Something that happened to the server as a whole.

@@ -163,6 +163,7 @@ async fn ten_rooms_play_twenty_hands_each() {
         mode: ServerMode::Cloud,
         server_name: "Load".into(),
         events: None,
+        tls: None,
     })
     .await
     .unwrap();

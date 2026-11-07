@@ -100,6 +100,7 @@ async fn main() -> anyhow::Result<()> {
         mode: ServerMode::Cloud,
         server_name: settings.server_name,
         events: None,
+        tls: None,
     })
     .await
     .context("could not start the server")?;
