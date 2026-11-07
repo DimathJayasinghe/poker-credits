@@ -73,65 +73,83 @@ class _SplashViewState extends State<SplashView> {
               constraints: const BoxConstraints(maxWidth: 480),
               child: Padding(
                 padding: const EdgeInsets.all(BrutalMetrics.gapL),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: BrutalMetrics.gapL, left: BrutalMetrics.gapS),
-                        child: EchoTitle(Strings.appName.split(' ')),
-                      ),
-                    ),
-                    const SizedBox(height: BrutalMetrics.gapXl),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
+                // A short screen (a phone on its side) shrinks the whole picture instead of clipping it.
+                child: LayoutBuilder(
+                  builder: (context, box) => FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: SizedBox(
+                      width: box.maxWidth,
+                      child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
-                          for (var i = 0; i < SplashView.hand.length; i++) ...<Widget>[
-                            if (i > 0) const SizedBox(width: BrutalMetrics.gapS),
-                            ExcludeSemantics(
-                              child: FlipCard(card: SplashView.hand[i], faceUp: i < _faceUp, size: CardSize.board),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: BrutalMetrics.gapL, left: BrutalMetrics.gapS),
+                              child: EchoTitle(Strings.appName.split(' ')),
                             ),
-                          ],
+                          ),
+                          const SizedBox(height: BrutalMetrics.gapXl),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                for (var i = 0; i < SplashView.hand.length; i++) ...<Widget>[
+                                  if (i > 0) const SizedBox(width: BrutalMetrics.gapS),
+                                  ExcludeSemantics(
+                                    child: FlipCard(card: SplashView.hand[i], faceUp: i < _faceUp, size: CardSize.board),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: BrutalMetrics.gapXl),
+                          Container(
+                            height: 14,
+                            decoration: BoxDecoration(
+                              border: Border.all(color: c.line, width: BrutalMetrics.border),
+                            ),
+                            alignment: Alignment.centerLeft,
+                            child: TweenAnimationBuilder<double>(
+                              tween: Tween<double>(begin: reduced ? 1 : 0, end: 1),
+                              duration: reduced ? Duration.zero : widget.duration,
+                              builder: (context, t, _) => FractionallySizedBox(
+                                widthFactor: t,
+                                heightFactor: 1,
+                                child: ColoredBox(color: c.accent),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: BrutalMetrics.gapS),
+                          // Wraps instead of overflowing when the text size is big.
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            spacing: BrutalMetrics.gapM,
+                            runSpacing: BrutalMetrics.gapXs,
+                            children: <Widget>[
+                              Text(
+                                '${Strings.splashLoading}…'.toUpperCase(),
+                                style: TextStyle(
+                                  fontFamily: BrutalFonts.mono,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  letterSpacing: 2,
+                                  color: c.ink,
+                                ),
+                              ),
+                              Text(
+                                Strings.splashSkip.toUpperCase(),
+                                style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: 12, letterSpacing: 2, color: c.muted),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: BrutalMetrics.gapXl),
-                    Container(
-                      height: 14,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: c.line, width: BrutalMetrics.border),
-                      ),
-                      alignment: Alignment.centerLeft,
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween<double>(begin: reduced ? 1 : 0, end: 1),
-                        duration: reduced ? Duration.zero : widget.duration,
-                        builder: (context, t, _) => FractionallySizedBox(
-                          widthFactor: t,
-                          heightFactor: 1,
-                          child: ColoredBox(color: c.accent),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: BrutalMetrics.gapS),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: <Widget>[
-                        Text(
-                          '${Strings.splashLoading}…'.toUpperCase(),
-                          style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 2, color: c.ink),
-                        ),
-                        Text(
-                          Strings.splashSkip.toUpperCase(),
-                          style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: 12, letterSpacing: 2, color: c.muted),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
