@@ -214,7 +214,7 @@ pub async fn start(config: ServerConfig) -> Result<ServerHandle, StartError> {
             config.limits.create_per_minute,
             config.limits.create_burst,
         ),
-        limits: config.limits,
+        limits: config.limits.clone(),
         mode: config.mode,
         server_name: config.server_name,
         shutdown: shutdown_rx,
@@ -241,7 +241,7 @@ pub async fn start(config: ServerConfig) -> Result<ServerHandle, StartError> {
         // The no-op tap makes this listener look like the plain one to axum, which is what gives
         // the handlers `ConnectInfo<SocketAddr>` (the per-address limits depend on it).
         Some(identity) => {
-            let listener = TlsListener::new(listener, identity)?.tap_io(|_| {});
+            let listener = TlsListener::new(listener, identity, &config.limits)?.tap_io(|_| {});
             serve!(listener)
         }
         None => serve!(listener),

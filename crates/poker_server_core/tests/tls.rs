@@ -297,6 +297,179 @@ async fn silent_sockets_cannot_hold_up_a_real_guest() {
     server.stop().await;
 }
 
+/// How long the server may keep a socket that says nothing, in tests (the real value is the
+/// limits' idle timeout).
+const SHORT_IDLE: Duration = Duration::from_secs(1);
+
+fn short_idle_limits() -> Limits {
+    Limits {
+        idle_timeout: SHORT_IDLE,
+        ..Limits::default()
+    }
+}
+
+/// `true` when the server closes `stream` within `within` (a read of 0 bytes or an error).
+async fn closed_by_server(stream: &mut Box<dyn ws_client::Conn>, within: Duration) -> bool {
+    let mut byte = [0_u8; 1];
+    matches!(
+        tokio::time::timeout(within, stream.read(&mut byte)).await,
+        Ok(Ok(0) | Err(_))
+    )
+}
+
+#[tokio::test]
+async fn a_guest_that_finishes_the_handshake_and_says_nothing_is_cut() {
+    // Past the handshake nothing used to time this socket out: a few hundred of them would use
+    // up the phone's sockets.
+    let (server, pin) = boot_tls_with(short_idle_limits()).await;
+    let mut silent = tls_connect(server.local_addr(), Some(pin)).await.unwrap();
+    assert!(
+        closed_by_server(&mut silent, SHORT_IDLE * 6).await,
+        "an idle encrypted socket must be closed"
+    );
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn half_a_request_that_never_ends_is_cut() {
+    // Slowloris: the request line arrives, the rest never does.
+    let (server, pin) = boot_tls_with(short_idle_limits()).await;
+    let mut slow = tls_connect(server.local_addr(), Some(pin)).await.unwrap();
+    slow.write_all(b"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\n")
+        .await
+        .unwrap();
+    assert!(
+        closed_by_server(&mut slow, SHORT_IDLE * 6).await,
+        "a request that stalls must be closed"
+    );
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn garbage_after_a_good_handshake_is_closed_and_the_server_keeps_serving() {
+    // A buggy or hostile client that gets through TLS and then sends bytes that are not HTTP.
+    let (server, pin) = boot_tls().await;
+    for junk in [
+        &b"\x00\x01\x02\xff\xfe not http at all \r\n\r\n"[..],
+        &[0xff_u8; 4096][..],
+        &b"GET / HTTP/9.9\r\n\r\n"[..],
+    ] {
+        let mut bad = tls_connect(server.local_addr(), Some(pin)).await.unwrap();
+        bad.write_all(junk).await.unwrap();
+        // The server may answer with a 400 first; what matters is that it then hangs up.
+        let mut reply = Vec::new();
+        let drained = tokio::time::timeout(Duration::from_secs(5), bad.read_to_end(&mut reply));
+        assert!(
+            drained.await.is_ok(),
+            "junk must end with a closed connection"
+        );
+        assert!(reply.len() < 1024, "no long answer to junk");
+    }
+    // The next real guest is served as if nothing happened.
+    let room = server
+        .registry()
+        .create_room_detached(
+            "Dimath".into(),
+            serde_json::from_value(room_config()).unwrap(),
+        )
+        .unwrap();
+    let mut guest = WsClient::connect_tls(server.local_addr(), Some(pin)).await;
+    guest
+        .send(json!({"v": 1, "type": "JOIN_ROOM", "roomCode": room.room_code, "name": "Ana", "spectator": false}))
+        .await;
+    guest.expect("JOINED").await;
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn an_active_websocket_is_not_cut_by_the_idle_timer() {
+    // The idle timer counts silence, not age: a guest that pings stays connected.
+    let (server, pin) = boot_tls_with(short_idle_limits()).await;
+    let mut host = WsClient::connect_tls(server.local_addr(), Some(pin)).await;
+    host.send(create_room()).await;
+    host.expect("ROOM_CREATED").await;
+    for _ in 0..5 {
+        tokio::time::sleep(SHORT_IDLE / 2).await;
+        host.send(json!({"v": 1, "type": "PING", "t": 1})).await;
+        host.expect("PONG").await;
+    }
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn a_socket_that_sends_nothing_is_dropped_within_seconds() {
+    // A TLS client speaks at once; a socket with nothing to say is not worth a handshake slot.
+    let (server, _pin) = boot_tls().await;
+    let mut silent = TcpStream::connect(server.local_addr()).await.unwrap();
+    let started = Instant::now();
+    let mut byte = [0_u8; 1];
+    let read = tokio::time::timeout(Duration::from_secs(4), silent.read(&mut byte)).await;
+    assert!(matches!(read, Ok(Ok(0) | Err(_))), "{read:?}");
+    assert!(
+        started.elapsed() < Duration::from_millis(3500),
+        "{:?}",
+        started.elapsed()
+    );
+    server.stop().await;
+}
+
+/// Connects from the loopback address `source` (every 127.x.y.z is this machine), so one test can
+/// play several devices on the Wi-Fi.
+async fn connect_from(source: &str, to: SocketAddr) -> TcpStream {
+    let socket = tokio::net::TcpSocket::new_v4().unwrap();
+    socket.bind(format!("{source}:0").parse().unwrap()).unwrap();
+    socket.connect(to).await.unwrap()
+}
+
+#[tokio::test]
+async fn a_crowd_of_silent_sockets_cannot_lock_a_real_guest_out() {
+    // Eight addresses with eight silent sockets each fill the pool of 64 handshakes. A guest from
+    // another address still gets in: it takes the place of the oldest handshake of an address
+    // that holds more than its share.
+    let (server, pin) = boot_tls().await;
+    let addr = server.local_addr();
+    let mut crowd = Vec::new();
+    for device in 10..18 {
+        for _ in 0..8 {
+            crowd.push(connect_from(&format!("127.0.0.{device}"), addr).await);
+        }
+    }
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let mut guest = WsClient::connect_tls(addr, Some(pin)).await;
+    guest.send(create_room()).await;
+    guest.expect("ROOM_CREATED").await;
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn one_address_cannot_push_another_out_of_a_fair_share() {
+    // The reverse: an address that holds only a few handshakes is not evicted for a newcomer that
+    // already holds as many.
+    let (server, pin) = boot_tls().await;
+    let addr = server.local_addr();
+    let mut crowd = Vec::new();
+    for device in 10..18 {
+        for _ in 0..8 {
+            crowd.push(connect_from(&format!("127.0.0.{device}"), addr).await);
+        }
+    }
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    // A guest from 127.0.0.2 that holds eight silent sockets already is turned away at its own cap.
+    let mut own = Vec::new();
+    for _ in 0..8 {
+        own.push(connect_from("127.0.0.2", addr).await);
+    }
+    let mut ninth = connect_from("127.0.0.2", addr).await;
+    let mut byte = [0_u8; 1];
+    let closed = tokio::time::timeout(Duration::from_secs(1), ninth.read(&mut byte)).await;
+    assert!(matches!(closed, Ok(Ok(0) | Err(_))), "{closed:?}");
+    // The real guest is unaffected.
+    let mut guest = WsClient::connect_tls(addr, Some(pin)).await;
+    guest.send(create_room()).await;
+    guest.expect("ROOM_CREATED").await;
+    server.stop().await;
+}
+
 /// A man in the middle that only records: what a sniffer on the Wi-Fi would see.
 async fn recording_relay(server: SocketAddr) -> (SocketAddr, Arc<Mutex<Vec<u8>>>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

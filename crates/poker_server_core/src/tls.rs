@@ -6,25 +6,36 @@
 //! they were given in the QR code (or saw the first time they joined, for code and lobby joins).
 //! Only TLS 1.3 is offered, with the `ring` crypto backend.
 
+use std::collections::HashMap;
 use std::fmt;
+use std::future::Future;
 use std::io;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::path::Path;
-use std::sync::Arc;
+use std::pin::Pin;
+use std::sync::{Arc, Mutex, PoisonError};
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use sha2::{Digest, Sha256};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{Semaphore, mpsc};
-use tokio::task::JoinHandle;
+use tokio::sync::mpsc;
+use tokio::task::{AbortHandle, JoinHandle};
+use tokio::time::{Instant, Sleep};
 use tokio_rustls::TlsAcceptor;
 use tokio_rustls::server::TlsStream;
 
+use crate::config::Limits;
+use crate::net::guards::{ConnectionGuard, IpLimiter};
 use crate::store::private;
 
 /// First line of the identity file; the number is the format version.
 const FILE_MAGIC: &[u8] = b"PCTLS1\n";
+
+/// How long a new socket gets to send its first byte (a TLS client speaks at once).
+const FIRST_BYTE_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// How long a client gets to finish the TLS handshake before the connection is dropped.
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -37,6 +48,18 @@ const MAX_HANDSHAKES_PER_IP: usize = 8;
 
 /// Finished handshakes waiting for the HTTP server to pick them up.
 const READY_QUEUE: usize = 32;
+
+/// An identity file is about 400 bytes; anything much larger is not ours and is not read whole.
+const MAX_IDENTITY_FILE: u64 = 16 * 1024;
+
+fn read_identity_file(path: &Path) -> io::Result<Vec<u8>> {
+    use std::io::Read as _;
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)?
+        .take(MAX_IDENTITY_FILE + 1)
+        .read_to_end(&mut bytes)?;
+    Ok(bytes)
+}
 
 /// Why the TLS identity or configuration could not be made.
 #[derive(Debug, thiserror::Error)]
@@ -185,7 +208,7 @@ impl Identity {
     /// # Errors
     /// [`TlsError`] when a new identity cannot be made or stored.
     pub fn load_or_create(path: &Path) -> Result<Identity, TlsError> {
-        match std::fs::read(path) {
+        match read_identity_file(path) {
             Ok(bytes) => match Identity::from_file_bytes(&bytes) {
                 Some(identity) if identity.server_config().is_ok() => return Ok(identity),
                 _ => tracing::warn!(
@@ -264,26 +287,44 @@ fn take_part(bytes: &[u8]) -> Option<(&[u8], &[u8])> {
 /// Accepts TCP connections, finishes their TLS handshakes in the background and hands the
 /// encrypted streams to the HTTP server.
 ///
-/// The handshakes run off the accept path, so a client that opens a socket and says nothing
-/// cannot hold up anyone else. At most [`MAX_HANDSHAKES`] run at once and
-/// [`MAX_HANDSHAKES_PER_IP`] per address; each gets [`HANDSHAKE_TIMEOUT`].
+/// A phone on a shared network must not be tied up by a neighbour, so every stage is bounded:
+/// - A socket that sends nothing within [`FIRST_BYTE_TIMEOUT`] is dropped, and a handshake gets
+///   [`HANDSHAKE_TIMEOUT`] in all. Handshakes run off the accept path, so a silent client never
+///   delays anyone else.
+/// - At most [`MAX_HANDSHAKES`] run at once and [`MAX_HANDSHAKES_PER_IP`] per address. When the
+///   pool is full, a newcomer takes the place of the oldest handshake of whichever address holds
+///   the most, so a device that opens many sockets cannot crowd real guests out.
+/// - An established connection is closed after a stretch of silence (a little over the
+///   WebSocket idle timeout) and counts against the per-address connection limit until then.
 #[derive(Debug)]
 pub struct TlsListener {
-    ready: mpsc::Receiver<(TlsStream<TcpStream>, SocketAddr)>,
+    ready: mpsc::Receiver<(Guarded<TlsStream<TcpStream>>, SocketAddr)>,
     local_addr: SocketAddr,
     task: JoinHandle<()>,
 }
 
 impl TlsListener {
-    /// Starts accepting on `listener`.
+    /// Starts accepting on `listener`, with the connection limits of `limits`.
     ///
     /// # Errors
     /// [`TlsError`] when the identity is not accepted by rustls, or the socket has no address.
-    pub fn new(listener: TcpListener, identity: &Identity) -> Result<TlsListener, TlsError> {
+    pub fn new(
+        listener: TcpListener,
+        identity: &Identity,
+        limits: &Limits,
+    ) -> Result<TlsListener, TlsError> {
         let acceptor = TlsAcceptor::from(identity.server_config()?);
         let local_addr = listener.local_addr()?;
         let (tx, ready) = mpsc::channel(READY_QUEUE);
-        let task = tokio::spawn(accept_loop(listener, acceptor, tx));
+        let task = tokio::spawn(accept_loop(
+            listener,
+            acceptor,
+            tx,
+            Guards {
+                idle: transport_idle(limits.idle_timeout),
+                open: IpLimiter::new(open_cap(limits.max_connections_per_ip)),
+            },
+        ));
         Ok(TlsListener {
             ready,
             local_addr,
@@ -300,7 +341,7 @@ impl Drop for TlsListener {
 }
 
 impl axum::serve::Listener for TlsListener {
-    type Io = TlsStream<TcpStream>;
+    type Io = Guarded<TlsStream<TcpStream>>;
     type Addr = SocketAddr;
 
     async fn accept(&mut self) -> (Self::Io, Self::Addr) {
@@ -317,13 +358,33 @@ impl axum::serve::Listener for TlsListener {
     }
 }
 
+/// The transport closes a silent connection a little after the WebSocket layer would, so the
+/// WebSocket layer's own close (with a reason) wins whenever there is one.
+fn transport_idle(websocket_idle: Duration) -> Duration {
+    websocket_idle.saturating_add(websocket_idle / 4)
+}
+
+/// Sockets one address may hold open at the transport. The WebSocket layer enforces the real
+/// per-address limit and tells the guest why; this one is the backstop for sockets that never
+/// get that far (idle or half-open), so it is looser.
+fn open_cap(websocket_limit: usize) -> usize {
+    websocket_limit.saturating_mul(2).saturating_add(4)
+}
+
+/// What every accepted connection is held to.
+#[derive(Clone, Debug)]
+struct Guards {
+    idle: Duration,
+    open: IpLimiter,
+}
+
 async fn accept_loop(
     listener: TcpListener,
     acceptor: TlsAcceptor,
-    ready: mpsc::Sender<(TlsStream<TcpStream>, SocketAddr)>,
+    ready: mpsc::Sender<(Guarded<TlsStream<TcpStream>>, SocketAddr)>,
+    guards: Guards,
 ) {
-    let all = Arc::new(Semaphore::new(MAX_HANDSHAKES));
-    let per_ip = crate::net::guards::IpLimiter::new(MAX_HANDSHAKES_PER_IP);
+    let pool = HandshakePool::default();
     loop {
         let (tcp, peer) = match listener.accept().await {
             Ok(connection) => connection,
@@ -334,35 +395,300 @@ async fn accept_loop(
                 continue;
             }
         };
-        let Ok(permit) = Arc::clone(&all).try_acquire_owned() else {
-            tracing::debug!(%peer, "too many handshakes in flight; dropping the connection");
+        let Some(open) = guards.open.try_acquire(peer.ip()) else {
+            tracing::debug!(%peer, "too many connections from one address; dropping");
             continue;
         };
-        let Some(slot) = per_ip.try_acquire(peer.ip()) else {
-            tracing::debug!(%peer, "too many handshakes from one address; dropping");
+        let Some(admission) = pool.admit(peer.ip()) else {
+            tracing::debug!(%peer, "too many handshakes in flight; dropping the connection");
             continue;
         };
         let _nodelay = tcp.set_nodelay(true);
         let acceptor = acceptor.clone();
         let ready = ready.clone();
-        tokio::spawn(async move {
-            let outcome = tokio::time::timeout(HANDSHAKE_TIMEOUT, acceptor.accept(tcp)).await;
-            // The slots are free again as soon as the handshake is over, however it ended.
-            drop((permit, slot));
+        let idle = guards.idle;
+        let id = admission.id;
+        let handle = tokio::spawn(async move {
+            let outcome = tokio::time::timeout(HANDSHAKE_TIMEOUT, handshake(&acceptor, tcp)).await;
+            // The pool slot is free again as soon as the handshake is over, however it ended.
+            drop(admission);
             match outcome {
                 Ok(Ok(stream)) => {
-                    let _closed = ready.send((stream, peer)).await;
+                    let guarded = Guarded::new(stream, idle, open);
+                    let _closed = ready.send((guarded, peer)).await;
                 }
                 Ok(Err(error)) => tracing::debug!(%peer, %error, "TLS handshake failed"),
                 Err(_) => tracing::debug!(%peer, "TLS handshake timed out"),
             }
         });
+        pool.attach(id, handle.abort_handle());
+    }
+}
+
+/// Waits for the first bytes, then runs the handshake.
+async fn handshake(acceptor: &TlsAcceptor, tcp: TcpStream) -> io::Result<TlsStream<TcpStream>> {
+    let mut first = [0_u8; 1];
+    match tokio::time::timeout(FIRST_BYTE_TIMEOUT, tcp.peek(&mut first)).await {
+        Ok(Ok(n)) if n > 0 => {}
+        Ok(Ok(_)) => return Err(io::ErrorKind::UnexpectedEof.into()),
+        Ok(Err(error)) => return Err(error),
+        Err(_) => return Err(io::ErrorKind::TimedOut.into()),
+    }
+    acceptor.accept(tcp).await
+}
+
+/// Which handshakes are running, so a crowded pool can make room for a newcomer.
+#[derive(Clone, Debug, Default)]
+struct HandshakePool {
+    state: Arc<Mutex<PoolState>>,
+}
+
+#[derive(Debug, Default)]
+struct PoolState {
+    next_id: u64,
+    entries: HashMap<u64, Pending>,
+}
+
+#[derive(Debug)]
+struct Pending {
+    owner: IpAddr,
+    started: Instant,
+    abort: Option<AbortHandle>,
+}
+
+/// One handshake's place in the pool; the place is given back when this is dropped.
+#[derive(Debug)]
+struct Admission {
+    id: u64,
+    pool: HandshakePool,
+}
+
+impl Drop for Admission {
+    fn drop(&mut self) {
+        self.pool.lock().entries.remove(&self.id);
+    }
+}
+
+/// Handshakes are short, so addresses are grouped coarsely: all of one IPv6 `/64` share a budget
+/// (a device can make billions of addresses there, link-local ones included).
+fn pool_key(ip: IpAddr) -> IpAddr {
+    match ip {
+        IpAddr::V4(_) => ip,
+        IpAddr::V6(v6) => {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                IpAddr::V4(v4)
+            } else {
+                let [a, b, c, d, ..] = v6.segments();
+                IpAddr::V6(Ipv6Addr::new(a, b, c, d, 0, 0, 0, 0))
+            }
+        }
+    }
+}
+
+impl HandshakePool {
+    fn lock(&self) -> std::sync::MutexGuard<'_, PoolState> {
+        self.state.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Takes a place for a handshake from `peer`, or `None` when it must be turned away.
+    fn admit(&self, peer: IpAddr) -> Option<Admission> {
+        let owner = pool_key(peer);
+        let mut state = self.lock();
+        let mine = state.entries.values().filter(|e| e.owner == owner).count();
+        if mine >= MAX_HANDSHAKES_PER_IP {
+            return None;
+        }
+        if state.entries.len() >= MAX_HANDSHAKES {
+            // Fair share: the address with the most handshakes loses its oldest one, but only if
+            // it holds more than the newcomer would after being let in.
+            let mut counts: HashMap<IpAddr, usize> = HashMap::new();
+            for entry in state.entries.values() {
+                *counts.entry(entry.owner).or_insert(0) += 1;
+            }
+            let (&heaviest, &held) = counts.iter().max_by_key(|(_, held)| **held)?;
+            if held <= mine + 1 {
+                return None;
+            }
+            let victim = state
+                .entries
+                .iter()
+                .filter(|(_, e)| e.owner == heaviest)
+                .min_by_key(|(_, e)| e.started)
+                .map(|(id, _)| *id)?;
+            if let Some(evicted) = state.entries.remove(&victim)
+                && let Some(abort) = evicted.abort
+            {
+                abort.abort();
+            }
+        }
+        let id = state.next_id;
+        state.next_id = state.next_id.wrapping_add(1);
+        state.entries.insert(
+            id,
+            Pending {
+                owner,
+                started: Instant::now(),
+                abort: None,
+            },
+        );
+        drop(state);
+        Some(Admission {
+            id,
+            pool: self.clone(),
+        })
+    }
+
+    /// Lets a later eviction stop the task that runs handshake `id`.
+    fn attach(&self, id: u64, abort: AbortHandle) {
+        if let Some(entry) = self.lock().entries.get_mut(&id) {
+            entry.abort = Some(abort);
+        }
+    }
+}
+
+/// An encrypted connection that is closed after a stretch of silence and holds one slot of the
+/// per-address connection limit until it is dropped.
+///
+/// The timer restarts whenever bytes move in either direction, so a quiet but healthy WebSocket
+/// (the client pings every 15 s) is never cut, while a socket that connects and says nothing, or
+/// sends half a request and stops, cannot sit on the phone's file descriptors.
+#[derive(Debug)]
+pub struct Guarded<S> {
+    inner: S,
+    idle: Duration,
+    timer: Pin<Box<Sleep>>,
+    _slot: ConnectionGuard,
+}
+
+impl<S> Guarded<S> {
+    fn new(inner: S, idle: Duration, slot: ConnectionGuard) -> Self {
+        Guarded {
+            inner,
+            idle,
+            timer: Box::pin(tokio::time::sleep(idle)),
+            _slot: slot,
+        }
+    }
+
+    fn touch(&mut self) {
+        self.timer.as_mut().reset(Instant::now() + self.idle);
+    }
+
+    /// What to answer when the inner stream is not ready: still waiting, or timed out.
+    fn waiting<T>(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<T>> {
+        match self.timer.as_mut().poll(cx) {
+            Poll::Ready(()) => Poll::Ready(Err(io::ErrorKind::TimedOut.into())),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+impl<S: AsyncRead + Unpin> AsyncRead for Guarded<S> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        let this = &mut *self;
+        let before = buf.filled().len();
+        match Pin::new(&mut this.inner).poll_read(cx, buf) {
+            Poll::Ready(result) => {
+                if buf.filled().len() > before {
+                    this.touch();
+                }
+                Poll::Ready(result)
+            }
+            Poll::Pending => this.waiting(cx),
+        }
+    }
+}
+
+impl<S: AsyncWrite + Unpin> AsyncWrite for Guarded<S> {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        data: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let this = &mut *self;
+        match Pin::new(&mut this.inner).poll_write(cx, data) {
+            Poll::Ready(result) => {
+                if matches!(result, Ok(written) if written > 0) {
+                    this.touch();
+                }
+                Poll::Ready(result)
+            }
+            Poll::Pending => this.waiting(cx),
+        }
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn v4(last: u8) -> IpAddr {
+        IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 0, last))
+    }
+
+    #[test]
+    fn the_pool_turns_away_an_address_at_its_own_cap() {
+        let pool = HandshakePool::default();
+        let held: Vec<_> = (0..MAX_HANDSHAKES_PER_IP)
+            .map(|_| pool.admit(v4(1)).unwrap())
+            .collect();
+        assert!(pool.admit(v4(1)).is_none());
+        // Another address is unaffected, and a finished handshake gives its place back.
+        assert!(pool.admit(v4(2)).is_some());
+        drop(held);
+        assert!(pool.admit(v4(1)).is_some());
+    }
+
+    #[test]
+    fn a_full_pool_makes_room_by_evicting_the_heaviest_address() {
+        let pool = HandshakePool::default();
+        let mut held = Vec::new();
+        for device in 0..(MAX_HANDSHAKES / MAX_HANDSHAKES_PER_IP) {
+            for _ in 0..MAX_HANDSHAKES_PER_IP {
+                held.push(pool.admit(v4(u8::try_from(device).unwrap())).unwrap());
+            }
+        }
+        assert_eq!(pool.lock().entries.len(), MAX_HANDSHAKES);
+        // A stranger is let in; the pool stays at its size.
+        let newcomer = pool.admit(v4(200));
+        assert!(newcomer.is_some());
+        assert_eq!(pool.lock().entries.len(), MAX_HANDSHAKES);
+        // A second one from the same stranger is fine too (it holds 2, the heaviest holds 7 or 8).
+        assert!(pool.admit(v4(200)).is_some());
+    }
+
+    #[test]
+    fn a_full_pool_of_equal_shares_turns_a_newcomer_away() {
+        // 64 addresses with one handshake each: nobody holds more than the newcomer would.
+        let pool = HandshakePool::default();
+        let mut held = Vec::new();
+        for device in 0..u8::try_from(MAX_HANDSHAKES).unwrap() {
+            held.push(pool.admit(v4(device)).unwrap());
+        }
+        assert!(pool.admit(v4(200)).is_none());
+    }
+
+    #[test]
+    fn ipv6_addresses_of_one_subnet_share_a_budget() {
+        let a: IpAddr = "fe80::1:2:3:4".parse().unwrap();
+        let b: IpAddr = "fe80::9:9:9:9".parse().unwrap();
+        assert_eq!(pool_key(a), pool_key(b));
+        let mapped: IpAddr = "::ffff:10.0.0.7".parse().unwrap();
+        assert_eq!(pool_key(mapped), v4(7));
+        assert_eq!(pool_key(v4(5)), v4(5));
+    }
 
     #[test]
     fn base64_matches_known_vectors() {
@@ -440,6 +766,7 @@ mod tests {
         let path = dir.path().join("tls-identity.bin");
         let first = Identity::load_or_create(&path).unwrap();
         for damage in [
+            vec![0_u8; 1 << 20],
             Vec::new(),
             b"garbage".to_vec(),
             first.to_file_bytes()[..30].to_vec(),
