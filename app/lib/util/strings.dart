@@ -244,7 +244,7 @@ abstract final class Strings {
   static const String handStraightFlush = 'Straight flush';
   static const String opponents = 'Other players';
   static const String hasCards = 'has cards';
-  static const String undoVirtualNote = 'Undo works inside one betting round. Once a card is turned it cannot be taken back.';
+  static const String undoVirtualNote = 'Undo works within one betting round. A card that is turned cannot be taken back.';
   static const String winsTag = 'Wins';
   static String potWonBy(String pot, int amount, String who) => '$pot $amount: $who';
   static const String winnerTag = 'Wins';

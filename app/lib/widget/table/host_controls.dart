@@ -37,10 +37,16 @@ class HostControls extends StatelessWidget {
   /// The run-out is still being dealt on screen; the next hand waits for its last card.
   final bool holdStart;
 
+  static bool _betting(WirePhase phase) =>
+      phase == WirePhase.preFlop || phase == WirePhase.flop || phase == WirePhase.turn || phase == WirePhase.river;
+
+  /// Whether the note about what undo can do is shown under the buttons, so the table can leave room.
+  static bool showsUndoNote({required WirePhase phase, required bool virtual}) => virtual && _betting(phase);
+
   @override
   Widget build(BuildContext context) {
     final phase = view.phase;
-    final inHand = phase == WirePhase.preFlop || phase == WirePhase.flop || phase == WirePhase.turn || phase == WirePhase.river;
+    final inHand = _betting(phase);
     VoidCallback? send(ClientMessage message) => enabled ? () => onSend(message) : null;
 
     final primary = switch (phase) {
@@ -87,7 +93,7 @@ class HostControls extends StatelessWidget {
         // The one thing to do next gets a row of its own, the full width of the controls.
         if (primary != null) ...<Widget>[primary, const SizedBox(height: BrutalMetrics.gapS)],
         _ButtonGrid(children: secondary),
-        if (virtual && inHand) ...<Widget>[
+        if (showsUndoNote(phase: phase, virtual: virtual)) ...<Widget>[
           const SizedBox(height: BrutalMetrics.gapS),
           Text(
             Strings.undoVirtualNote,

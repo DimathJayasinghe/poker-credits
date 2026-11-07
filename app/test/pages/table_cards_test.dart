@@ -6,6 +6,7 @@ import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/cards/board_view.dart';
 import 'package:poker_credits/widget/cards/hole_cards_dock.dart';
 import 'package:poker_credits/widget/cards/playing_card.dart';
+import 'package:poker_credits/widget/table/action_ticker.dart';
 import 'package:poker_credits/widget/table/pot_results.dart';
 import 'package:poker_credits/widget/table/seat_plate.dart';
 import 'package:poker_protocol/poker_protocol.dart';
@@ -49,6 +50,7 @@ Future<TestHarness> _openHostTable(
   final h = harness ?? TestHarness();
   await tester.pumpWidget(h.scope(const PokerCreditsApp()));
   await tester.pump();
+  await tester.ensureVisible(find.text('HOST A GAME'));
   await tester.tap(find.text('HOST A GAME'));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField).first, 'Dimath');
@@ -269,6 +271,35 @@ void main() {
     expect(find.text(Strings.undoVirtualNote), findsOneWidget);
     await _close(tester);
   });
+
+  // Every height from a short window up to a tall tablet: the host's note and buttons are whole
+  // and above the action ticker, either at rest or once the table is scrolled to its end.
+  for (final width in <double>[1280, 390]) {
+    for (final scale in <double>[1, 2]) {
+      testWidgets('the host controls and their undo note are never cut off by the action ticker (width $width, text x$scale)', (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final bad = <String>[];
+        for (var height = 560.0; height <= 1100; height += 40) {
+          await _openHostTable(tester, _hand(), size: Size(width, height));
+          expect(tester.takeException(), isNull, reason: 'no overflow at $width x $height');
+          final scrollable = find.descendant(of: find.byType(TablePage), matching: find.byType(Scrollable));
+          if (scrollable.evaluate().isNotEmpty) {
+            final position = tester.state<ScrollableState>(scrollable.first).position;
+            position.jumpTo(position.maxScrollExtent);
+            await tester.pump();
+          }
+          final ticker = tester.getRect(find.byType(ActionTicker));
+          for (final finder in <Finder>[find.text(Strings.undoVirtualNote), find.text('END GAME')]) {
+            final rect = tester.getRect(finder);
+            if (rect.bottom > ticker.top + 0.5) bad.add('$height: ${rect.bottom} runs under the ticker at ${ticker.top}');
+          }
+          await _close(tester);
+        }
+        expect(bad, isEmpty);
+      });
+    }
+  }
 
   group('the seated host\'s own cards', () {
     testWidgets('on a shared screen they show only while held', (tester) async {

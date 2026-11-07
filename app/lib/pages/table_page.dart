@@ -442,7 +442,15 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
             builder: (context, box) {
               // Roomy: the oval fills what the controls leave. Cramped: the whole middle scrolls
               // and the controls come first, so nothing is ever drawn over anything else.
-              if (_cramped(context, box, myTurn: mine != null, host: session.isHost, lobby: view.phase == WirePhase.lobby, dock: dock != null)) {
+              if (_cramped(
+                context,
+                box,
+                myTurn: mine != null,
+                host: session.isHost,
+                lobby: view.phase == WirePhase.lobby,
+                dock: dock != null,
+                note: HostControls.showsUndoNote(phase: view.phase, virtual: showCards),
+              )) {
                 // Short content sits with the controls at the bottom edge; long content scrolls.
                 return SingleChildScrollView(
                   child: ConstrainedBox(
@@ -494,16 +502,27 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
   /// The seated host's cards and their caption.
   static const double _dockHeight = 170;
 
-  static double _hostBlockHeight({required double width, required bool lobby}) {
+  /// The note under the host controls in a virtual room: up to three lines of small text and its gap.
+  static const double _undoNoteHeight = BrutalMetrics.gapS + 3 * 17;
+
+  static double _hostBlockHeight({required double width, required bool lobby, required bool note}) {
     final rows = width < 480 ? 2 : 1;
-    return 16 + (lobby ? 44 : 0) + 56 + BrutalMetrics.gapS + rows * 48 + (rows - 1) * BrutalMetrics.gapS;
+    return 16 + (lobby ? 44 : 0) + 56 + BrutalMetrics.gapS + rows * 48 + (rows - 1) * BrutalMetrics.gapS + (note ? _undoNoteHeight : 0);
   }
 
-  bool _cramped(BuildContext context, BoxConstraints box, {required bool myTurn, required bool host, required bool lobby, required bool dock}) {
+  bool _cramped(
+    BuildContext context,
+    BoxConstraints box, {
+    required bool myTurn,
+    required bool host,
+    required bool lobby,
+    required bool dock,
+    required bool note,
+  }) {
     final chrome =
         (dock ? _dockHeight : 0) +
         (myTurn ? _turnBlockHeight : 0) +
-        (host ? _hostBlockHeight(width: box.maxWidth, lobby: lobby) : 0) +
+        (host ? _hostBlockHeight(width: box.maxWidth, lobby: lobby, note: note) : 0) +
         2 * BrutalMetrics.gapM;
     if (box.maxWidth < FeltLayout.narrowWidth) return box.maxHeight < 420 + chrome;
     return box.maxHeight < FeltLayout.minOvalHeight(context) + chrome;
