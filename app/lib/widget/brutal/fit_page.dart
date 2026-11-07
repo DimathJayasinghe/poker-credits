@@ -87,16 +87,33 @@ class FitPage extends StatelessWidget {
   /// The share of the width the footer gets as a pane on a phone held on its side.
   final double footerShare;
 
-  static FitInfo infoFor(BoxConstraints box, double textScale, {required double compactBelow, required double tightBelow}) {
-    final height = box.maxHeight / (textScale < 1 ? 1 : textScale);
+  /// The tier and the layout for [box]. [keyboard] is the height an open on-screen keyboard takes
+  /// away from the page (see [keyboardTake]): the tier is picked from the height the page has
+  /// without it. A page that changed tier (or went side by side) when the keyboard came up would
+  /// rebuild its fields in another place of the tree, and the field the person just tapped would
+  /// lose its focus and close the keyboard again. With the keyboard open the page scrolls instead.
+  static FitInfo infoFor(BoxConstraints box, double textScale, {required double compactBelow, required double tightBelow, double keyboard = 0}) {
+    final room = box.maxHeight + keyboard;
+    final height = room / (textScale < 1 ? 1 : textScale);
     final tier = height >= compactBelow ? FitTier.comfortable : (height >= tightBelow ? FitTier.compact : FitTier.tight);
-    return FitInfo(tier: tier, sideBySide: box.maxWidth >= 600 && box.maxHeight < 460, width: box.maxWidth, height: box.maxHeight);
+    return FitInfo(tier: tier, sideBySide: box.maxWidth >= 600 && room < 460, width: box.maxWidth, height: box.maxHeight);
+  }
+
+  /// How much of the page's height an open keyboard takes. The scaffold shrinks the body by the
+  /// keyboard, and the safe area inside it keeps only what the window has not given to the
+  /// keyboard already (on a phone `padding` shrinks as `viewInsets` grows, `viewPadding` does not):
+  /// the page loses `viewInsets + padding - viewPadding` in all.
+  static double keyboardTake(MediaQueryData media) {
+    final take = media.viewInsets.bottom + media.padding.bottom - media.viewPadding.bottom;
+    return take > 0 ? take : 0;
   }
 
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final media = MediaQuery.of(context);
+    final textScale = media.textScaler.scale(14) / 14;
+    final keyboard = keyboardTake(media);
     return PaperScaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -105,7 +122,7 @@ class FitPage extends StatelessWidget {
           Expanded(
             child: LayoutBuilder(
               builder: (context, box) {
-                final info = infoFor(box, textScale, compactBelow: compactBelow, tightBelow: tightBelow);
+                final info = infoFor(box, textScale, compactBelow: compactBelow, tightBelow: tightBelow, keyboard: keyboard);
                 final width = info.sideBySide ? maxWidth * 1.7 : maxWidth;
                 final inset = padding ?? EdgeInsets.all(info.pad);
                 final body = LayoutBuilder(
