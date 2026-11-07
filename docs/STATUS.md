@@ -9,6 +9,10 @@ Owner bug reports and requests, all committed one change at a time on `feature/e
 
 **Audit result.** `test/pages/screens_layout_test.dart` sweeps Home, Settings, Guide, Support and the splash, terms and intro at 320x568, 390x844, 844x390, 1280x800 and 1920x1080, text sizes 1.0, 2.0 and 3.0, light and dark (150 cases), and checks every pressable cell outside a game is at least 44 px. The game screens keep their own sweeps (`text_scale_test`, `table_layout_test`).
 
+**Release signing (owner decision, 2026-11-07):** releases may ship signed with the Android debug key until the owner buys a real signing key. CI does **not** reject debug-signed artifacts; do not add that check until the real key exists. Windows and Linux packages stay unsigned.
+
+**Independent audit (Codex, 2026-11-07) triaged:** fixed the raise sheet overflow at 3x text and the release error screen (now an error ID, details only on request); the "RAISE unreachable" warnings were a test that did not pump after `ensureVisible`, now fixed and fatal on a missed tap. Settlement and cash features are out of scope by the owner's choice. Not done, deliberately for now: per-host TLS with a pinned fingerprint (the main LAN limit, documented in `SECURITY_AND_EDGE_CASES.md`), long invite tokens and approval for cloud rooms, a hardened cloud deployment template, localisation, mDNS discovery. Revisit them before any public cloud launch.
+
 **Not verified / open:**
 - The new screens were checked in widget tests and goldens only. The emulator on the machine still has the 1.1.0 APK: rebuild and reinstall to see the splash, terms, intro, tours and Support on a device.
 - **Support links copy the address, they do not open it:** `url_launcher` is not on the approved list. Needs the owner's yes; the change is one more `ExternalLinks` implementation.
