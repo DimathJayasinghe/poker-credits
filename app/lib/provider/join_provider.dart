@@ -1,5 +1,6 @@
 import 'package:logging/logging.dart';
 import 'package:poker_credits/model/join_link.dart';
+import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/net/features.dart';
 import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
@@ -43,7 +44,24 @@ class JoinService {
     final attempt = ++_attempt;
     var target = link;
     if (target.fingerprint == null) {
-      final pin = await _ref.read(hostFinderProvider).fingerprintOf(link.hostAndPort);
+      final finder = _ref.read(hostFinderProvider);
+      var pin = await finder.fingerprintOf(link.hostAndPort);
+      if (attempt != _attempt) return;
+      if (pin == null) {
+        // One busy moment on a crowded Wi-Fi should not read as "the host is outdated": ask once more.
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        if (attempt != _attempt) return;
+        pin = await finder.fingerprintOf(link.hostAndPort);
+        if (attempt != _attempt) return;
+      }
+      if (pin == null && await finder.speaksPlainHttp(link.hostAndPort)) {
+        if (attempt != _attempt) return;
+        // An older host: its first message could only go out in the clear. Say so now instead of
+        // retrying a connection that can never succeed.
+        _log.info('${link.hostAndPort} speaks plain HTTP: an older version');
+        _ref.notifier(sessionProvider).refuse(uri: Uri.parse('wss://${link.hostAndPort}/v1/ws'), failure: LinkFailure.hostOutdated);
+        return;
+      }
       if (attempt != _attempt) return;
       target = target.withFingerprint(pin);
     }

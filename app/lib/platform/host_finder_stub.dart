@@ -19,6 +19,9 @@ final class _NoFinder implements HostFinder {
 
   @override
   Future<String?> fingerprintOf(String hostAndPort) async => null;
+
+  @override
+  Future<bool> speaksPlainHttp(String hostAndPort) async => false;
 }
 
 final class _NoBrowse implements LobbyBrowse {

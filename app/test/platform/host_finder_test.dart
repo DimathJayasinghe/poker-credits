@@ -95,6 +95,48 @@ void main() {
     });
   });
 
+  group('an older host', () {
+    Future<HttpServer> plain(void Function(HttpRequest request) handler) async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen(handler);
+      addTearDown(() => server.close(force: true));
+      return server;
+    }
+
+    test('is recognised by its plain health answer', () async {
+      final old = await plain((request) {
+        request.response
+          ..headers.contentType = ContentType.json
+          ..write('{"status":"healthy","activeRooms":1,"version":"1.3.1","protocol":1}')
+          ..close();
+      });
+      expect(await _finder(<String>[], <int>[]).speaksPlainHttp('127.0.0.1:${old.port}'), isTrue);
+    });
+
+    test('is not confused with some other web server, a TLS host or a dead port', () async {
+      final other = await plain((request) {
+        request.response
+          ..write('<html>hello</html>')
+          ..close();
+      });
+      final missing = await plain((request) {
+        request.response
+          ..statusCode = 404
+          ..close();
+      });
+      final tls = await _host(code: 'KQ7M');
+      addTearDown(() => tls.close(force: true));
+      final closed = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final deadPort = closed.port;
+      await closed.close();
+      final finder = _finder(<String>[], <int>[]);
+      expect(await finder.speaksPlainHttp('127.0.0.1:${other.port}'), isFalse);
+      expect(await finder.speaksPlainHttp('127.0.0.1:${missing.port}'), isFalse);
+      expect(await finder.speaksPlainHttp('127.0.0.1:${tls.port}'), isFalse);
+      expect(await finder.speaksPlainHttp('127.0.0.1:$deadPort'), isFalse);
+    });
+  });
+
   test('tries the second port when the first has nobody', () async {
     final server = await _host(code: 'KQ7M');
     addTearDown(() => server.close(force: true));

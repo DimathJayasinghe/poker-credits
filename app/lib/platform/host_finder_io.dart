@@ -78,6 +78,26 @@ final class LanHostFinder implements HostFinder {
     }
   }
 
+  @override
+  Future<bool> speaksPlainHttp(String hostAndPort) async {
+    final client = HttpClient()..connectionTimeout = probeTimeout * 4;
+    try {
+      final request = await client.getUrl(Uri.parse('http://$hostAndPort/health')).timeout(probeTimeout * 4);
+      final response = await request.close().timeout(probeTimeout * 4);
+      if (response.statusCode != 200) {
+        await response.drain<void>().timeout(probeTimeout * 4);
+        return false;
+      }
+      final body = await utf8.decoder.bind(response).join().timeout(probeTimeout * 4);
+      // Only our own health answer counts, not any web server that happens to be there.
+      return body.length < 512 && body.contains('"status":"healthy"') && body.contains('"protocol"');
+    } on Object {
+      return false;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   final List<int> ports;
 
   /// Probes in flight at once.

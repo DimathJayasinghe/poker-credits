@@ -121,4 +121,10 @@ abstract interface class HostFinder {
   /// The pin of the certificate the host at [hostAndPort] shows (a typed address has none yet),
   /// or `null` when nothing there speaks TLS. Trust on first use, like a search by code.
   Future<String?> fingerprintOf(String hostAndPort);
+
+  /// Whether the device at [hostAndPort] answers like a Poker Credits host of an older version:
+  /// plain HTTP, no TLS. Only a status request is made, and nothing secret is sent. It lets the
+  /// app say "this host needs an update" at once instead of retrying a connection that can never
+  /// work.
+  Future<bool> speaksPlainHttp(String hostAndPort);
 }

@@ -256,6 +256,12 @@ class FakeHostFinder implements HostFinder {
   /// What a typed address shows when asked for its certificate; `null` means nothing answered.
   String? shown = testPin;
 
+  /// Addresses that answer plain HTTP like a host of an older version.
+  final Set<String> plainHosts = <String>{};
+
+  @override
+  Future<bool> speaksPlainHttp(String hostAndPort) async => plainHosts.contains(hostAndPort);
+
   /// Every address whose certificate was looked at.
   final List<String> fingerprintRequests = <String>[];
 

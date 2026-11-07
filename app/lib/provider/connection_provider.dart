@@ -125,6 +125,18 @@ class SessionNotifier extends Notifier<SessionState> {
     client.start();
   }
 
+  /// Shows [failure] for [uri] without opening a connection, for a host the app already knows it
+  /// cannot reach safely (an older version that speaks no TLS). The state is what a failed
+  /// [attach] would leave, so the screens need no special case.
+  void refuse({required Uri uri, required LinkFailure failure}) {
+    unawaited(_detach());
+    _established = false;
+    state = SessionState(
+      serverUri: uri.toString(),
+      link: LinkState(phase: LinkPhase.failed, failure: failure),
+    );
+  }
+
   /// Sends a message; false when there is no live socket (nothing is queued).
   bool send(ClientMessage message) => _client?.send(message) ?? false;
 
