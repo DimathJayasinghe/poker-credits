@@ -162,10 +162,14 @@ class RoomClient {
       if (generation == _generation) _fail(LinkFailure.hostOutdated, null);
       return;
     } on NoSecureChannel {
-      // One failed handshake can be a flaky network; two in a row mean the host is not speaking TLS.
+      // One failed handshake can be a flaky network; two in a row on a first join mean the host is
+      // not speaking TLS. A session that was accepted once (or is being resumed) did talk TLS to
+      // that host, so a failed handshake there is the network or another device at the old address:
+      // keep retrying, and let the search for the room code find the host's new address.
       _log.info('the host does not speak TLS');
       if (generation != _generation) return;
-      if (++_insecureAttempts >= 2) {
+      final firstJoin = _credentials == null && _first is! Resume;
+      if (firstJoin && ++_insecureAttempts >= 2) {
         _fail(LinkFailure.hostOutdated, null);
       } else {
         _scheduleRetry();

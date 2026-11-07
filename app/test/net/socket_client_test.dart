@@ -308,6 +308,27 @@ void main() {
       });
     });
 
+    test('a session that is being resumed keeps retrying: a failed handshake is not an outdated host', () {
+      fakeAsync((async) {
+        final attempts = <int>[];
+        final client = RoomClient(
+          uri: Uri.parse('wss://192.168.1.5:7878/v1/ws'),
+          firstMessage: const Resume(roomCode: 'KQ7M', sessionToken: 'tok'),
+          transport: (uri) async {
+            attempts.add(attempts.length);
+            throw const NoSecureChannel();
+          },
+          backoff: Backoff(random: Random(7)),
+          now: () => _start.add(async.elapsed),
+        )..start();
+        async.flushMicrotasks();
+        async.elapse(const Duration(minutes: 2));
+        expect(client.state.failure, isNull, reason: 'another device at the old address must not end the session');
+        expect(attempts.length, greaterThan(3), reason: 'so the search for the new address can run');
+        client.close();
+      });
+    });
+
     test('a plaintext address of another device is refused for good', () {
       fakeAsync((async) {
         final attempts = <int>[];
