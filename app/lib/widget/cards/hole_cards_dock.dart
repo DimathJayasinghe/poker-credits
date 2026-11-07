@@ -17,6 +17,7 @@ class HoleCardsDock extends StatefulWidget {
     this.pressToPeek = false,
     this.size = CardSize.hero,
     this.fourColour = false,
+    this.showHint = true,
   });
 
   /// Null = no cards (folded, between hands, or not yet dealt).
@@ -26,6 +27,10 @@ class HoleCardsDock extends StatefulWidget {
   final bool pressToPeek;
   final CardSize size;
   final bool fourColour;
+
+  /// The "tap to show" line under the cards; left out where the screen is short (the semantics
+  /// hint stays).
+  final bool showHint;
 
   @override
   State<HoleCardsDock> createState() => _HoleCardsDockState();
@@ -98,14 +103,16 @@ class _HoleCardsDockState extends State<HoleCardsDock> {
                     ],
                   ),
                 ),
-                const SizedBox(height: BrutalMetrics.gapXs),
-                ExcludeSemantics(
-                  child: Text(
-                    hint.toUpperCase(),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2, color: c.muted),
+                if (widget.showHint) ...<Widget>[
+                  const SizedBox(height: BrutalMetrics.gapXs),
+                  ExcludeSemantics(
+                    child: Text(
+                      hint.toUpperCase(),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2, color: c.muted),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

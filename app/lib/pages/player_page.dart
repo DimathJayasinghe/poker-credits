@@ -31,10 +31,10 @@ import 'package:poker_credits/widget/table/seat_order_sheet.dart';
 import 'package:poker_credits/widget/cards/board_view.dart';
 import 'package:poker_credits/widget/cards/card_row.dart';
 import 'package:poker_credits/widget/cards/hole_cards_dock.dart';
-import 'package:poker_credits/widget/cards/playing_card.dart';
 import 'package:poker_credits/widget/cards/showdown_panel.dart';
 import 'package:poker_credits/widget/player/action_buttons.dart';
 import 'package:poker_credits/widget/player/opponent_strip.dart';
+import 'package:poker_credits/widget/player/player_fit.dart';
 import 'package:poker_credits/widget/player/raise_slider.dart';
 import 'package:poker_credits/widget/player/rebuy_sheet.dart';
 import 'package:poker_credits/widget/player/turn_alert.dart';
@@ -57,8 +57,8 @@ class PlayerPage extends StatefulWidget {
 }
 
 class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObserver {
-  /// The three small buttons share a height that fits a two-line label on a narrow phone.
-  static const double _secondaryHeight = 64;
+  /// Room a banner (or the seat button) takes at the top, which the layout below makes up for.
+  static const double _extraHeight = 48;
 
   Timer? _ticker;
   final TurnAlertGate _gate = TurnAlertGate();
@@ -255,15 +255,21 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
   @override
   Widget build(BuildContext context) {
     final session = context.ref.watch(sessionProvider);
-    // One thumb column: on a tablet or TV it stays phone-sized in the middle.
+    // One thumb column: on a tablet or TV it stays phone-sized in the middle. A phone on its side
+    // is too short for a column, so it gets the width (see PlayerFit.isWide).
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _onBack();
       },
       child: PaperScaffold(
-        body: Center(
-          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: _body(context, session)),
+        body: LayoutBuilder(
+          builder: (context, box) => Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: PlayerFit.isWide(box.biggest) ? 960 : 560),
+              child: _body(context, session),
+            ),
+          ),
         ),
       ),
     );
@@ -349,16 +355,23 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
     _faceUp = startOpen;
   }
 
-  Widget _dock(RoomState room, SeatView seat, bool fourColour) {
+  Widget _dock(RoomState room, SeatView seat, bool fourColour, PlayerFit fit) {
     final cards = seat.hasFolded ? null : room.visibleHoleCards;
     // Dealt but the private message is still on its way: show the backs, not "no cards".
     if (cards == null && seat.hasCards && !seat.hasFolded) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: BrutalMetrics.gapS),
-        child: CardRow(cards: <PokerCard?>[null, null], size: CardSize.hero, gap: BrutalMetrics.gapS, alignment: MainAxisAlignment.center),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapS),
+        child: CardRow(cards: const <PokerCard?>[null, null], size: fit.card, gap: BrutalMetrics.gapS, alignment: MainAxisAlignment.center),
       );
     }
-    return HoleCardsDock(cards: cards, faceUp: _faceUp, onToggle: () => setState(() => _faceUp = !_faceUp), fourColour: fourColour);
+    return HoleCardsDock(
+      cards: cards,
+      faceUp: _faceUp,
+      onToggle: () => setState(() => _faceUp = !_faceUp),
+      fourColour: fourColour,
+      size: fit.card,
+      showHint: fit.hint,
+    );
   }
 
   Widget _controller(BuildContext context, SessionState session, RoomView rawView, SeatView rawSeat) {
@@ -406,171 +419,284 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
     }
 
     final check = widget.solo ? null : room.presenceCheck;
-    // At huge text sizes the whole controller scrolls, so the action buttons stay reachable; at
-    // normal sizes it fills the screen and the buttons sit at the bottom.
-    return CustomScrollView(
-      slivers: <Widget>[
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              if (solo) _SoloTopBar(blinds: view.blinds, onBack: _onBack) else _TopBar(roomCode: view.roomCode, link: session.link, onBack: _onBack),
-              if (!live) _linkBanner(session.link),
-              if (view.paused) const BrutalBanner(message: Strings.gamePaused, kind: BrutalBannerKind.warning),
-              if (room.lastError != null) BrutalBanner(message: errorText(room.lastError!.code), kind: BrutalBannerKind.error),
-              if (pending != null && !solo)
-                BrutalBanner(message: pending.approved ? Strings.topUpApproved : '${Strings.topUpPending}: ${pending.amount}'),
-              if (check != null && check.subjectPlayerId != seat.playerId) _presenceStrip(check),
-              Padding(
-                padding: const EdgeInsets.all(BrutalMetrics.gapM),
-                child: _StackBlock(seat: seat),
+    final presence = check != null && check.subjectPlayerId != seat.playerId ? check : null;
+    final choosesSeat = !solo && guestMayChooseSeat(view.phase);
+    // Banners and the seat button take height of their own; the layout below is sized for what is left.
+    final extras =
+        (!live ? 1 : 0) +
+        (view.paused ? 1 : 0) +
+        (room.lastError != null ? 1 : 0) +
+        (pending != null && !solo ? 1 : 0) +
+        (presence != null ? 1 : 0) +
+        (choosesSeat ? 1 : 0);
+
+    return LayoutBuilder(
+      builder: (context, box) {
+        final wide = PlayerFit.isWide(box.biggest);
+        final rawScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+        // Banners and the seat button take height of their own; the layout is sized for what is left.
+        final room0 = box.maxHeight - extras * _extraHeight;
+        final cap = PlayerFit.maxTextScale(room0, wide: wide);
+        final textScale = rawScale < cap ? rawScale : cap;
+        final fit = wide ? PlayerFit.forWide(room0) : PlayerFit.forHeight(room0, textScale: textScale);
+
+        final bar = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            if (solo) _SoloTopBar(blinds: view.blinds, onBack: _onBack) else _TopBar(roomCode: view.roomCode, link: session.link, onBack: _onBack),
+            if (!live) _linkBanner(session.link),
+            if (view.paused) const BrutalBanner(message: Strings.gamePaused, kind: BrutalBannerKind.warning),
+            if (room.lastError != null) BrutalBanner(message: errorText(room.lastError!.code), kind: BrutalBannerKind.error),
+            if (pending != null && !solo)
+              BrutalBanner(message: pending.approved ? Strings.topUpApproved : '${Strings.topUpPending}: ${pending.amount}'),
+            if (presence != null) _presenceStrip(presence),
+          ],
+        );
+
+        final stack = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: EdgeInsets.fromLTRB(BrutalMetrics.gapM, fit.stackPad, BrutalMetrics.gapM, fit.stackPad),
+              child: _StackBlock(seat: seat, numeral: fit.numeral),
+            ),
+            if (showCards) ...<Widget>[
+              OpponentStrip(
+                seats: view.seats,
+                myPlayerId: seat.playerId,
+                showStacks: solo,
+                activeSeat: solo ? view.activeSeat : null,
+                // A new turn (hand, street or bet) starts the thinking bar again.
+                turnKey: '${view.handNumber}:${view.phase.name}:${view.activeSeat}:${view.totalPot}',
+                paused: view.paused,
               ),
-              if (showCards) ...<Widget>[
-                OpponentStrip(
-                  seats: view.seats,
-                  myPlayerId: seat.playerId,
-                  showStacks: solo,
-                  activeSeat: solo ? view.activeSeat : null,
-                  // A new turn (hand, street or bet) starts the thinking bar again.
-                  turnKey: '${view.handNumber}:${view.phase.name}:${view.activeSeat}:${view.totalPot}',
-                  paused: view.paused,
-                ),
-                const SizedBox(height: BrutalMetrics.gapS),
-              ],
-              if (!solo && guestMayChooseSeat(view.phase))
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapM, 0, BrutalMetrics.gapM, BrutalMetrics.gapM),
-                  child: BrutalButton(
-                    label: '${Strings.seatLabel(seatNumber(seat.seatIndex))}: ${Strings.seatsMove}',
-                    onPressed: live ? () => showSeatOrderSheet(context, isHost: false) : null,
-                  ),
-                ),
-              Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        TurnBlock(myTurn: myTurn, title: title, detail: detail),
-                        if (solo && (headsUp || _outLines.isNotEmpty)) _SoloNotes(headsUp: headsUp, outLines: List<Finish>.of(_outLines)),
-                        const SizedBox(height: BrutalMetrics.gapM),
-                        Text(
-                          '${Strings.pot.toUpperCase()} ${view.totalPot}',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 28, color: c.ink),
-                        ),
-                        if (showCards) ...<Widget>[
-                          const SizedBox(height: BrutalMetrics.gapM),
-                          Center(
-                            child: BoardView(shown: board, fourColour: settings.fourColourDeck, animate: true),
-                          ),
-                        ],
-                        if (result != null) ...<Widget>[
-                          const SizedBox(height: BrutalMetrics.gapM),
-                          ShowdownPanel(
-                            animate: true,
-                            reveals: view.reveals,
-                            result: result,
-                            fourColour: settings.fourColourDeck,
-                            myPlayerId: seat.playerId,
-                          ),
-                        ],
-                        if (room.ticker.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: BrutalMetrics.gapS),
-                            child: Text(
-                              '> ${describeAction(room.ticker.last)}'.toUpperCase(),
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, color: c.muted),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              const SizedBox(height: BrutalMetrics.gapS),
+            ],
+            if (choosesSeat)
               Padding(
                 padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapM, 0, BrutalMetrics.gapM, BrutalMetrics.gapM),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                child: BrutalButton(
+                  label: '${Strings.seatLabel(seatNumber(seat.seatIndex))}: ${Strings.seatsMove}',
+                  onPressed: live ? () => showSeatOrderSheet(context, isHost: false) : null,
+                ),
+              ),
+          ],
+        );
+
+        // The middle of the screen. [areaHeight] is what it has: a showdown lists as many hands as fit
+        // and sums up the rest in a "+n more" line that opens them all in a sheet.
+        Widget info(BuildContext context, double areaHeight) {
+          final showdown = result != null;
+          final oneLine = fit.compactTurn || showdown;
+          final fourColour = settings.fourColourDeck;
+          Widget? panel;
+          if (result != null) {
+            final overhead = 44 + fit.gap + 20 + (showCards && board.isNotEmpty ? 52 : 0) + result.pots.length * 34 + 24;
+            final rows = ((areaHeight - overhead) / ShowdownPanel.compactRowHeight).floor();
+            ShowdownPanel panelFor({required bool compact}) => ShowdownPanel(
+              animate: compact,
+              compact: compact,
+              maxRows: rows < 1 ? 1 : rows,
+              reveals: view.reveals,
+              result: result,
+              board: showCards ? board : const <PokerCard>[],
+              fourColour: fourColour,
+              myPlayerId: seat.playerId,
+              onMore: () => showBrutalSheet<void>(
+                context: context,
+                title: Strings.showdownTitle,
+                builder: (_) => SingleChildScrollView(
+                  padding: const EdgeInsets.all(BrutalMetrics.gapM),
+                  child: panelFor(compact: false),
+                ),
+              ),
+            );
+            panel = panelFor(compact: true);
+          }
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                TurnBlock(
+                  myTurn: myTurn,
+                  title: title,
+                  detail: detail,
+                  scale: fit.turn,
+                  trailing: oneLine ? '${Strings.pot} ${view.totalPot}' : null,
+                ),
+                if (solo && (headsUp || _outLines.isNotEmpty)) _SoloNotes(headsUp: headsUp, outLines: List<Finish>.of(_outLines)),
+                if (!oneLine) ...<Widget>[
+                  SizedBox(height: fit.gap),
+                  Text(
+                    '${Strings.pot.toUpperCase()} ${view.totalPot}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontFamily: BrutalFonts.display, fontSize: fit.pot, color: c.ink),
+                  ),
+                ],
+                // The showdown shows the board itself, so the plain board makes way for it.
+                if (showCards && !showdown) ...<Widget>[
+                  SizedBox(height: fit.gap),
+                  Center(
+                    child: BoardView(shown: board, fourColour: settings.fourColourDeck, animate: true),
+                  ),
+                ],
+                if (panel != null) ...<Widget>[SizedBox(height: fit.gap), panel],
+                if (room.ticker.isNotEmpty && !oneLine)
+                  Padding(
+                    padding: const EdgeInsets.only(top: BrutalMetrics.gapS),
+                    child: Text(
+                      '> ${describeAction(room.ticker.last)}'.toUpperCase(),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, color: c.muted),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }
+
+        // Hosted games keep room for a two-line label on the three small buttons.
+        final secondary = solo ? fit.secondary : fit.secondary + 12;
+        final bottom = Padding(
+          padding: EdgeInsets.fromLTRB(BrutalMetrics.gapM, 0, BrutalMetrics.gapM, fit.gap),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              if (showCards) _dock(room, seat, settings.fourColourDeck, fit),
+              if (myPrompt != null) ...<Widget>[
+                ActionButtons(
+                  legal: myPrompt.legal,
+                  enabled: live && !inFlight,
+                  buttonHeight: fit.button,
+                  gap: fit.gap,
+                  onFold: () => _act(const FoldAction()),
+                  onCheck: () => _act(const CheckAction()),
+                  onCall: () => _act(const CallAction()),
+                  onRaise: () => _raise(myPrompt.legal),
+                ),
+                SizedBox(height: fit.gap),
+              ] else if (!over && result == null)
+                // The buttons' place is kept while it is not my turn, so nothing moves when it is.
+                // Between hands there is no turn to wait for, and the showdown gets the room.
+                SizedBox(
+                  height: ActionButtons.heightFor(buttonHeight: fit.button, gap: fit.gap) + fit.gap,
+                ),
+              if (over)
+                BrutalButton(
+                  label: Strings.seeResult,
+                  kind: BrutalButtonKind.primary,
+                  heavy: true,
+                  minHeight: BrutalMetrics.tapPlayer,
+                  onPressed: _seeResult,
+                )
+              else if (solo)
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: BrutalButton(
+                        label: view.paused ? Strings.resume : Strings.pause,
+                        minHeight: secondary,
+                        onPressed: live ? () => _send(view.paused ? const ResumeGame() : const Pause()) : null,
+                      ),
+                    ),
+                    const SizedBox(width: BrutalMetrics.gapS),
+                    Expanded(
+                      child: BrutalButton(label: Strings.soloEnd, kind: BrutalButtonKind.danger, minHeight: secondary, onPressed: _endSolo),
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: BrutalButton(label: Strings.topUp, minHeight: secondary, onPressed: live ? () => _topUp(null) : null),
+                    ),
+                    const SizedBox(width: BrutalMetrics.gapS),
+                    Expanded(
+                      child: BrutalButton(
+                        label: seat.isSittingOut ? Strings.imBack : Strings.sitOut,
+                        minHeight: secondary,
+                        onPressed: live ? () => _send(SetSittingOut(sittingOut: !seat.isSittingOut)) : null,
+                      ),
+                    ),
+                    const SizedBox(width: BrutalMetrics.gapS),
+                    Expanded(
+                      child: BrutalButton(label: Strings.leave, kind: BrutalButtonKind.danger, minHeight: secondary, onPressed: _leaveTable),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        );
+
+        // The whole controller is on screen at once, whatever the device: no scrolling in a game.
+        // The pieces keep their size and the text scale is capped to what fits; the middle (turn,
+        // pot, board, showdown) is the part that shrinks, and if even the pieces do not fit, the
+        // whole controller is scaled down.
+        final infoFit = LayoutBuilder(
+          builder: (context, area) => FittedBox(
+            fit: BoxFit.scaleDown,
+            child: SizedBox(width: area.maxWidth, child: info(context, area.maxHeight)),
+          ),
+        );
+        final Widget layout;
+        if (wide) {
+          layout = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              bar,
+              Expanded(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    if (showCards) _dock(room, seat, settings.fourColourDeck),
-                    if (myPrompt != null) ...<Widget>[
-                      ActionButtons(
-                        legal: myPrompt.legal,
-                        enabled: live && !inFlight,
-                        onFold: () => _act(const FoldAction()),
-                        onCheck: () => _act(const CheckAction()),
-                        onCall: () => _act(const CallAction()),
-                        onRaise: () => _raise(myPrompt.legal),
-                      ),
-                      const SizedBox(height: BrutalMetrics.gapM),
-                    ],
-                    if (over)
-                      BrutalButton(
-                        label: Strings.seeResult,
-                        kind: BrutalButtonKind.primary,
-                        heavy: true,
-                        minHeight: BrutalMetrics.tapPlayer,
-                        onPressed: _seeResult,
-                      )
-                    else if (solo)
-                      Row(
+                    Expanded(
+                      flex: 11,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
-                          Expanded(
-                            child: BrutalButton(
-                              label: view.paused ? Strings.resume : Strings.pause,
-                              minHeight: _secondaryHeight,
-                              onPressed: live ? () => _send(view.paused ? const ResumeGame() : const Pause()) : null,
-                            ),
-                          ),
-                          const SizedBox(width: BrutalMetrics.gapS),
-                          Expanded(
-                            child: BrutalButton(
-                              label: Strings.soloEnd,
-                              kind: BrutalButtonKind.danger,
-                              minHeight: _secondaryHeight,
-                              onPressed: _endSolo,
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: BrutalButton(label: Strings.topUp, minHeight: _secondaryHeight, onPressed: live ? () => _topUp(null) : null),
-                          ),
-                          const SizedBox(width: BrutalMetrics.gapS),
-                          Expanded(
-                            child: BrutalButton(
-                              label: seat.isSittingOut ? Strings.imBack : Strings.sitOut,
-                              minHeight: _secondaryHeight,
-                              onPressed: live ? () => _send(SetSittingOut(sittingOut: !seat.isSittingOut)) : null,
-                            ),
-                          ),
-                          const SizedBox(width: BrutalMetrics.gapS),
-                          Expanded(
-                            child: BrutalButton(
-                              label: Strings.leave,
-                              kind: BrutalButtonKind.danger,
-                              minHeight: _secondaryHeight,
-                              onPressed: _leaveTable,
-                            ),
-                          ),
+                          stack,
+                          Expanded(child: infoFit),
                         ],
                       ),
+                    ),
+                    Expanded(
+                      flex: 9,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: <Widget>[bottom],
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
-          ),
-        ),
-      ],
+          );
+        } else {
+          layout = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              bar,
+              stack,
+              Expanded(child: infoFit),
+              bottom,
+            ],
+          );
+        }
+        final needed = (wide ? PlayerFit.minWideHeight : PlayerFit.minHeight) + extras * _extraHeight + (solo ? 0 : 12);
+        return MediaQuery.withClampedTextScaling(
+          maxScaleFactor: cap,
+          child: box.maxHeight >= needed
+              ? layout
+              : FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: SizedBox(width: box.maxWidth, height: needed, child: layout),
+                ),
+        );
+      },
     );
   }
 
@@ -641,9 +767,12 @@ class _TopBar extends StatelessWidget {
 
 /// Your chips in large type, with the state tags.
 class _StackBlock extends StatelessWidget {
-  const _StackBlock({required this.seat});
+  const _StackBlock({required this.seat, required this.numeral});
 
   final SeatView seat;
+
+  /// Size of the chip count.
+  final double numeral;
 
   @override
   Widget build(BuildContext context) {
@@ -662,7 +791,7 @@ class _StackBlock extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: BrutalNumber(seat.chips, size: 64, color: c.ink),
+                child: BrutalNumber(seat.chips, size: numeral, color: c.ink),
               ),
             ),
             if (seat.streetBet > 0) ...<Widget>[
@@ -680,16 +809,18 @@ class _StackBlock extends StatelessWidget {
             ],
           ],
         ),
-        const SizedBox(height: BrutalMetrics.gapS),
-        Wrap(
-          spacing: BrutalMetrics.gapS,
-          runSpacing: BrutalMetrics.gapXs,
-          children: <Widget>[
-            if (seat.hasFolded) const BrutalTag(Strings.folded),
-            if (seat.isAllIn) const BrutalTag(Strings.allIn, kind: BrutalTagKind.danger),
-            if (seat.isSittingOut) const BrutalTag(Strings.sittingOut),
-          ],
-        ),
+        if (seat.hasFolded || seat.isAllIn || seat.isSittingOut) ...<Widget>[
+          const SizedBox(height: BrutalMetrics.gapS),
+          Wrap(
+            spacing: BrutalMetrics.gapS,
+            runSpacing: BrutalMetrics.gapXs,
+            children: <Widget>[
+              if (seat.hasFolded) const BrutalTag(Strings.folded),
+              if (seat.isAllIn) const BrutalTag(Strings.allIn, kind: BrutalTagKind.danger),
+              if (seat.isSittingOut) const BrutalTag(Strings.sittingOut),
+            ],
+          ),
+        ],
       ],
     );
   }

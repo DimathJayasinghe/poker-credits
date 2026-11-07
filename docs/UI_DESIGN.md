@@ -129,6 +129,14 @@ Top bar cells: room code | hand and street | Pause | Undo. Centre: the `felt` pa
 ### Player (portrait, one thumb)
 Top bar: room, connection state. Hero cell: stack in Anton 64, bet beside it. Middle: whose turn (quiet `surface` cell) or, when acting, a full-width accent YOUR TURN cell with the countdown. Bottom third: FOLD (outlined), CHECK or CALL n (ink), RAISE (accent); raise opens the slider sheet. Haptics unchanged.
 
+**No scrolling (1.3.1).** A game never scrolls: the controls, my cards and every opponent are on screen at once, on every phone from 360x640 to a Pro Max, with its system bars, upright or on its side. How (`app/lib/widget/player/player_fit.dart`, `PlayerPage._controller`):
+- The bottom block (my cards, the action buttons, the pause row) is pinned. The room for the buttons is kept while it is not my turn, so nothing moves when it is; a showdown gives that room to the hands.
+- A tier (`roomy`, `snug`, `tight`) is picked from the height left after the system bars and banners: it sets the size of the chip count, my cards (`hero`, `hand`, `board`), the buttons (56, 52, 48), the gaps, and, on `tight`, merges the turn and the pot into one line.
+- The text scale is capped to what fits (`PlayerFit.maxTextScale`: the height over 555). The middle (turn, pot, board) is the part that shrinks, never below about 0.65 of its size; below the least height the whole controller is scaled down.
+- Opponents share the width (never a sideways scroll). Up to five get a cell with their two card backs; more take two rows of dense cells (name and chips only). A showdown lists the winners and my hand first, one line each, and a "+n more" line opens every hand in a sheet.
+- A phone on its side (shorter than 600, much wider than tall) gets two panes: the chips, the table and the middle on the left, my cards and the buttons on the right.
+`test/pages/solo_table_test.dart` (group "everything I need fits without scrolling") checks 24 real device sizes with their system bars, at text 1.0 and 1.3, and the biggest table (nine opponents, a six-way showdown).
+
 **Seat order.** Seats run clockwise and are numbered 1 to 10 (seat 1 at the bottom of the table screen). Between hands the Player screen shows "Seat N: change seat" and the host controls show "Seats"; both open the seat sheet: ten numbered cells, free ones tappable for a guest, and for the host a pick-then-place move (a taken seat swaps). Names are listed clockwise under the grid so the room can check the order out loud. During a hand the sheet only explains that seats are locked.
 
 **Table layout rule.** The oval is used only when ten plates fit around the pot without touching (`FeltLayout.ovalFits`, about five plate heights at the current text size); otherwise the plates go into a grid in seat order, and when the controls would squeeze even that, the middle of the page scrolls as a whole with the player's own buttons first. Nothing is ever drawn over anything else. `test/pages/table_layout_test.dart` fails on any overlap.
@@ -158,7 +166,7 @@ Settings persist in a small JSON file (`path_provider`, behind a platform seam; 
 ## 6. Accessibility
 - Contrast: body 7:1 or better; `muted` 4.5:1 or better; checked by `test/theme/contrast_test.dart` for both themes.
 - Semantics label on every actionable cell; a 3 px `accent`-contrast focus outline with offset for keyboard use.
-- Text scales to 3.0 without clipping or overflow on Home, Join, Host, Player, Settings, Guide, Support, the splash, terms, intro and the tours, and to 2.0 on the host Table (a shared display with fixed geometry; it clamps there on purpose). The Player screen scrolls as a whole at huge sizes so the action buttons stay reachable. Widget tests (`test/pages/text_scale_test.dart`, `home_page_test.dart`) fail on any overflow at 1.0, 2.0 and 3.0 on 320x640, 390x844 and 1280x800.
+- Text scales to 3.0 without clipping or overflow on Home, Join, Host, Player, Settings, Guide, Support, the splash, terms, intro and the tours, and to 2.0 on the host Table (a shared display with fixed geometry; it clamps there on purpose). The Player screen never scrolls: it caps the text scale to what fits (see Player). Widget tests (`test/pages/text_scale_test.dart`, `home_page_test.dart`) fail on any overflow at 1.0, 2.0 and 3.0 on 320x640, 390x844 and 1280x800.
 - Colour never carries meaning alone (section 2). Reduced motion honoured. Texture can be switched off.
 
 ## 7. Implementation rules

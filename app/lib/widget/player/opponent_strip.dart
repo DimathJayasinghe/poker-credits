@@ -6,6 +6,7 @@ import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/cards/card_row.dart';
+import 'package:poker_credits/widget/cards/playing_card.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
 /// The other players on the phone: a name and two face-down cards each while they are still in
@@ -36,27 +37,48 @@ class OpponentStrip extends StatelessWidget {
   /// The game is paused: the thinking bar stands still.
   final bool paused;
 
-  /// Width of one opponent's cell.
+  /// Widest one opponent's cell gets.
   static const double cellWidth = 76;
+
+  /// Below this width a cell uses small cards and type, so five of them fit a narrow phone.
+  static const double compactBelow = 70;
+
+  /// Most cells in a row; more opponents than this take a second row, so the whole table is
+  /// always in view and never scrolls sideways.
+  static const int perRow = 5;
 
   @override
   Widget build(BuildContext context) {
     final others = seats.where((s) => s.playerId != myPlayerId).toList();
     if (others.isEmpty) return const SizedBox.shrink();
+    final inRow = others.length <= perRow ? others.length : (others.length + 1) ~/ 2;
     return Semantics(
       container: true,
       label: Strings.opponents,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
+      child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            for (final seat in others) ...<Widget>[
-              _Opponent(seat: seat, showStack: showStacks, active: seat.seatIndex == activeSeat, turnKey: turnKey, paused: paused),
-              const SizedBox(width: BrutalMetrics.gapS),
-            ],
-          ],
+        child: LayoutBuilder(
+          builder: (context, box) {
+            // Gaps shrink with the cells; the width is shared out evenly.
+            final gap = box.maxWidth < inRow * (cellWidth + BrutalMetrics.gapS) ? BrutalMetrics.gapXs : BrutalMetrics.gapS;
+            final width = ((box.maxWidth - (inRow - 1) * gap) / inRow).floorToDouble().clamp(0.0, cellWidth);
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: <Widget>[
+                for (final seat in others)
+                  _Opponent(
+                    seat: seat,
+                    showStack: showStacks,
+                    active: seat.seatIndex == activeSeat,
+                    turnKey: turnKey,
+                    paused: paused,
+                    width: width,
+                    dense: others.length > perRow,
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -64,7 +86,15 @@ class OpponentStrip extends StatelessWidget {
 }
 
 class _Opponent extends StatelessWidget {
-  const _Opponent({required this.seat, required this.showStack, required this.active, required this.turnKey, required this.paused});
+  const _Opponent({
+    required this.seat,
+    required this.showStack,
+    required this.active,
+    required this.turnKey,
+    required this.paused,
+    required this.width,
+    required this.dense,
+  });
 
   final SeatView seat;
   final bool showStack;
@@ -72,12 +102,20 @@ class _Opponent extends StatelessWidget {
   final Object? turnKey;
   final bool paused;
 
+  /// Width of the cell; a narrow one is drawn with small cards and type.
+  final double width;
+
+  /// A crowded table: no card backs, only the name and the chips, so two rows stay short.
+  final bool dense;
+
+  bool get _compact => width < OpponentStrip.compactBelow;
+
   /// A tournament table marks whose turn it is with a frame; the ordinary strip stays plain.
   Widget _frame(BrutalColors c, {required Widget child}) {
-    if (!showStack) return SizedBox(width: OpponentStrip.cellWidth, child: child);
+    if (!showStack) return SizedBox(width: width, child: child);
     return Container(
-      width: OpponentStrip.cellWidth,
-      padding: const EdgeInsets.all(BrutalMetrics.gapXs),
+      width: width,
+      padding: EdgeInsets.all(_compact ? 2 : BrutalMetrics.gapXs),
       decoration: BoxDecoration(
         border: Border.all(color: active ? c.line : c.line.withValues(alpha: 0), width: active ? BrutalMetrics.borderHeavy : BrutalMetrics.border),
       ),
@@ -89,6 +127,8 @@ class _Opponent extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
     final live = seat.hasCards && !seat.hasFolded;
+    final type = _compact ? 11.0 : 12.0;
+    final cards = _compact ? CardSize.tiny : CardSize.mini;
     final status = seat.hasFolded
         ? Strings.folded
         : seat.isAllIn
@@ -107,26 +147,35 @@ class _Opponent extends StatelessWidget {
               seat.name.toUpperCase(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, color: seat.hasFolded ? c.muted : c.ink),
+              style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: type, color: seat.hasFolded ? c.muted : c.ink),
             ),
-            if (showStack)
+            // One line under the name: the folded or all-in state, else the chips. A crowded table has
+            // no card backs: the state is in the type and this line.
+            if (dense ? (status != null || showStack) : showStack)
               Text(
-                '${seat.chips}',
+                dense && status != null ? status.toUpperCase() : '${seat.chips}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: 12, color: c.muted),
+                style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: type, color: c.muted),
               ),
-            const SizedBox(height: BrutalMetrics.gapXs),
-            if (live)
-              const CardRow(cards: <PokerCard?>[null, null])
-            else
-              SizedBox(
-                height: 44,
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: Text((status ?? '').toUpperCase(), style: TextStyle(fontSize: 11, color: c.muted)),
+            if (!dense) ...<Widget>[
+              const SizedBox(height: BrutalMetrics.gapXs),
+              if (live)
+                CardRow(cards: const <PokerCard?>[null, null], size: cards)
+              else
+                SizedBox(
+                  height: cards.height,
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: Text(
+                      (status ?? '').toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.clip,
+                      style: TextStyle(fontSize: 11, color: c.muted),
+                    ),
+                  ),
                 ),
-              ),
+            ],
             // A tournament table shows that the player on turn is thinking, so there is something to
             // watch while a computer player takes its time. The slot is always there, so nothing moves.
             if (showStack) ...<Widget>[

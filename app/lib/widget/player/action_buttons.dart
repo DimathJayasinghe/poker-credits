@@ -15,6 +15,8 @@ class ActionButtons extends StatelessWidget {
     required this.onCheck,
     required this.onCall,
     required this.onRaise,
+    this.buttonHeight = BrutalMetrics.tapPlayer,
+    this.gap = BrutalMetrics.gapM,
   });
 
   final LegalActions legal;
@@ -26,15 +28,22 @@ class ActionButtons extends StatelessWidget {
   final VoidCallback onCall;
   final VoidCallback onRaise;
 
+  /// Height of every button, and the space between them; a short screen asks for less.
+  final double buttonHeight;
+  final double gap;
+
+  /// The height the three buttons take together, so the space can be kept while they are not shown.
+  static double heightFor({double buttonHeight = BrutalMetrics.tapPlayer, double gap = BrutalMetrics.gapM}) => 2 * buttonHeight + gap;
+
   @override
   Widget build(BuildContext context) {
     VoidCallback? guard(bool allowed, VoidCallback action) => enabled && allowed ? action : null;
     final middle = legal.canCheck
-        ? BrutalButton(label: Strings.check, kind: BrutalButtonKind.info, minHeight: BrutalMetrics.tapPlayer, onPressed: guard(true, onCheck))
+        ? BrutalButton(label: Strings.check, kind: BrutalButtonKind.info, minHeight: buttonHeight, onPressed: guard(true, onCheck))
         : BrutalButton(
             label: '${Strings.call} ${legal.callAmount}',
             kind: BrutalButtonKind.info,
-            minHeight: BrutalMetrics.tapPlayer,
+            minHeight: buttonHeight,
             onPressed: guard(legal.canCall, onCall),
           );
     return Column(
@@ -45,21 +54,21 @@ class ActionButtons extends StatelessWidget {
           label: Strings.raise,
           kind: BrutalButtonKind.primary,
           heavy: true,
-          minHeight: BrutalMetrics.tapPlayer,
+          minHeight: buttonHeight,
           onPressed: guard(legal.canRaise, onRaise),
         ),
-        const SizedBox(height: BrutalMetrics.gapM),
+        SizedBox(height: gap),
         Row(
           children: <Widget>[
             Expanded(
               child: BrutalButton(
                 label: Strings.fold,
                 kind: BrutalButtonKind.danger,
-                minHeight: BrutalMetrics.tapPlayer,
+                minHeight: buttonHeight,
                 onPressed: guard(legal.canFold, onFold),
               ),
             ),
-            const SizedBox(width: BrutalMetrics.gapM),
+            SizedBox(width: gap),
             Expanded(child: middle),
           ],
         ),

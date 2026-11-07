@@ -22,7 +22,19 @@ class ShowdownPanel extends StatelessWidget {
     this.fourColour = false,
     this.myPlayerId,
     this.animate = false,
+    this.compact = false,
+    this.maxRows,
+    this.onMore,
   });
+
+  /// One line per hand (name, what it made, the two cards) instead of the full spread, for a
+  /// screen with little height. Winners come first, then my own hand.
+  final bool compact;
+
+  /// With [compact]: the most hands to list. The rest are summed up in a "+n more" line that
+  /// calls [onMore]; null = all of them.
+  final int? maxRows;
+  final VoidCallback? onMore;
 
   /// The hands turn over one player after the other.
   final bool animate;
@@ -39,8 +51,83 @@ class ShowdownPanel extends StatelessWidget {
 
   Set<String> get _winners => <String>{for (final pot in result.pots) ...pot.winnerPlayerIds};
 
+  /// Roughly what one line of a compact panel takes, for the caller that has to fit it.
+  static const double compactRowHeight = 50;
+
+  /// The hands in the order a compact panel lists them: winners, then me, then the rest.
+  List<Reveal> get _ordered {
+    final winners = _winners;
+    int rank(Reveal r) => winners.contains(r.playerId) ? 0 : (r.playerId == myPlayerId ? 1 : 2);
+    final indexed = reveals.asMap().entries.toList()
+      ..sort((a, b) {
+        final byRank = rank(a.value).compareTo(rank(b.value));
+        return byRank != 0 ? byRank : a.key.compareTo(b.key);
+      });
+    return <Reveal>[for (final e in indexed) e.value];
+  }
+
+  Widget _compactBody(BuildContext context) {
+    final c = BrutalTheme.of(context).colors;
+    final winners = _winners;
+    final ordered = _ordered;
+    final shown = maxRows == null ? ordered : ordered.take(maxRows!.clamp(1, ordered.length)).toList();
+    final hidden = ordered.length - shown.length;
+    return BrutalCard(
+      padding: const EdgeInsets.all(BrutalMetrics.gapS),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          if (board.isNotEmpty) ...<Widget>[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: BoardView(shown: board, size: CardSize.mini, fourColour: fourColour),
+            ),
+            const SizedBox(height: BrutalMetrics.gapS),
+          ],
+          if (result.uncontested)
+            Text(Strings.wonUncontested, style: TextStyle(fontSize: 14, height: 1.4, color: c.muted))
+          else
+            for (var i = 0; i < shown.length; i++)
+              _CompactLine(
+                reveal: shown[i],
+                won: winners.contains(shown[i].playerId),
+                mine: shown[i].playerId == myPlayerId,
+                fourColour: fourColour,
+                delay: animate ? (BrutalMetrics.flip + BrutalMetrics.dealGap) * i : null,
+              ),
+          if (hidden > 0 && onMore != null)
+            Semantics(
+              button: true,
+              label: Strings.showdownMore(hidden),
+              excludeSemantics: true,
+              onTap: onMore,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onMore,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapXs),
+                  child: Text(
+                    Strings.showdownMore(hidden).toUpperCase(),
+                    style: TextStyle(
+                      fontFamily: BrutalFonts.mono,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      decoration: TextDecoration.underline,
+                      color: c.ink,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          for (var i = 0; i < result.pots.length; i++) _PotLine(pot: result.pots[i], main: i == 0, number: i, myPlayerId: myPlayerId),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (compact) return _compactBody(context);
     final c = BrutalTheme.of(context).colors;
     final winners = _winners;
     return BrutalCard(
@@ -71,6 +158,63 @@ class ShowdownPanel extends StatelessWidget {
             ],
           for (var i = 0; i < result.pots.length; i++) _PotLine(pot: result.pots[i], main: i == 0, number: i, myPlayerId: myPlayerId),
         ],
+      ),
+    );
+  }
+}
+
+/// One hand in a compact panel: who, what it made, and the two cards on the right.
+class _CompactLine extends StatelessWidget {
+  const _CompactLine({required this.reveal, required this.won, required this.mine, required this.fourColour, this.delay});
+
+  final Duration? delay;
+  final Reveal reveal;
+  final bool won;
+  final bool mine;
+  final bool fourColour;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = BrutalTheme.of(context).colors;
+    final best = reveal.bestFive.toSet();
+    final dimmed = <int>{
+      for (var i = 0; i < reveal.cards.length; i++)
+        if (!best.contains(reveal.cards[i])) i,
+    };
+    return Semantics(
+      container: true,
+      label: '${reveal.name}, ${handCategoryText(reveal.category)}${won ? ', ${Strings.winnerTag}' : ''}',
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: BrutalMetrics.gapXs),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Wrap(
+                spacing: BrutalMetrics.gapS,
+                runSpacing: BrutalMetrics.gapXs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: <Widget>[
+                  Text(
+                    reveal.name.toUpperCase(),
+                    style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 14, color: c.ink),
+                  ),
+                  if (mine) const BrutalTag(Strings.youTag),
+                  if (won) const BrutalTag(Strings.winnerTag, kind: BrutalTagKind.signal),
+                  Text(handCategoryText(reveal.category), style: TextStyle(fontSize: 13, color: c.muted)),
+                ],
+              ),
+            ),
+            const SizedBox(width: BrutalMetrics.gapS),
+            ExcludeSemantics(
+              child: SizedBox(
+                width: 64,
+                child: delay == null
+                    ? CardRow(cards: reveal.cards, fourColour: fourColour, dimmed: dimmed)
+                    : _FlipRow(cards: reveal.cards, delay: delay!, fourColour: fourColour, dimmed: dimmed),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

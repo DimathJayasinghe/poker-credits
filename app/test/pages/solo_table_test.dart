@@ -6,6 +6,11 @@ import 'package:poker_credits/pages/solo_result_page.dart';
 import 'package:poker_credits/pages/solo_table_page.dart';
 import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/widget/brutal/app_shell.dart';
+import 'package:poker_credits/widget/brutal/brutal_button.dart';
+import 'package:poker_credits/widget/cards/board_view.dart';
+import 'package:poker_credits/widget/cards/hole_cards_dock.dart';
+import 'package:poker_credits/widget/cards/showdown_panel.dart';
+import 'package:poker_credits/widget/player/opponent_strip.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
 import '../support/fakes.dart';
@@ -50,6 +55,7 @@ Future<TestHarness> _playing(
   Size size = const Size(390, 844),
   double scale = 1,
   bool dark = false,
+  EdgeInsets insets = EdgeInsets.zero,
 }) async {
   _phone(tester, size: size);
   final h = harness ?? TestHarness();
@@ -57,7 +63,7 @@ Future<TestHarness> _playing(
   addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
   await tester.pumpWidget(
     MediaQuery(
-      data: MediaQueryData(size: size, textScaler: TextScaler.linear(scale)),
+      data: MediaQueryData(size: size, textScaler: TextScaler.linear(scale), padding: insets, viewPadding: insets),
       child: h.scope(const PokerCreditsApp()),
     ),
   );
@@ -453,6 +459,166 @@ void main() {
         });
       }
     }
+  });
+
+  // A game's controls must be on screen without scrolling: the buttons, my cards and the pause
+  // row are budgeted for even while I am only waiting, so nothing jumps when my turn starts.
+  group('everything I need fits without scrolling', () {
+    // Logical sizes of phones people really own, with the status bar and the bottom bar (or the
+    // home indicator) taken off by the system: (width, height, top, bottom). `min` is the text
+    // scale up to which nothing may scroll; a screen too short for more is allowed to scroll as a whole.
+    const devices = <(String, double, double, double, double, double)>[
+      // Phones held on their side: the system bars sit on the sides, so only the bottom one counts.
+      ('iPhone 14 landscape 844x390', 844, 390, 0, 21, 1.0),
+      ('iPhone SE landscape 667x375', 667, 375, 0, 0, 1.0),
+      ('Android landscape 800x360', 800, 360, 24, 0, 1.0),
+      ('Pixel landscape 915x412', 915, 412, 24, 16, 1.3),
+      // Android: three-button and gesture navigation.
+      ('Android budget 360x640', 360, 640, 24, 48, 1.0),
+      ('Android 360x720', 360, 720, 24, 48, 1.0),
+      ('Android 360x800 buttons', 360, 800, 28, 48, 1.3),
+      ('Android 360x800 gestures', 360, 800, 28, 16, 1.3),
+      ('Galaxy S24 384x832', 384, 832, 32, 24, 1.3),
+      ('Android 393x851', 393, 851, 28, 24, 1.3),
+      ('Pixel 412x915', 412, 915, 36, 24, 1.3),
+      ('Pixel 412x915 buttons', 412, 915, 36, 48, 1.3),
+      // Apple.
+      ('iPhone SE 375x667', 375, 667, 20, 0, 1.0),
+      ('iPhone 8 Plus 414x736', 414, 736, 20, 0, 1.0),
+      ('iPhone 13 mini 375x812', 375, 812, 50, 34, 1.3),
+      ('iPhone 14 390x844', 390, 844, 47, 34, 1.3),
+      ('iPhone 15 Pro 393x852', 393, 852, 59, 34, 1.3),
+      ('iPhone 16 Pro 402x874', 402, 874, 62, 34, 1.3),
+      ('iPhone 15 Plus 428x926', 428, 926, 47, 34, 1.3),
+      ('iPhone 16 Pro Max 440x956', 440, 956, 62, 34, 1.3),
+      // Bigger screens and a desktop window.
+      ('iPad mini 744x1133', 744, 1133, 24, 20, 1.3),
+      ('iPad landscape 1180x820', 1180, 820, 24, 20, 1.3),
+      ('narrow desktop window 368x690', 368, 690, 0, 0, 1.0),
+      ('desktop 1280x800', 1280, 800, 0, 0, 1.3),
+    ];
+    const turn = TurnPrompt(
+      playerId: 'p_1',
+      seatIndex: 1,
+      nextActionSeq: 4,
+      legal: LegalActions(canFold: true, canCheck: false, canCall: true, callAmount: 80, canRaise: true, minRaiseTo: 160, maxRaiseTo: 930),
+    );
+    final board = <PokerCard>[card('9c'), card('Td'), card('2h')];
+
+    Rect rectOf(WidgetTester tester, String label) => tester.getRect(find.ancestor(of: find.text(label), matching: find.byType(BrutalButton)).first);
+
+    void insideScreen(Rect rect, Size size, EdgeInsets insets, String what) {
+      expect(rect.top, greaterThanOrEqualTo(insets.top - 0.5), reason: '$what starts under the status bar');
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(size.height - insets.bottom + 0.5),
+        reason: '$what runs off the bottom (${rect.bottom} of ${size.height - insets.bottom})',
+      );
+    }
+
+    for (final d in devices) {
+      for (final scale in <double>[1.0, 1.3]) {
+        for (final myTurn in <bool>[true, false]) {
+          testWidgets('${d.$1}, text x$scale, ${myTurn ? 'my turn' : 'waiting'}', (tester) async {
+            final size = Size(d.$2, d.$3);
+            final insets = EdgeInsets.only(top: d.$4, bottom: d.$5);
+            final view = _view(active: myTurn ? 1 : 2, seats: _seats(others: 5)).copyWith(board: board, currentHighBet: 80);
+            final h = await _playing(tester, view: view, size: size, scale: scale, insets: insets);
+            if (myTurn) h.network.last.serverSends(turn);
+            h.network.last.serverSends(
+              const ActionPerformed(
+                playerId: 'p_3',
+                playerName: 'Zoe',
+                kind: ActionKind.fold,
+                amount: 0,
+                chipsRemaining: 900,
+                allIn: false,
+                auto: false,
+              ),
+            );
+            await tester.pump();
+            await tester.pump();
+            await tester.pump(const Duration(seconds: 3));
+            expect(tester.takeException(), isNull, reason: 'no overflow at all');
+            expect(find.byType(Scrollable), findsNothing, reason: 'a game does not scroll');
+            // The middle of the screen may shrink to fit, but never into something unreadable.
+            expect(tester.getRect(find.byType(BoardView)).width, greaterThan(274 * 0.65), reason: 'the board stays readable');
+            if (scale <= d.$6) {
+              if (myTurn) {
+                for (final label in <String>['RAISE', 'FOLD', 'CALL 80']) {
+                  insideScreen(rectOf(tester, label), size, insets, label);
+                }
+              }
+              insideScreen(rectOf(tester, 'PAUSE'), size, insets, 'PAUSE');
+              insideScreen(rectOf(tester, 'END GAME'), size, insets, 'END GAME');
+              insideScreen(tester.getRect(find.byType(HoleCardsDock)), size, insets, 'my cards');
+            }
+            await _close(tester);
+          });
+        }
+      }
+    }
+
+    // The biggest table (nine opponents) and a showdown with many hands: all of it still on screen.
+    const crowded = <(String, double, double, double, double)>[
+      ('Android budget 360x640', 360, 640, 24, 48),
+      ('iPhone SE 375x667', 375, 667, 20, 0),
+      ('iPhone 14 390x844', 390, 844, 47, 34),
+      ('Pixel 412x915', 412, 915, 36, 24),
+      ('Android landscape 800x360', 800, 360, 24, 0),
+    ];
+    for (final d in crowded) {
+      testWidgets('${d.$1}: nine opponents and a showdown fit', (tester) async {
+        final size = Size(d.$2, d.$3);
+        final insets = EdgeInsets.only(top: d.$4, bottom: d.$5);
+        final seats = _seats(others: 9);
+        final reveals = <Reveal>[
+          for (var i = 0; i < 6; i++)
+            Reveal(
+              playerId: 'p_$i',
+              name: seats[i].name,
+              cards: <PokerCard>[card('As'), card('Kd')],
+              category: HandCategory.pair,
+              bestFive: <PokerCard>[card('As'), card('Ad'), card('Kd'), card('9c'), card('4h')],
+            ),
+        ];
+        final view = _view(active: null, seats: seats, result: _iWon, reveals: reveals).copyWith(
+          board: <PokerCard>[card('9c'), card('Td'), card('2h'), card('Jc'), card('3s')],
+        );
+        await _playing(tester, view: view, size: size, insets: insets);
+        await tester.pump(const Duration(seconds: 6));
+        expect(tester.takeException(), isNull);
+        expect(find.byType(Scrollable), findsNothing);
+        final limit = size.height - insets.bottom + 0.5;
+        for (final label in <String>['PAUSE', 'END GAME']) {
+          expect(rectOf(tester, label).bottom, lessThanOrEqualTo(limit), reason: '$label runs off the bottom');
+        }
+        expect(tester.getRect(find.byType(HoleCardsDock)).bottom, lessThanOrEqualTo(limit));
+        final strip = tester.getRect(find.byType(OpponentStrip));
+        expect(strip.right, lessThanOrEqualTo(size.width + 0.5), reason: 'the opponents do not run off the side');
+        final panel = tester.getRect(find.byType(ShowdownPanel));
+        expect(panel.top, greaterThanOrEqualTo(insets.top));
+        expect(panel.bottom, lessThanOrEqualTo(limit), reason: 'the showdown is fully on screen');
+        await _close(tester);
+      });
+    }
+
+    testWidgets('the buttons do not move when my turn starts', (tester) async {
+      const size = Size(390, 844);
+      const insets = EdgeInsets.only(top: 47, bottom: 34);
+      final view = _view(active: 2, seats: _seats(others: 5)).copyWith(board: board, currentHighBet: 80);
+      final h = await _playing(tester, view: view, size: size, insets: insets);
+      await tester.pump(const Duration(seconds: 2));
+      final pauseWaiting = rectOf(tester, 'PAUSE');
+      final cardsWaiting = tester.getRect(find.byType(HoleCardsDock));
+      await _update(tester, h, _view(active: 1, seats: _seats(others: 5)).copyWith(board: board, currentHighBet: 80));
+      h.network.last.serverSends(turn);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+      expect(rectOf(tester, 'PAUSE'), pauseWaiting, reason: 'the pause row stays put');
+      expect(tester.getRect(find.byType(HoleCardsDock)), cardsWaiting, reason: 'my cards stay put');
+      await _close(tester);
+    });
   });
 
   group('goldens', () {

@@ -12,6 +12,9 @@ enum CardSize {
   /// Your own two cards.
   hero(84, 120, 38, 20, 44),
 
+  /// Your own two cards where the screen is short.
+  hand(66, 95, 30, 16, 35),
+
   /// The community cards.
   board(50, 72, 23, 12, 26),
 

@@ -324,6 +324,7 @@ abstract final class Strings {
   static const String winnerTag = 'Wins';
   static const String youTag = 'You';
   static const String showdownTitle = 'Showdown';
+  static String showdownMore(int n) => '+$n more';
   static const String wonUncontested = 'Everyone else folded';
   static const String mainPot = 'Main pot';
   static String sidePotNumber(int n) => 'Side pot $n';
