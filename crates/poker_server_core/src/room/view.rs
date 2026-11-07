@@ -1,12 +1,13 @@
 //! `RoomState` to `RoomView`: the public table state sent in `STATE_UPDATE` and `SNAPSHOT`.
 //! It never contains tokens, hashes or anything private.
 
+use poker_engine::blinds::BlindsStrategy;
 use poker_engine::{HandStatus, Phase};
 
 use super::state::RoomState;
 use crate::protocol::{
-    FinishView, HandResultView, PendingRebuyView, PotResultView, PotView, RevealView, RoomView,
-    SeatView, ShareView, WirePhase,
+    BlindsView, FinishView, HandResultView, PendingRebuyView, PotResultView, PotView, RevealView,
+    RoomView, SeatView, ShareView, WirePhase,
 };
 
 fn wire_phase(phase: Phase, paused: bool) -> WirePhase {
@@ -112,7 +113,40 @@ impl RoomState {
                     place: entry.place,
                 })
                 .collect(),
+            blinds: self.blinds_view(),
         }
+    }
+
+    /// The blinds of a solo game: those of the hand being played, or of the next one between
+    /// hands, and what the next level is. Read from the engine's ladder, never worked out here.
+    fn blinds_view(&self) -> Option<BlindsView> {
+        if !self.is_solo() {
+            return None;
+        }
+        let table = &self.game.table;
+        let in_hand =
+            table.phase.is_betting() || matches!(table.phase, Phase::AllInRunout | Phase::Showdown);
+        let hand = if in_hand {
+            table.hand_number
+        } else {
+            table.hand_number.saturating_add(1)
+        };
+        let now = if in_hand {
+            table.hand_blinds
+        } else {
+            table.blinds.blinds(hand, 0)
+        };
+        let next = match &table.blinds {
+            poker_engine::blinds::BlindsMode::Tournament(ladder) => ladder.next_level(hand),
+            poker_engine::blinds::BlindsMode::Cash(_) => None,
+        };
+        Some(BlindsView {
+            small_blind: now.small_blind.get(),
+            big_blind: now.big_blind.get(),
+            next_small_blind: next.map(|(blinds, _)| blinds.small_blind.get()),
+            next_big_blind: next.map(|(blinds, _)| blinds.big_blind.get()),
+            hands_left: next.map(|(_, left)| left),
+        })
     }
 
     /// Whether this seat still holds face-down cards in the hand being played. It says nothing

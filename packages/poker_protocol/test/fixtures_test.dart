@@ -220,6 +220,15 @@ void main() {
       expect(asMap(encodeServer(plain))['view'], isNot(contains('finishOrder')));
     });
 
+    test('the blinds of a solo game parse, and a view without them has none and is written without them', () {
+      final solo = decodeServer(File('${fixtureDir.path}/server_state_update_solo.json').readAsStringSync()).body as StateUpdate;
+      final blinds = solo.view.blinds!;
+      expect((blinds.smallBlind, blinds.bigBlind, blinds.nextSmallBlind, blinds.nextBigBlind, blinds.handsLeft), (15, 30, 25, 50, 3));
+      final plain = decodeServer(File('${fixtureDir.path}/server_state_update.json').readAsStringSync()).body as StateUpdate;
+      expect(plain.view.blinds, isNull);
+      expect(asMap(encodeServer(plain))['view'], isNot(contains('blinds')));
+    });
+
     test('garbage is a ProtocolFormatException', () {
       for (final text in ['not json', '[]', '{"v":1}', '{"type":"PONG","t":1}', '{"v":1,"type":"PONG"}']) {
         expect(() => decodeServer(text), throwsA(isA<ProtocolFormatException>()), reason: text);

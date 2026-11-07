@@ -42,6 +42,7 @@
     "finishOrder": [
       { "playerId": "p_2", "name": "Liam", "place": 4 },
       { "playerId": "p_4", "name": "Zoe", "place": 3 }
-    ]
+    ],
+    "blinds": { "smallBlind": 15, "bigBlind": 30, "nextSmallBlind": 25, "nextBigBlind": 50, "handsLeft": 3 }
   }
 }

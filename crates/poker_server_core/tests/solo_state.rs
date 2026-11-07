@@ -253,3 +253,47 @@ fn configure_can_neither_change_a_solo_room_nor_make_one() {
     );
     assert!(!plain.is_solo());
 }
+
+#[test]
+fn the_view_names_the_blinds_and_when_they_rise() {
+    let mut room = solo_room(3, 5);
+    let blinds = room.view(&|_| true).blinds.unwrap();
+    // Nothing dealt yet: the first hand is played at the first level, 8 hands per level.
+    assert_eq!((blinds.small_blind, blinds.big_blind), (5, 10));
+    assert_eq!(
+        (blinds.next_small_blind, blinds.next_big_blind),
+        (Some(8), Some(15))
+    );
+    assert_eq!(blinds.hands_left, Some(8));
+
+    // Between hands the view looks at the hand that is about to be dealt.
+    room.game.table.hand_number = 7;
+    let blinds = room.view(&|_| true).blinds.unwrap();
+    assert_eq!((blinds.small_blind, blinds.hands_left), (5, Some(1)));
+    room.game.table.hand_number = 8;
+    let blinds = room.view(&|_| true).blinds.unwrap();
+    assert_eq!(
+        (blinds.small_blind, blinds.big_blind),
+        (8, 15),
+        "hand 9 is the next level"
+    );
+    assert_eq!(blinds.hands_left, Some(8));
+
+    // During a hand it is the hand being played that counts.
+    room.game.table.phase = Phase::Flop;
+    let blinds = room.view(&|_| true).blinds.unwrap();
+    assert_eq!(
+        blinds.hands_left,
+        Some(1),
+        "hand 8 is the last at its level"
+    );
+}
+
+#[test]
+fn only_a_solo_game_has_blinds_in_its_view() {
+    let mut cfg = config(3);
+    cfg.solo = None;
+    cfg.card_mode = CardMode::Physical;
+    let room = RoomState::new("ABCD".into(), cfg, "Dimath", "h".into(), "s".into(), 0).unwrap();
+    assert!(room.view(&|_| true).blinds.is_none());
+}

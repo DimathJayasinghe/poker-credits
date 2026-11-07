@@ -305,4 +305,10 @@ fn solo_settings_and_finish_order_ride_on_the_existing_messages() {
     };
     assert_eq!(view.finish_order.len(), 2);
     assert_eq!(view.finish_order[0].place, 4);
+    let blinds = view.blinds.expect("blinds");
+    assert_eq!((blinds.small_blind, blinds.big_blind), (15, 30));
+    assert_eq!(
+        (blinds.next_small_blind, blinds.hands_left),
+        (Some(25), Some(3))
+    );
 }

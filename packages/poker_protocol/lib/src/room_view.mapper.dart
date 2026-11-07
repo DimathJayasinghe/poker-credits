@@ -1428,6 +1428,179 @@ class _FinishCopyWithImpl<$R, $Out> extends ClassCopyWithBase<$R, Finish, $Out>
       _FinishCopyWithImpl<$R2, $Out2>($value, $cast, t);
 }
 
+class BlindsViewMapper extends ClassMapperBase<BlindsView> {
+  BlindsViewMapper._();
+
+  static BlindsViewMapper? _instance;
+  static BlindsViewMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = BlindsViewMapper._());
+    }
+    return _instance!;
+  }
+
+  @override
+  final String id = 'BlindsView';
+
+  static int _$smallBlind(BlindsView v) => v.smallBlind;
+  static const Field<BlindsView, int> _f$smallBlind = Field(
+    'smallBlind',
+    _$smallBlind,
+  );
+  static int _$bigBlind(BlindsView v) => v.bigBlind;
+  static const Field<BlindsView, int> _f$bigBlind = Field(
+    'bigBlind',
+    _$bigBlind,
+  );
+  static int? _$nextSmallBlind(BlindsView v) => v.nextSmallBlind;
+  static const Field<BlindsView, int> _f$nextSmallBlind = Field(
+    'nextSmallBlind',
+    _$nextSmallBlind,
+    opt: true,
+  );
+  static int? _$nextBigBlind(BlindsView v) => v.nextBigBlind;
+  static const Field<BlindsView, int> _f$nextBigBlind = Field(
+    'nextBigBlind',
+    _$nextBigBlind,
+    opt: true,
+  );
+  static int? _$handsLeft(BlindsView v) => v.handsLeft;
+  static const Field<BlindsView, int> _f$handsLeft = Field(
+    'handsLeft',
+    _$handsLeft,
+    opt: true,
+  );
+
+  @override
+  final MappableFields<BlindsView> fields = const {
+    #smallBlind: _f$smallBlind,
+    #bigBlind: _f$bigBlind,
+    #nextSmallBlind: _f$nextSmallBlind,
+    #nextBigBlind: _f$nextBigBlind,
+    #handsLeft: _f$handsLeft,
+  };
+  @override
+  final bool ignoreNull = true;
+
+  static BlindsView _instantiate(DecodingData data) {
+    return BlindsView(
+      smallBlind: data.dec(_f$smallBlind),
+      bigBlind: data.dec(_f$bigBlind),
+      nextSmallBlind: data.dec(_f$nextSmallBlind),
+      nextBigBlind: data.dec(_f$nextBigBlind),
+      handsLeft: data.dec(_f$handsLeft),
+    );
+  }
+
+  @override
+  final Function instantiate = _instantiate;
+
+  static BlindsView fromMap(Map<String, dynamic> map) {
+    return ensureInitialized().decodeMap<BlindsView>(map);
+  }
+
+  static BlindsView fromJson(String json) {
+    return ensureInitialized().decodeJson<BlindsView>(json);
+  }
+}
+
+mixin BlindsViewMappable {
+  String toJson() {
+    return BlindsViewMapper.ensureInitialized().encodeJson<BlindsView>(
+      this as BlindsView,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return BlindsViewMapper.ensureInitialized().encodeMap<BlindsView>(
+      this as BlindsView,
+    );
+  }
+
+  BlindsViewCopyWith<BlindsView, BlindsView, BlindsView> get copyWith =>
+      _BlindsViewCopyWithImpl<BlindsView, BlindsView>(
+        this as BlindsView,
+        $identity,
+        $identity,
+      );
+  @override
+  String toString() {
+    return BlindsViewMapper.ensureInitialized().stringifyValue(
+      this as BlindsView,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return BlindsViewMapper.ensureInitialized().equalsValue(
+      this as BlindsView,
+      other,
+    );
+  }
+
+  @override
+  int get hashCode {
+    return BlindsViewMapper.ensureInitialized().hashValue(this as BlindsView);
+  }
+}
+
+extension BlindsViewValueCopy<$R, $Out>
+    on ObjectCopyWith<$R, BlindsView, $Out> {
+  BlindsViewCopyWith<$R, BlindsView, $Out> get $asBlindsView =>
+      $base.as((v, t, t2) => _BlindsViewCopyWithImpl<$R, $Out>(v, t, t2));
+}
+
+abstract class BlindsViewCopyWith<$R, $In extends BlindsView, $Out>
+    implements ClassCopyWith<$R, $In, $Out> {
+  $R call({
+    int? smallBlind,
+    int? bigBlind,
+    int? nextSmallBlind,
+    int? nextBigBlind,
+    int? handsLeft,
+  });
+  BlindsViewCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
+}
+
+class _BlindsViewCopyWithImpl<$R, $Out>
+    extends ClassCopyWithBase<$R, BlindsView, $Out>
+    implements BlindsViewCopyWith<$R, BlindsView, $Out> {
+  _BlindsViewCopyWithImpl(super.value, super.then, super.then2);
+
+  @override
+  late final ClassMapperBase<BlindsView> $mapper =
+      BlindsViewMapper.ensureInitialized();
+  @override
+  $R call({
+    int? smallBlind,
+    int? bigBlind,
+    Object? nextSmallBlind = $none,
+    Object? nextBigBlind = $none,
+    Object? handsLeft = $none,
+  }) => $apply(
+    FieldCopyWithData({
+      if (smallBlind != null) #smallBlind: smallBlind,
+      if (bigBlind != null) #bigBlind: bigBlind,
+      if (nextSmallBlind != $none) #nextSmallBlind: nextSmallBlind,
+      if (nextBigBlind != $none) #nextBigBlind: nextBigBlind,
+      if (handsLeft != $none) #handsLeft: handsLeft,
+    }),
+  );
+  @override
+  BlindsView $make(CopyWithData data) => BlindsView(
+    smallBlind: data.get(#smallBlind, or: $value.smallBlind),
+    bigBlind: data.get(#bigBlind, or: $value.bigBlind),
+    nextSmallBlind: data.get(#nextSmallBlind, or: $value.nextSmallBlind),
+    nextBigBlind: data.get(#nextBigBlind, or: $value.nextBigBlind),
+    handsLeft: data.get(#handsLeft, or: $value.handsLeft),
+  );
+
+  @override
+  BlindsViewCopyWith<$R2, BlindsView, $Out2> $chain<$R2, $Out2>(
+    Then<$Out2, $R2> t,
+  ) => _BlindsViewCopyWithImpl<$R2, $Out2>($value, $cast, t);
+}
+
 class RoomViewMapper extends ClassMapperBase<RoomView> {
   RoomViewMapper._();
 
@@ -1443,6 +1616,7 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
       RevealMapper.ensureInitialized();
       HandResultMapper.ensureInitialized();
       FinishMapper.ensureInitialized();
+      BlindsViewMapper.ensureInitialized();
     }
     return _instance!;
   }
@@ -1552,6 +1726,12 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
     opt: true,
     def: const <Finish>[],
   );
+  static BlindsView? _$blinds(RoomView v) => v.blinds;
+  static const Field<RoomView, BlindsView> _f$blinds = Field(
+    'blinds',
+    _$blinds,
+    opt: true,
+  );
 
   @override
   final MappableFields<RoomView> fields = const {
@@ -1575,6 +1755,7 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
     #reveals: _f$reveals,
     #result: _f$result,
     #finishOrder: _f$finishOrder,
+    #blinds: _f$blinds,
   };
   @override
   final bool ignoreNull = true;
@@ -1607,6 +1788,7 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
       reveals: data.dec(_f$reveals),
       result: data.dec(_f$result),
       finishOrder: data.dec(_f$finishOrder),
+      blinds: data.dec(_f$blinds),
     );
   }
 
@@ -1681,6 +1863,7 @@ abstract class RoomViewCopyWith<$R, $In extends RoomView, $Out>
   ListCopyWith<$R, Reveal, RevealCopyWith<$R, Reveal, Reveal>> get reveals;
   HandResultCopyWith<$R, HandResult, HandResult>? get result;
   ListCopyWith<$R, Finish, FinishCopyWith<$R, Finish, Finish>> get finishOrder;
+  BlindsViewCopyWith<$R, BlindsView, BlindsView>? get blinds;
   $R call({
     String? roomCode,
     int? handNumber,
@@ -1702,6 +1885,7 @@ abstract class RoomViewCopyWith<$R, $In extends RoomView, $Out>
     List<Reveal>? reveals,
     HandResult? result,
     List<Finish>? finishOrder,
+    BlindsView? blinds,
   });
   RoomViewCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -1764,6 +1948,9 @@ class _RoomViewCopyWithImpl<$R, $Out>
     (v) => call(finishOrder: v),
   );
   @override
+  BlindsViewCopyWith<$R, BlindsView, BlindsView>? get blinds =>
+      $value.blinds?.copyWith.$chain((v) => call(blinds: v));
+  @override
   $R call({
     String? roomCode,
     int? handNumber,
@@ -1785,6 +1972,7 @@ class _RoomViewCopyWithImpl<$R, $Out>
     List<Reveal>? reveals,
     Object? result = $none,
     List<Finish>? finishOrder,
+    Object? blinds = $none,
   }) => $apply(
     FieldCopyWithData({
       if (roomCode != null) #roomCode: roomCode,
@@ -1807,6 +1995,7 @@ class _RoomViewCopyWithImpl<$R, $Out>
       if (reveals != null) #reveals: reveals,
       if (result != $none) #result: result,
       if (finishOrder != null) #finishOrder: finishOrder,
+      if (blinds != $none) #blinds: blinds,
     }),
   );
   @override
@@ -1831,6 +2020,7 @@ class _RoomViewCopyWithImpl<$R, $Out>
     reveals: data.get(#reveals, or: $value.reveals),
     result: data.get(#result, or: $value.result),
     finishOrder: data.get(#finishOrder, or: $value.finishOrder),
+    blinds: data.get(#blinds, or: $value.blinds),
   );
 
   @override

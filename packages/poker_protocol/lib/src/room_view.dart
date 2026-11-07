@@ -138,6 +138,25 @@ class Finish with FinishMappable {
   final int place;
 }
 
+/// The blinds of a single-player game, as the engine's ladder gives them. The app only shows
+/// these numbers.
+@MappableClass()
+class BlindsView with BlindsViewMappable {
+  const BlindsView({required this.smallBlind, required this.bigBlind, this.nextSmallBlind, this.nextBigBlind, this.handsLeft});
+
+  /// Of the hand being played, or of the next one between hands.
+  final int smallBlind;
+  final int bigBlind;
+
+  /// After the next rise; absent on the last level.
+  final int? nextSmallBlind;
+  final int? nextBigBlind;
+
+  /// Hands left at these blinds, the one being played (or about to be dealt) included. 1 means the
+  /// blinds rise with the hand after it.
+  final int? handsLeft;
+}
+
 /// The public state of a room, as sent in `SNAPSHOT` and `STATE_UPDATE`.
 @MappableClass(
   includeCustomMappers: [PokerCardMapper()],
@@ -165,6 +184,7 @@ class RoomView with RoomViewMappable {
     this.reveals = const <Reveal>[],
     this.result,
     this.finishOrder = const <Finish>[],
+    this.blinds,
   });
 
   final String roomCode;
@@ -199,4 +219,7 @@ class RoomView with RoomViewMappable {
 
   /// Single-player games: who has gone out, in order, with the winner last. Empty otherwise.
   final List<Finish> finishOrder;
+
+  /// Single-player games: the blinds and when they rise. Absent otherwise.
+  final BlindsView? blinds;
 }

@@ -184,6 +184,32 @@ fn hand_ladder_ignores_elapsed_time() {
 }
 
 #[test]
+fn next_level_names_the_rise_and_the_hands_left() {
+    let ladder = ladder(3);
+    // Hands 1..=3 are the first level: 3, 2 and 1 hands left, hand counted.
+    assert_eq!(ladder.next_level(1), Some((level(15, 30, 0), 3)));
+    assert_eq!(ladder.next_level(2), Some((level(15, 30, 0), 2)));
+    assert_eq!(ladder.next_level(3), Some((level(15, 30, 0), 1)));
+    assert_eq!(ladder.next_level(4), Some((level(25, 50, 5), 3)));
+    assert_eq!(ladder.next_level(6), Some((level(25, 50, 5), 1)));
+    // The last level repeats and nothing follows it.
+    assert_eq!(ladder.next_level(7), None);
+    assert_eq!(ladder.next_level(100), None);
+    // Hand zero (nothing dealt yet) is the first level, like `blinds`.
+    assert_eq!(ladder.next_level(0), Some((level(15, 30, 0), 3)));
+}
+
+#[test]
+fn next_level_needs_a_hand_driven_ladder() {
+    let timed = Tournament {
+        levels: vec![level(10, 20, 0), level(15, 30, 0)],
+        level_ms: 60_000,
+        hands_per_level: None,
+    };
+    assert_eq!(timed.next_level(1), None);
+}
+
+#[test]
 fn hand_zero_is_the_first_level() {
     assert_eq!(ladder(3).blinds(0, 0), level(10, 20, 0));
 }

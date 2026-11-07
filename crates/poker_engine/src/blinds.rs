@@ -80,6 +80,18 @@ impl Tournament {
     fn hands_per_level(&self) -> Option<u32> {
         self.hands_per_level.filter(|hands| *hands > 0)
     }
+
+    /// For a hand-driven ladder: the blinds of the level after the one `hand_number` is played at,
+    /// and how many hands are left at the current level, `hand_number` included. `None` without a
+    /// hand-driven ladder, and on the last level (it repeats, so nothing rises).
+    #[must_use]
+    pub fn next_level(&self, hand_number: u32) -> Option<(Blinds, u32)> {
+        let hands = self.hands_per_level()?;
+        let played = hand_number.saturating_sub(1);
+        let level = usize::try_from(played / hands).ok()?;
+        let next = self.levels.get(level.checked_add(1)?)?;
+        Some((*next, hands - played % hands))
+    }
 }
 
 impl BlindsStrategy for Tournament {

@@ -421,6 +421,29 @@ pub struct RoomView {
     /// Solo games: who has been knocked out, in the order it happened, and the winner last.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub finish_order: Vec<FinishView>,
+    /// Solo games: the blinds now and when they rise. Absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blinds: Option<BlindsView>,
+}
+
+/// The blinds of a solo game. The app only shows these numbers; the ladder is the engine's.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlindsView {
+    /// Small blind of the hand being played, or of the next one between hands.
+    pub small_blind: u64,
+    /// Big blind of the same hand.
+    pub big_blind: u64,
+    /// Small blind after the next rise (absent on the last level).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_small_blind: Option<u64>,
+    /// Big blind after the next rise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_big_blind: Option<u64>,
+    /// Hands left at these blinds, the one being played (or about to be dealt) included. 1 means
+    /// the blinds rise with the hand after it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hands_left: Option<u32>,
 }
 
 /// One finishing place in a solo game.
