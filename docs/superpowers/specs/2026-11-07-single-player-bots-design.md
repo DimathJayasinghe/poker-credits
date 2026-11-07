@@ -191,7 +191,7 @@ The owner decided that rebuys would make solo boring, since the player would nev
 - Bots that bust other bots keep a visible reason to exist: a bot that knocked someone out gets a small mood boost (a very light "confidence" in 4.7).
 
 ### 10.2 Rising blinds by hands, not by clock (my call)
-The tension of a tournament comes from blinds that rise. The engine's `Tournament` strategy rises by elapsed time (`BlindsStrategy::blinds(hand_number, elapsed_ms)`), which is wrong for solo: the clock keeps running while the app is paused, and a clock-driven change needs a timer. Solo adds a **hand-driven ladder**: a new `BlindsMode::Ladder { levels, hands_per_level }` in `crates/poker_engine/src/blinds.rs` that ignores `elapsed_ms` and uses `hand_number`, so it is deterministic, replay-safe, needs no timer, and pauses naturally. Levels grow about 1.5x (10/20, 15/30, 25/50, 40/80, 60/120, ...) and the last level repeats. The room shows "Blinds 25/50, rise in 3 hands" in the top bar. A bot's strategy reads the blinds relative to its stack (it gets short-stacked and pushes), which creates natural drama.
+The tension of a tournament comes from blinds that rise. The engine's `Tournament` strategy rises by elapsed time (`BlindsStrategy::blinds(hand_number, elapsed_ms)`), which is wrong for solo: the clock keeps running while the app is paused, and a clock-driven change needs a timer. Solo adds a **hand-driven ladder**: an optional `hands_per_level` on the existing `Tournament` in `crates/poker_engine/src/blinds.rs` (it already holds the 1x, 1.5x, 2x, 3x ladder) that, when set, ignores `elapsed_ms` and uses `hand_number`, so it is deterministic, replay-safe, needs no timer, and pauses naturally. Levels grow about 1.5x (10/20, 15/30, 25/50, 40/80, 60/120, ...) and the last level repeats. The room shows "Blinds 25/50, rise in 3 hands" in the top bar. A bot's strategy reads the blinds relative to its stack (it gets short-stacked and pushes), which creates natural drama.
 
 ### 10.3 A rival
 At creation one or two bots are marked internally as **rivals** (a higher `read_weight`, and a more distinctive archetype such as LAG or Nit-trapper). Nothing is shown to the player; rivals simply play more memorably against the human, so each game has a character the player remembers.
@@ -218,7 +218,7 @@ Bounties, side game modes, daily challenges, table chat and achievements: each a
 - Gates as always: `fvm flutter analyze`, tests, protocol tests, `tool/check_web_safe.sh` (solo uses the existing platform seams; the web build is deferred and stubs host features), `tool/check_no_state_logging.sh` (bot logs carry no cards), cargo fmt, clippy, test.
 
 ## 12. Delivery order (for the plan)
-0. **Engine:** `BlindsMode::Ladder` (hand-driven levels) with unit and property tests; validate and serialise it; replay-safe.
+0. **Engine:** `Tournament.hands_per_level` (hand-driven levels) with unit and property tests; validate and serialise it; replay-safe.
 1. **Core:** `poker_bots` crate with `BotView`, strength, decision, RNG, personalities; headless harness; fairness tests. Green on its own.
 2. **Room integration:** `Op::AddBot`, `room/bots.rs`, scheduling in the actor, absence exemption, config validation, journal and restore, loopback binding. Sim tests with the real actor.
 3. **Adaptation and skill:** notes, reads, skill tuning, mood; simulation assertions tuned.
