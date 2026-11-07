@@ -45,6 +45,9 @@ enum ErrorCode {
   roomCrashed,
   internalError,
 
+  /// This app cannot play the room (virtual cards); the player must update.
+  updateRequired,
+
   /// Any code added by a newer server.
   unknown,
 }

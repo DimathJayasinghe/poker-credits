@@ -1,0 +1,15 @@
+{
+  "v": 1,
+  "type": "CREATE_ROOM",
+  "hostName": "Dimath",
+  "config": {
+    "startingChips": 1000,
+    "smallBlind": 10,
+    "bigBlind": 20,
+    "ante": 0,
+    "isTournament": false,
+    "blindLevelMinutes": 15,
+    "turnTimeLimitSeconds": 30,
+    "cardMode": "VIRTUAL"
+  }
+}

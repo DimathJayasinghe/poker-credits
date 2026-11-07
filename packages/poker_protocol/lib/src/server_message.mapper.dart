@@ -21,6 +21,7 @@ class ServerMessageMapper extends ClassMapperBase<ServerMessage> {
       SnapshotMapper.ensureInitialized();
       StateUpdateMapper.ensureInitialized();
       TurnPromptMapper.ensureInitialized();
+      HoleCardsMapper.ensureInitialized();
       ActionPerformedMapper.ensureInitialized();
       AckMapper.ensureInitialized();
       ErrorMessageMapper.ensureInitialized();
@@ -1018,6 +1019,156 @@ class _TurnPromptCopyWithImpl<$R, $Out>
   TurnPromptCopyWith<$R2, TurnPrompt, $Out2> $chain<$R2, $Out2>(
     Then<$Out2, $R2> t,
   ) => _TurnPromptCopyWithImpl<$R2, $Out2>($value, $cast, t);
+}
+
+class HoleCardsMapper extends SubClassMapperBase<HoleCards> {
+  HoleCardsMapper._();
+
+  static HoleCardsMapper? _instance;
+  static HoleCardsMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = HoleCardsMapper._());
+      ServerMessageMapper.ensureInitialized().addSubMapper(_instance!);
+      MapperContainer.globals.useAll([PokerCardMapper()]);
+    }
+    return _instance!;
+  }
+
+  @override
+  final String id = 'HoleCards';
+
+  static int _$handNumber(HoleCards v) => v.handNumber;
+  static const Field<HoleCards, int> _f$handNumber = Field(
+    'handNumber',
+    _$handNumber,
+  );
+  static List<PokerCard> _$cards(HoleCards v) => v.cards;
+  static const Field<HoleCards, List<PokerCard>> _f$cards = Field(
+    'cards',
+    _$cards,
+  );
+
+  @override
+  final MappableFields<HoleCards> fields = const {
+    #handNumber: _f$handNumber,
+    #cards: _f$cards,
+  };
+  @override
+  final bool ignoreNull = true;
+
+  @override
+  final String discriminatorKey = 'type';
+  @override
+  final dynamic discriminatorValue = 'HOLE_CARDS';
+  @override
+  late final ClassMapperBase superMapper =
+      ServerMessageMapper.ensureInitialized();
+
+  static HoleCards _instantiate(DecodingData data) {
+    return HoleCards(
+      handNumber: data.dec(_f$handNumber),
+      cards: data.dec(_f$cards),
+    );
+  }
+
+  @override
+  final Function instantiate = _instantiate;
+
+  static HoleCards fromMap(Map<String, dynamic> map) {
+    return ensureInitialized().decodeMap<HoleCards>(map);
+  }
+
+  static HoleCards fromJson(String json) {
+    return ensureInitialized().decodeJson<HoleCards>(json);
+  }
+}
+
+mixin HoleCardsMappable {
+  String toJson() {
+    return HoleCardsMapper.ensureInitialized().encodeJson<HoleCards>(
+      this as HoleCards,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return HoleCardsMapper.ensureInitialized().encodeMap<HoleCards>(
+      this as HoleCards,
+    );
+  }
+
+  HoleCardsCopyWith<HoleCards, HoleCards, HoleCards> get copyWith =>
+      _HoleCardsCopyWithImpl<HoleCards, HoleCards>(
+        this as HoleCards,
+        $identity,
+        $identity,
+      );
+  @override
+  String toString() {
+    return HoleCardsMapper.ensureInitialized().stringifyValue(
+      this as HoleCards,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return HoleCardsMapper.ensureInitialized().equalsValue(
+      this as HoleCards,
+      other,
+    );
+  }
+
+  @override
+  int get hashCode {
+    return HoleCardsMapper.ensureInitialized().hashValue(this as HoleCards);
+  }
+}
+
+extension HoleCardsValueCopy<$R, $Out> on ObjectCopyWith<$R, HoleCards, $Out> {
+  HoleCardsCopyWith<$R, HoleCards, $Out> get $asHoleCards =>
+      $base.as((v, t, t2) => _HoleCardsCopyWithImpl<$R, $Out>(v, t, t2));
+}
+
+abstract class HoleCardsCopyWith<$R, $In extends HoleCards, $Out>
+    implements ServerMessageCopyWith<$R, $In, $Out> {
+  ListCopyWith<$R, PokerCard, ObjectCopyWith<$R, PokerCard, PokerCard>>
+  get cards;
+  @override
+  $R call({int? handNumber, List<PokerCard>? cards});
+  HoleCardsCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
+}
+
+class _HoleCardsCopyWithImpl<$R, $Out>
+    extends ClassCopyWithBase<$R, HoleCards, $Out>
+    implements HoleCardsCopyWith<$R, HoleCards, $Out> {
+  _HoleCardsCopyWithImpl(super.value, super.then, super.then2);
+
+  @override
+  late final ClassMapperBase<HoleCards> $mapper =
+      HoleCardsMapper.ensureInitialized();
+  @override
+  ListCopyWith<$R, PokerCard, ObjectCopyWith<$R, PokerCard, PokerCard>>
+  get cards => ListCopyWith(
+    $value.cards,
+    (v, t) => ObjectCopyWith(v, $identity, t),
+    (v) => call(cards: v),
+  );
+  @override
+  $R call({int? handNumber, List<PokerCard>? cards}) => $apply(
+    FieldCopyWithData({
+      if (handNumber != null) #handNumber: handNumber,
+      if (cards != null) #cards: cards,
+    }),
+  );
+  @override
+  HoleCards $make(CopyWithData data) => HoleCards(
+    handNumber: data.get(#handNumber, or: $value.handNumber),
+    cards: data.get(#cards, or: $value.cards),
+  );
+
+  @override
+  HoleCardsCopyWith<$R2, HoleCards, $Out2> $chain<$R2, $Out2>(
+    Then<$Out2, $R2> t,
+  ) => _HoleCardsCopyWithImpl<$R2, $Out2>($value, $cast, t);
 }
 
 class ActionPerformedMapper extends SubClassMapperBase<ActionPerformed> {

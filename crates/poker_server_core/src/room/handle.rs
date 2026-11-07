@@ -125,6 +125,8 @@ pub struct RoomInfo {
     pub max_players: usize,
     /// A hand has been dealt (the room is past the lobby).
     pub in_progress: bool,
+    /// Real or virtual cards.
+    pub card_mode: crate::protocol::CardMode,
 }
 
 /// What the supervisor tells connections about their room.

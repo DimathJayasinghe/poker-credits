@@ -10,11 +10,12 @@
 
 use poker_engine::{Chips, PlayerAction};
 use poker_server_core::config::Timings;
-use poker_server_core::protocol::{ErrorCode, RoomConfig, ServerMessage, WirePhase};
+use poker_server_core::protocol::{CardMode, ErrorCode, RoomConfig, ServerMessage, WirePhase};
 use poker_server_core::room::state::{Broadcast, HostCommand, Op, Outcome, RoomError, RoomState};
 
 fn config() -> RoomConfig {
     RoomConfig {
+        card_mode: CardMode::Physical,
         starting_chips: 1000,
         small_blind: 5,
         big_blind: 10,
@@ -137,7 +138,7 @@ fn only_the_host_can_start_a_hand() {
     let (mut room, _) = table_of_three();
     let op = Op::Host {
         by: "p_2".into(),
-        command: HostCommand::StartHand,
+        command: HostCommand::StartHand { deck: None },
         at_ms: 10,
     };
     assert_eq!(
@@ -150,7 +151,10 @@ fn only_the_host_can_start_a_hand() {
 fn start_hand_sets_the_turn_clock_and_prompts_the_actor() {
     let (mut room, _) = table_of_three();
     let out = room
-        .apply(host(HostCommand::StartHand, 1000), &Timings::default())
+        .apply(
+            host(HostCommand::StartHand { deck: None }, 1000),
+            &Timings::default(),
+        )
         .unwrap();
     assert_eq!(room.turn_deadline_ms, Some(31_000));
     let actor = active_id(&room);
@@ -166,7 +170,8 @@ fn start_hand_sets_the_turn_clock_and_prompts_the_actor() {
 fn action_seq_counts_duplicates_and_gaps() {
     let (mut room, _) = table_of_three();
     let t = Timings::default();
-    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    room.apply(host(HostCommand::StartHand { deck: None }, 1000), &t)
+        .unwrap();
     let actor = active_id(&room);
     let first = Op::Act {
         player_id: actor.clone(),
@@ -197,7 +202,8 @@ fn action_seq_counts_duplicates_and_gaps() {
 fn acting_out_of_turn_is_refused() {
     let (mut room, _) = table_of_three();
     let t = Timings::default();
-    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    room.apply(host(HostCommand::StartHand { deck: None }, 1000), &t)
+        .unwrap();
     let actor = active_id(&room);
     let other = ["p_1", "p_2", "p_3"]
         .into_iter()
@@ -216,7 +222,8 @@ fn acting_out_of_turn_is_refused() {
 fn timeout_waits_for_the_deadline_then_acts() {
     let (mut room, _) = table_of_three();
     let t = Timings::default();
-    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    room.apply(host(HostCommand::StartHand { deck: None }, 1000), &t)
+        .unwrap();
     let early = room.apply(Op::Timeout { at_ms: 30_999 }, &t).unwrap_err();
     assert_eq!(early.code, ErrorCode::BadRequest);
     let actor = active_id(&room);
@@ -229,7 +236,8 @@ fn timeout_waits_for_the_deadline_then_acts() {
 fn recover_gives_the_player_on_turn_a_fresh_clock() {
     let (mut room, _) = table_of_three();
     let t = Timings::default();
-    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    room.apply(host(HostCommand::StartHand { deck: None }, 1000), &t)
+        .unwrap();
     assert_eq!(room.turn_deadline_ms, Some(31_000));
     let actor = active_id(&room);
     // The server was down for an hour: without recovery the turn would time out at once.
@@ -253,7 +261,7 @@ fn recover_never_shortens_a_clock_and_changes_nothing_without_one() {
         "lobby: no clock"
     );
     assert_eq!(room.state_version, version);
-    room.apply(host(HostCommand::StartHand, 10_000), &t)
+    room.apply(host(HostCommand::StartHand { deck: None }, 10_000), &t)
         .unwrap();
     // A recovery time earlier than the turn start (clock skew) would give a shorter clock
     // than the one running: the existing deadline (40 s) stays.
@@ -266,7 +274,8 @@ fn recover_never_shortens_a_clock_and_changes_nothing_without_one() {
 fn pause_freezes_the_clock_and_resume_gives_back_the_remaining_time() {
     let (mut room, _) = table_of_three();
     let t = Timings::default();
-    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    room.apply(host(HostCommand::StartHand { deck: None }, 1000), &t)
+        .unwrap();
     room.apply(host(HostCommand::Pause { reason: None }, 11_000), &t)
         .unwrap();
     assert_eq!(room.turn_deadline_ms, None);
@@ -289,7 +298,8 @@ fn pause_freezes_the_clock_and_resume_gives_back_the_remaining_time() {
 fn chips_are_conserved_through_a_hand() {
     let (mut room, _) = table_of_three();
     let t = Timings::default();
-    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    room.apply(host(HostCommand::StartHand { deck: None }, 1000), &t)
+        .unwrap();
     assert_eq!(total_chips(&room), 3000);
     act(
         &mut room,
@@ -310,7 +320,8 @@ fn state_version_rises_only_when_state_changes() {
     let (mut room, _) = table_of_three();
     let t = Timings::default();
     let v0 = room.state_version;
-    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    room.apply(host(HostCommand::StartHand { deck: None }, 1000), &t)
+        .unwrap();
     assert_eq!(room.state_version, v0 + 1);
     let v1 = room.state_version;
     let _ = room.apply(Op::Timeout { at_ms: 1001 }, &t);
@@ -322,7 +333,7 @@ fn replaying_the_ops_rebuilds_an_identical_state() {
     let (mut live, joins) = table_of_three();
     let t = Timings::default();
     let mut ops = joins;
-    ops.push(host(HostCommand::StartHand, 1000));
+    ops.push(host(HostCommand::StartHand { deck: None }, 1000));
     live.apply(ops[2].clone(), &t).unwrap();
     for (n, action) in [PlayerAction::Call, PlayerAction::Call, PlayerAction::Check]
         .into_iter()
@@ -397,7 +408,8 @@ fn the_host_cannot_be_kicked() {
 fn a_kick_during_a_hand_folds_first_and_removes_after_the_hand() {
     let (mut room, _) = table_of_three();
     let t = Timings::default();
-    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    room.apply(host(HostCommand::StartHand { deck: None }, 1000), &t)
+        .unwrap();
     let victim = ["p_2", "p_3"]
         .into_iter()
         .find(|id| *id != active_id(&room))
@@ -590,7 +602,8 @@ fn end_game_closes_the_room_to_new_joins() {
 fn rc005_a_top_up_during_a_hand_applies_to_the_following_hand() {
     let (mut room, _) = table_of_three();
     let t = Timings::default();
-    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    room.apply(host(HostCommand::StartHand { deck: None }, 1000), &t)
+        .unwrap();
     room.apply(
         Op::RequestRebuy {
             player_id: "p_2".into(),
@@ -760,7 +773,8 @@ fn only_the_host_may_move_somebody_else() {
 fn nobody_moves_during_a_hand_and_nothing_changes() {
     let (mut room, _) = table_of_three();
     let t = Timings::default();
-    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    room.apply(host(HostCommand::StartHand { deck: None }, 1000), &t)
+        .unwrap();
     let seats: Vec<_> = ["p_1", "p_2", "p_3"].map(|id| seat_of(&room, id)).to_vec();
     let version = room.state_version;
     assert!(room.apply(choose("p_2", 8, 1100), &t).is_err());
@@ -800,7 +814,8 @@ fn the_new_order_survives_a_snapshot_round_trip() {
 fn once_the_game_has_run_guests_cannot_hop_seats_but_the_host_can_move_them() {
     let (mut room, _) = table_of_three();
     let t = Timings::default();
-    room.apply(host(HostCommand::StartHand, 1000), &t).unwrap();
+    room.apply(host(HostCommand::StartHand { deck: None }, 1000), &t)
+        .unwrap();
     // Everybody folds until the hand is over and the table is between hands.
     let mut at = 1100;
     while room.game.legal_actions().is_some() {

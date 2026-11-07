@@ -3,6 +3,8 @@
 //! Rust is the schema. Dart mirrors it in `packages/poker_protocol` and both sides are tested
 //! against the golden files in `protocol/fixtures/v1/`.
 
+use poker_engine::card::Card;
+use poker_engine::hand_rank::HandCategory;
 use poker_engine::{ActionKind, LegalActions, PlayerAction, PokerError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -37,6 +39,28 @@ pub enum Role {
     Spectator,
 }
 
+/// A client feature a virtual-card room requires (sent in `JOIN_ROOM` / `RESUME` `features`).
+pub const FEATURE_VIRTUAL_CARDS: &str = "VIRTUAL_CARDS";
+
+/// Who deals the cards. Fixed for the life of a room (ADR-016).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CardMode {
+    /// Real cards on the table; the app handles chips and pots (the original mode).
+    #[default]
+    Physical,
+    /// The server shuffles, deals, reveals and ranks.
+    Virtual,
+}
+
+impl CardMode {
+    /// For `skip_serializing_if`: physical rooms serialise exactly as they always did.
+    #[must_use]
+    pub fn is_physical(&self) -> bool {
+        matches!(self, CardMode::Physical)
+    }
+}
+
 /// Room settings chosen by the host.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -55,6 +79,9 @@ pub struct RoomConfig {
     pub blind_level_minutes: u32,
     /// Seconds a player has to act, zero for no timer.
     pub turn_time_limit_seconds: u32,
+    /// Real or virtual cards (absent means real).
+    #[serde(default, skip_serializing_if = "CardMode::is_physical")]
+    pub card_mode: CardMode,
 }
 
 /// Winners of one pot as sent by the host.
@@ -94,6 +121,9 @@ pub enum ClientMessage {
         /// Watch only.
         #[serde(default)]
         spectator: bool,
+        /// Optional abilities of this client, for example `VIRTUAL_CARDS`.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        features: Vec<String>,
     },
     /// Re-attach after a lost connection.
     Resume {
@@ -107,6 +137,9 @@ pub enum ClientMessage {
         /// Host proof, only for the host.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         host_token: Option<String>,
+        /// Optional abilities of this client, for example `VIRTUAL_CARDS`.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        features: Vec<String>,
     },
     /// Host: deal the next hand.
     StartHand,
@@ -247,6 +280,9 @@ pub struct SeatView {
     pub is_sitting_out: bool,
     /// Has a live connection.
     pub is_connected: bool,
+    /// Virtual cards: a hand was dealt to this seat (draw a card back).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub has_cards: bool,
 }
 
 /// One pot in `RoomView`.
@@ -259,6 +295,58 @@ pub struct PotView {
     pub amount: u64,
     /// Players who can win it.
     pub eligible_player_ids: Vec<String>,
+}
+
+/// A hand turned face up at showdown (virtual cards).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RevealView {
+    /// Whose hand.
+    pub player_id: String,
+    /// Their name when the hand was paid.
+    pub name: String,
+    /// The two hole cards.
+    pub cards: [Card; 2],
+    /// What the hand is.
+    pub category: HandCategory,
+    /// The five cards that make it.
+    pub best_five: [Card; 5],
+}
+
+/// What one player received from a pot.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShareView {
+    /// Winner.
+    pub player_id: String,
+    /// Their name when the hand was paid.
+    pub name: String,
+    /// Chips received.
+    pub amount: u64,
+}
+
+/// How one pot was paid.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PotResultView {
+    /// 0 = main pot.
+    pub pot_index: u32,
+    /// Chips in the pot.
+    pub amount: u64,
+    /// Everyone who shared it.
+    pub winner_player_ids: Vec<String>,
+    /// Each winner's amount.
+    pub shares: Vec<ShareView>,
+}
+
+/// How the last hand was paid (virtual cards), kept until the next hand starts.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HandResultView {
+    /// Everyone else folded; no hands were compared.
+    pub uncontested: bool,
+    /// One entry per pot, main pot first.
+    pub pots: Vec<PotResultView>,
 }
 
 /// The public table state. Never contains private data.
@@ -302,6 +390,15 @@ pub struct RoomView {
     pub spectator_count: u32,
     /// Top-ups waiting for the host (or for the end of the hand once approved).
     pub pending_rebuys: Vec<PendingRebuyView>,
+    /// Virtual cards: the board cards everyone may see.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub board: Vec<Card>,
+    /// Virtual cards: hands turned face up at showdown.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reveals: Vec<RevealView>,
+    /// Virtual cards: how the last hand was paid.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result: Option<HandResultView>,
 }
 
 /// A top-up request, public so the host can approve it.
@@ -384,6 +481,8 @@ pub enum ErrorCode {
     RateLimited,
     /// Same seat connected elsewhere.
     Superseded,
+    /// This app version cannot play this room (for example it needs virtual cards).
+    UpdateRequired,
     /// Room frozen after repeated panics.
     RoomCrashed,
     /// Unexpected server failure.
@@ -407,7 +506,9 @@ impl From<&PokerError> for ErrorCode {
             PokerError::UnknownPlayer => ErrorCode::UnknownPlayer,
             PokerError::PlayerExists => ErrorCode::AlreadySeated,
             PokerError::SeatOccupied => ErrorCode::SeatOccupied,
-            PokerError::InvalidSeat => ErrorCode::BadRequest,
+            PokerError::InvalidSeat | PokerError::InvalidDeck | PokerError::InvalidHand => {
+                ErrorCode::BadRequest
+            }
             PokerError::InvalidAmount => ErrorCode::InvalidAmount,
             PokerError::Overflow => ErrorCode::InternalError,
             PokerError::IllegalTransition { .. } => ErrorCode::IllegalState,
@@ -515,6 +616,13 @@ pub enum ServerMessage {
         all_in: bool,
         /// Chosen by the server after a timeout.
         auto: bool,
+    },
+    /// Virtual cards: your two cards. Only ever sent to their owner.
+    HoleCards {
+        /// Hand the cards belong to.
+        hand_number: u32,
+        /// The cards.
+        cards: [Card; 2],
     },
     /// Request accepted.
     Ack {

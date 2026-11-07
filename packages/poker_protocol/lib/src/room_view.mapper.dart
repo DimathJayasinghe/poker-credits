@@ -132,6 +132,80 @@ extension WirePhaseMapperExtension on WirePhase {
   }
 }
 
+class HandCategoryMapper extends EnumMapper<HandCategory> {
+  HandCategoryMapper._();
+
+  static HandCategoryMapper? _instance;
+  static HandCategoryMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = HandCategoryMapper._());
+    }
+    return _instance!;
+  }
+
+  static HandCategory fromValue(dynamic value) {
+    ensureInitialized();
+    return MapperContainer.globals.fromValue(value);
+  }
+
+  @override
+  HandCategory decode(dynamic value) {
+    switch (value) {
+      case r'HIGH_CARD':
+        return HandCategory.highCard;
+      case r'PAIR':
+        return HandCategory.pair;
+      case r'TWO_PAIR':
+        return HandCategory.twoPair;
+      case r'THREE_OF_AKIND':
+        return HandCategory.threeOfAKind;
+      case r'STRAIGHT':
+        return HandCategory.straight;
+      case r'FLUSH':
+        return HandCategory.flush;
+      case r'FULL_HOUSE':
+        return HandCategory.fullHouse;
+      case r'FOUR_OF_AKIND':
+        return HandCategory.fourOfAKind;
+      case r'STRAIGHT_FLUSH':
+        return HandCategory.straightFlush;
+      default:
+        return HandCategory.values[0];
+    }
+  }
+
+  @override
+  dynamic encode(HandCategory self) {
+    switch (self) {
+      case HandCategory.highCard:
+        return r'HIGH_CARD';
+      case HandCategory.pair:
+        return r'PAIR';
+      case HandCategory.twoPair:
+        return r'TWO_PAIR';
+      case HandCategory.threeOfAKind:
+        return r'THREE_OF_AKIND';
+      case HandCategory.straight:
+        return r'STRAIGHT';
+      case HandCategory.flush:
+        return r'FLUSH';
+      case HandCategory.fullHouse:
+        return r'FULL_HOUSE';
+      case HandCategory.fourOfAKind:
+        return r'FOUR_OF_AKIND';
+      case HandCategory.straightFlush:
+        return r'STRAIGHT_FLUSH';
+    }
+  }
+}
+
+extension HandCategoryMapperExtension on HandCategory {
+  String toValue() {
+    HandCategoryMapper.ensureInitialized();
+    return MapperContainer.globals.toValue<HandCategory>(this) as String;
+  }
+}
+
 class SeatViewMapper extends ClassMapperBase<SeatView> {
   SeatViewMapper._();
 
@@ -182,6 +256,13 @@ class SeatViewMapper extends ClassMapperBase<SeatView> {
     'isConnected',
     _$isConnected,
   );
+  static bool _$hasCards(SeatView v) => v.hasCards;
+  static const Field<SeatView, bool> _f$hasCards = Field(
+    'hasCards',
+    _$hasCards,
+    opt: true,
+    def: false,
+  );
 
   @override
   final MappableFields<SeatView> fields = const {
@@ -194,10 +275,13 @@ class SeatViewMapper extends ClassMapperBase<SeatView> {
     #isAllIn: _f$isAllIn,
     #isSittingOut: _f$isSittingOut,
     #isConnected: _f$isConnected,
+    #hasCards: _f$hasCards,
   };
   @override
   final bool ignoreNull = true;
 
+  @override
+  final MappingHook hook = const OmitWhenDefault({'hasCards': false});
   static SeatView _instantiate(DecodingData data) {
     return SeatView(
       seatIndex: data.dec(_f$seatIndex),
@@ -209,6 +293,7 @@ class SeatViewMapper extends ClassMapperBase<SeatView> {
       isAllIn: data.dec(_f$isAllIn),
       isSittingOut: data.dec(_f$isSittingOut),
       isConnected: data.dec(_f$isConnected),
+      hasCards: data.dec(_f$hasCards),
     );
   }
 
@@ -279,6 +364,7 @@ abstract class SeatViewCopyWith<$R, $In extends SeatView, $Out>
     bool? isAllIn,
     bool? isSittingOut,
     bool? isConnected,
+    bool? hasCards,
   });
   SeatViewCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -302,6 +388,7 @@ class _SeatViewCopyWithImpl<$R, $Out>
     bool? isAllIn,
     bool? isSittingOut,
     bool? isConnected,
+    bool? hasCards,
   }) => $apply(
     FieldCopyWithData({
       if (seatIndex != null) #seatIndex: seatIndex,
@@ -313,6 +400,7 @@ class _SeatViewCopyWithImpl<$R, $Out>
       if (isAllIn != null) #isAllIn: isAllIn,
       if (isSittingOut != null) #isSittingOut: isSittingOut,
       if (isConnected != null) #isConnected: isConnected,
+      if (hasCards != null) #hasCards: hasCards,
     }),
   );
   @override
@@ -326,6 +414,7 @@ class _SeatViewCopyWithImpl<$R, $Out>
     isAllIn: data.get(#isAllIn, or: $value.isAllIn),
     isSittingOut: data.get(#isSittingOut, or: $value.isSittingOut),
     isConnected: data.get(#isConnected, or: $value.isConnected),
+    hasCards: data.get(#hasCards, or: $value.hasCards),
   );
 
   @override
@@ -624,6 +713,604 @@ class _PendingRebuyViewCopyWithImpl<$R, $Out>
   ) => _PendingRebuyViewCopyWithImpl<$R2, $Out2>($value, $cast, t);
 }
 
+class RevealMapper extends ClassMapperBase<Reveal> {
+  RevealMapper._();
+
+  static RevealMapper? _instance;
+  static RevealMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = RevealMapper._());
+      MapperContainer.globals.useAll([PokerCardMapper()]);
+      HandCategoryMapper.ensureInitialized();
+    }
+    return _instance!;
+  }
+
+  @override
+  final String id = 'Reveal';
+
+  static String _$playerId(Reveal v) => v.playerId;
+  static const Field<Reveal, String> _f$playerId = Field(
+    'playerId',
+    _$playerId,
+  );
+  static String _$name(Reveal v) => v.name;
+  static const Field<Reveal, String> _f$name = Field('name', _$name);
+  static List<PokerCard> _$cards(Reveal v) => v.cards;
+  static const Field<Reveal, List<PokerCard>> _f$cards = Field(
+    'cards',
+    _$cards,
+  );
+  static HandCategory _$category(Reveal v) => v.category;
+  static const Field<Reveal, HandCategory> _f$category = Field(
+    'category',
+    _$category,
+  );
+  static List<PokerCard> _$bestFive(Reveal v) => v.bestFive;
+  static const Field<Reveal, List<PokerCard>> _f$bestFive = Field(
+    'bestFive',
+    _$bestFive,
+  );
+
+  @override
+  final MappableFields<Reveal> fields = const {
+    #playerId: _f$playerId,
+    #name: _f$name,
+    #cards: _f$cards,
+    #category: _f$category,
+    #bestFive: _f$bestFive,
+  };
+  @override
+  final bool ignoreNull = true;
+
+  static Reveal _instantiate(DecodingData data) {
+    return Reveal(
+      playerId: data.dec(_f$playerId),
+      name: data.dec(_f$name),
+      cards: data.dec(_f$cards),
+      category: data.dec(_f$category),
+      bestFive: data.dec(_f$bestFive),
+    );
+  }
+
+  @override
+  final Function instantiate = _instantiate;
+
+  static Reveal fromMap(Map<String, dynamic> map) {
+    return ensureInitialized().decodeMap<Reveal>(map);
+  }
+
+  static Reveal fromJson(String json) {
+    return ensureInitialized().decodeJson<Reveal>(json);
+  }
+}
+
+mixin RevealMappable {
+  String toJson() {
+    return RevealMapper.ensureInitialized().encodeJson<Reveal>(this as Reveal);
+  }
+
+  Map<String, dynamic> toMap() {
+    return RevealMapper.ensureInitialized().encodeMap<Reveal>(this as Reveal);
+  }
+
+  RevealCopyWith<Reveal, Reveal, Reveal> get copyWith =>
+      _RevealCopyWithImpl<Reveal, Reveal>(this as Reveal, $identity, $identity);
+  @override
+  String toString() {
+    return RevealMapper.ensureInitialized().stringifyValue(this as Reveal);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return RevealMapper.ensureInitialized().equalsValue(this as Reveal, other);
+  }
+
+  @override
+  int get hashCode {
+    return RevealMapper.ensureInitialized().hashValue(this as Reveal);
+  }
+}
+
+extension RevealValueCopy<$R, $Out> on ObjectCopyWith<$R, Reveal, $Out> {
+  RevealCopyWith<$R, Reveal, $Out> get $asReveal =>
+      $base.as((v, t, t2) => _RevealCopyWithImpl<$R, $Out>(v, t, t2));
+}
+
+abstract class RevealCopyWith<$R, $In extends Reveal, $Out>
+    implements ClassCopyWith<$R, $In, $Out> {
+  ListCopyWith<$R, PokerCard, ObjectCopyWith<$R, PokerCard, PokerCard>>
+  get cards;
+  ListCopyWith<$R, PokerCard, ObjectCopyWith<$R, PokerCard, PokerCard>>
+  get bestFive;
+  $R call({
+    String? playerId,
+    String? name,
+    List<PokerCard>? cards,
+    HandCategory? category,
+    List<PokerCard>? bestFive,
+  });
+  RevealCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
+}
+
+class _RevealCopyWithImpl<$R, $Out> extends ClassCopyWithBase<$R, Reveal, $Out>
+    implements RevealCopyWith<$R, Reveal, $Out> {
+  _RevealCopyWithImpl(super.value, super.then, super.then2);
+
+  @override
+  late final ClassMapperBase<Reveal> $mapper = RevealMapper.ensureInitialized();
+  @override
+  ListCopyWith<$R, PokerCard, ObjectCopyWith<$R, PokerCard, PokerCard>>
+  get cards => ListCopyWith(
+    $value.cards,
+    (v, t) => ObjectCopyWith(v, $identity, t),
+    (v) => call(cards: v),
+  );
+  @override
+  ListCopyWith<$R, PokerCard, ObjectCopyWith<$R, PokerCard, PokerCard>>
+  get bestFive => ListCopyWith(
+    $value.bestFive,
+    (v, t) => ObjectCopyWith(v, $identity, t),
+    (v) => call(bestFive: v),
+  );
+  @override
+  $R call({
+    String? playerId,
+    String? name,
+    List<PokerCard>? cards,
+    HandCategory? category,
+    List<PokerCard>? bestFive,
+  }) => $apply(
+    FieldCopyWithData({
+      if (playerId != null) #playerId: playerId,
+      if (name != null) #name: name,
+      if (cards != null) #cards: cards,
+      if (category != null) #category: category,
+      if (bestFive != null) #bestFive: bestFive,
+    }),
+  );
+  @override
+  Reveal $make(CopyWithData data) => Reveal(
+    playerId: data.get(#playerId, or: $value.playerId),
+    name: data.get(#name, or: $value.name),
+    cards: data.get(#cards, or: $value.cards),
+    category: data.get(#category, or: $value.category),
+    bestFive: data.get(#bestFive, or: $value.bestFive),
+  );
+
+  @override
+  RevealCopyWith<$R2, Reveal, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t) =>
+      _RevealCopyWithImpl<$R2, $Out2>($value, $cast, t);
+}
+
+class ShareMapper extends ClassMapperBase<Share> {
+  ShareMapper._();
+
+  static ShareMapper? _instance;
+  static ShareMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = ShareMapper._());
+    }
+    return _instance!;
+  }
+
+  @override
+  final String id = 'Share';
+
+  static String _$playerId(Share v) => v.playerId;
+  static const Field<Share, String> _f$playerId = Field('playerId', _$playerId);
+  static String _$name(Share v) => v.name;
+  static const Field<Share, String> _f$name = Field('name', _$name);
+  static int _$amount(Share v) => v.amount;
+  static const Field<Share, int> _f$amount = Field('amount', _$amount);
+
+  @override
+  final MappableFields<Share> fields = const {
+    #playerId: _f$playerId,
+    #name: _f$name,
+    #amount: _f$amount,
+  };
+  @override
+  final bool ignoreNull = true;
+
+  static Share _instantiate(DecodingData data) {
+    return Share(
+      playerId: data.dec(_f$playerId),
+      name: data.dec(_f$name),
+      amount: data.dec(_f$amount),
+    );
+  }
+
+  @override
+  final Function instantiate = _instantiate;
+
+  static Share fromMap(Map<String, dynamic> map) {
+    return ensureInitialized().decodeMap<Share>(map);
+  }
+
+  static Share fromJson(String json) {
+    return ensureInitialized().decodeJson<Share>(json);
+  }
+}
+
+mixin ShareMappable {
+  String toJson() {
+    return ShareMapper.ensureInitialized().encodeJson<Share>(this as Share);
+  }
+
+  Map<String, dynamic> toMap() {
+    return ShareMapper.ensureInitialized().encodeMap<Share>(this as Share);
+  }
+
+  ShareCopyWith<Share, Share, Share> get copyWith =>
+      _ShareCopyWithImpl<Share, Share>(this as Share, $identity, $identity);
+  @override
+  String toString() {
+    return ShareMapper.ensureInitialized().stringifyValue(this as Share);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return ShareMapper.ensureInitialized().equalsValue(this as Share, other);
+  }
+
+  @override
+  int get hashCode {
+    return ShareMapper.ensureInitialized().hashValue(this as Share);
+  }
+}
+
+extension ShareValueCopy<$R, $Out> on ObjectCopyWith<$R, Share, $Out> {
+  ShareCopyWith<$R, Share, $Out> get $asShare =>
+      $base.as((v, t, t2) => _ShareCopyWithImpl<$R, $Out>(v, t, t2));
+}
+
+abstract class ShareCopyWith<$R, $In extends Share, $Out>
+    implements ClassCopyWith<$R, $In, $Out> {
+  $R call({String? playerId, String? name, int? amount});
+  ShareCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
+}
+
+class _ShareCopyWithImpl<$R, $Out> extends ClassCopyWithBase<$R, Share, $Out>
+    implements ShareCopyWith<$R, Share, $Out> {
+  _ShareCopyWithImpl(super.value, super.then, super.then2);
+
+  @override
+  late final ClassMapperBase<Share> $mapper = ShareMapper.ensureInitialized();
+  @override
+  $R call({String? playerId, String? name, int? amount}) => $apply(
+    FieldCopyWithData({
+      if (playerId != null) #playerId: playerId,
+      if (name != null) #name: name,
+      if (amount != null) #amount: amount,
+    }),
+  );
+  @override
+  Share $make(CopyWithData data) => Share(
+    playerId: data.get(#playerId, or: $value.playerId),
+    name: data.get(#name, or: $value.name),
+    amount: data.get(#amount, or: $value.amount),
+  );
+
+  @override
+  ShareCopyWith<$R2, Share, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t) =>
+      _ShareCopyWithImpl<$R2, $Out2>($value, $cast, t);
+}
+
+class PotResultMapper extends ClassMapperBase<PotResult> {
+  PotResultMapper._();
+
+  static PotResultMapper? _instance;
+  static PotResultMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = PotResultMapper._());
+      ShareMapper.ensureInitialized();
+    }
+    return _instance!;
+  }
+
+  @override
+  final String id = 'PotResult';
+
+  static int _$potIndex(PotResult v) => v.potIndex;
+  static const Field<PotResult, int> _f$potIndex = Field(
+    'potIndex',
+    _$potIndex,
+  );
+  static int _$amount(PotResult v) => v.amount;
+  static const Field<PotResult, int> _f$amount = Field('amount', _$amount);
+  static List<String> _$winnerPlayerIds(PotResult v) => v.winnerPlayerIds;
+  static const Field<PotResult, List<String>> _f$winnerPlayerIds = Field(
+    'winnerPlayerIds',
+    _$winnerPlayerIds,
+  );
+  static List<Share> _$shares(PotResult v) => v.shares;
+  static const Field<PotResult, List<Share>> _f$shares = Field(
+    'shares',
+    _$shares,
+  );
+
+  @override
+  final MappableFields<PotResult> fields = const {
+    #potIndex: _f$potIndex,
+    #amount: _f$amount,
+    #winnerPlayerIds: _f$winnerPlayerIds,
+    #shares: _f$shares,
+  };
+  @override
+  final bool ignoreNull = true;
+
+  static PotResult _instantiate(DecodingData data) {
+    return PotResult(
+      potIndex: data.dec(_f$potIndex),
+      amount: data.dec(_f$amount),
+      winnerPlayerIds: data.dec(_f$winnerPlayerIds),
+      shares: data.dec(_f$shares),
+    );
+  }
+
+  @override
+  final Function instantiate = _instantiate;
+
+  static PotResult fromMap(Map<String, dynamic> map) {
+    return ensureInitialized().decodeMap<PotResult>(map);
+  }
+
+  static PotResult fromJson(String json) {
+    return ensureInitialized().decodeJson<PotResult>(json);
+  }
+}
+
+mixin PotResultMappable {
+  String toJson() {
+    return PotResultMapper.ensureInitialized().encodeJson<PotResult>(
+      this as PotResult,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return PotResultMapper.ensureInitialized().encodeMap<PotResult>(
+      this as PotResult,
+    );
+  }
+
+  PotResultCopyWith<PotResult, PotResult, PotResult> get copyWith =>
+      _PotResultCopyWithImpl<PotResult, PotResult>(
+        this as PotResult,
+        $identity,
+        $identity,
+      );
+  @override
+  String toString() {
+    return PotResultMapper.ensureInitialized().stringifyValue(
+      this as PotResult,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return PotResultMapper.ensureInitialized().equalsValue(
+      this as PotResult,
+      other,
+    );
+  }
+
+  @override
+  int get hashCode {
+    return PotResultMapper.ensureInitialized().hashValue(this as PotResult);
+  }
+}
+
+extension PotResultValueCopy<$R, $Out> on ObjectCopyWith<$R, PotResult, $Out> {
+  PotResultCopyWith<$R, PotResult, $Out> get $asPotResult =>
+      $base.as((v, t, t2) => _PotResultCopyWithImpl<$R, $Out>(v, t, t2));
+}
+
+abstract class PotResultCopyWith<$R, $In extends PotResult, $Out>
+    implements ClassCopyWith<$R, $In, $Out> {
+  ListCopyWith<$R, String, ObjectCopyWith<$R, String, String>>
+  get winnerPlayerIds;
+  ListCopyWith<$R, Share, ShareCopyWith<$R, Share, Share>> get shares;
+  $R call({
+    int? potIndex,
+    int? amount,
+    List<String>? winnerPlayerIds,
+    List<Share>? shares,
+  });
+  PotResultCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
+}
+
+class _PotResultCopyWithImpl<$R, $Out>
+    extends ClassCopyWithBase<$R, PotResult, $Out>
+    implements PotResultCopyWith<$R, PotResult, $Out> {
+  _PotResultCopyWithImpl(super.value, super.then, super.then2);
+
+  @override
+  late final ClassMapperBase<PotResult> $mapper =
+      PotResultMapper.ensureInitialized();
+  @override
+  ListCopyWith<$R, String, ObjectCopyWith<$R, String, String>>
+  get winnerPlayerIds => ListCopyWith(
+    $value.winnerPlayerIds,
+    (v, t) => ObjectCopyWith(v, $identity, t),
+    (v) => call(winnerPlayerIds: v),
+  );
+  @override
+  ListCopyWith<$R, Share, ShareCopyWith<$R, Share, Share>> get shares =>
+      ListCopyWith(
+        $value.shares,
+        (v, t) => v.copyWith.$chain(t),
+        (v) => call(shares: v),
+      );
+  @override
+  $R call({
+    int? potIndex,
+    int? amount,
+    List<String>? winnerPlayerIds,
+    List<Share>? shares,
+  }) => $apply(
+    FieldCopyWithData({
+      if (potIndex != null) #potIndex: potIndex,
+      if (amount != null) #amount: amount,
+      if (winnerPlayerIds != null) #winnerPlayerIds: winnerPlayerIds,
+      if (shares != null) #shares: shares,
+    }),
+  );
+  @override
+  PotResult $make(CopyWithData data) => PotResult(
+    potIndex: data.get(#potIndex, or: $value.potIndex),
+    amount: data.get(#amount, or: $value.amount),
+    winnerPlayerIds: data.get(#winnerPlayerIds, or: $value.winnerPlayerIds),
+    shares: data.get(#shares, or: $value.shares),
+  );
+
+  @override
+  PotResultCopyWith<$R2, PotResult, $Out2> $chain<$R2, $Out2>(
+    Then<$Out2, $R2> t,
+  ) => _PotResultCopyWithImpl<$R2, $Out2>($value, $cast, t);
+}
+
+class HandResultMapper extends ClassMapperBase<HandResult> {
+  HandResultMapper._();
+
+  static HandResultMapper? _instance;
+  static HandResultMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = HandResultMapper._());
+      PotResultMapper.ensureInitialized();
+    }
+    return _instance!;
+  }
+
+  @override
+  final String id = 'HandResult';
+
+  static bool _$uncontested(HandResult v) => v.uncontested;
+  static const Field<HandResult, bool> _f$uncontested = Field(
+    'uncontested',
+    _$uncontested,
+  );
+  static List<PotResult> _$pots(HandResult v) => v.pots;
+  static const Field<HandResult, List<PotResult>> _f$pots = Field(
+    'pots',
+    _$pots,
+  );
+
+  @override
+  final MappableFields<HandResult> fields = const {
+    #uncontested: _f$uncontested,
+    #pots: _f$pots,
+  };
+  @override
+  final bool ignoreNull = true;
+
+  static HandResult _instantiate(DecodingData data) {
+    return HandResult(
+      uncontested: data.dec(_f$uncontested),
+      pots: data.dec(_f$pots),
+    );
+  }
+
+  @override
+  final Function instantiate = _instantiate;
+
+  static HandResult fromMap(Map<String, dynamic> map) {
+    return ensureInitialized().decodeMap<HandResult>(map);
+  }
+
+  static HandResult fromJson(String json) {
+    return ensureInitialized().decodeJson<HandResult>(json);
+  }
+}
+
+mixin HandResultMappable {
+  String toJson() {
+    return HandResultMapper.ensureInitialized().encodeJson<HandResult>(
+      this as HandResult,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return HandResultMapper.ensureInitialized().encodeMap<HandResult>(
+      this as HandResult,
+    );
+  }
+
+  HandResultCopyWith<HandResult, HandResult, HandResult> get copyWith =>
+      _HandResultCopyWithImpl<HandResult, HandResult>(
+        this as HandResult,
+        $identity,
+        $identity,
+      );
+  @override
+  String toString() {
+    return HandResultMapper.ensureInitialized().stringifyValue(
+      this as HandResult,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return HandResultMapper.ensureInitialized().equalsValue(
+      this as HandResult,
+      other,
+    );
+  }
+
+  @override
+  int get hashCode {
+    return HandResultMapper.ensureInitialized().hashValue(this as HandResult);
+  }
+}
+
+extension HandResultValueCopy<$R, $Out>
+    on ObjectCopyWith<$R, HandResult, $Out> {
+  HandResultCopyWith<$R, HandResult, $Out> get $asHandResult =>
+      $base.as((v, t, t2) => _HandResultCopyWithImpl<$R, $Out>(v, t, t2));
+}
+
+abstract class HandResultCopyWith<$R, $In extends HandResult, $Out>
+    implements ClassCopyWith<$R, $In, $Out> {
+  ListCopyWith<$R, PotResult, PotResultCopyWith<$R, PotResult, PotResult>>
+  get pots;
+  $R call({bool? uncontested, List<PotResult>? pots});
+  HandResultCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
+}
+
+class _HandResultCopyWithImpl<$R, $Out>
+    extends ClassCopyWithBase<$R, HandResult, $Out>
+    implements HandResultCopyWith<$R, HandResult, $Out> {
+  _HandResultCopyWithImpl(super.value, super.then, super.then2);
+
+  @override
+  late final ClassMapperBase<HandResult> $mapper =
+      HandResultMapper.ensureInitialized();
+  @override
+  ListCopyWith<$R, PotResult, PotResultCopyWith<$R, PotResult, PotResult>>
+  get pots => ListCopyWith(
+    $value.pots,
+    (v, t) => v.copyWith.$chain(t),
+    (v) => call(pots: v),
+  );
+  @override
+  $R call({bool? uncontested, List<PotResult>? pots}) => $apply(
+    FieldCopyWithData({
+      if (uncontested != null) #uncontested: uncontested,
+      if (pots != null) #pots: pots,
+    }),
+  );
+  @override
+  HandResult $make(CopyWithData data) => HandResult(
+    uncontested: data.get(#uncontested, or: $value.uncontested),
+    pots: data.get(#pots, or: $value.pots),
+  );
+
+  @override
+  HandResultCopyWith<$R2, HandResult, $Out2> $chain<$R2, $Out2>(
+    Then<$Out2, $R2> t,
+  ) => _HandResultCopyWithImpl<$R2, $Out2>($value, $cast, t);
+}
+
 class RoomViewMapper extends ClassMapperBase<RoomView> {
   RoomViewMapper._();
 
@@ -631,10 +1318,13 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
   static RoomViewMapper ensureInitialized() {
     if (_instance == null) {
       MapperContainer.globals.use(_instance = RoomViewMapper._());
+      MapperContainer.globals.useAll([PokerCardMapper()]);
       WirePhaseMapper.ensureInitialized();
       PotViewMapper.ensureInitialized();
       SeatViewMapper.ensureInitialized();
       PendingRebuyViewMapper.ensureInitialized();
+      RevealMapper.ensureInitialized();
+      HandResultMapper.ensureInitialized();
     }
     return _instance!;
   }
@@ -717,6 +1407,26 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
     opt: true,
     def: const <PendingRebuyView>[],
   );
+  static List<PokerCard> _$board(RoomView v) => v.board;
+  static const Field<RoomView, List<PokerCard>> _f$board = Field(
+    'board',
+    _$board,
+    opt: true,
+    def: const <PokerCard>[],
+  );
+  static List<Reveal> _$reveals(RoomView v) => v.reveals;
+  static const Field<RoomView, List<Reveal>> _f$reveals = Field(
+    'reveals',
+    _$reveals,
+    opt: true,
+    def: const <Reveal>[],
+  );
+  static HandResult? _$result(RoomView v) => v.result;
+  static const Field<RoomView, HandResult> _f$result = Field(
+    'result',
+    _$result,
+    opt: true,
+  );
 
   @override
   final MappableFields<RoomView> fields = const {
@@ -736,10 +1446,18 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
     #turnDeadlineMs: _f$turnDeadlineMs,
     #spectatorCount: _f$spectatorCount,
     #pendingRebuys: _f$pendingRebuys,
+    #board: _f$board,
+    #reveals: _f$reveals,
+    #result: _f$result,
   };
   @override
   final bool ignoreNull = true;
 
+  @override
+  final MappingHook hook = const OmitWhenDefault({
+    'board': <Object?>[],
+    'reveals': <Object?>[],
+  });
   static RoomView _instantiate(DecodingData data) {
     return RoomView(
       roomCode: data.dec(_f$roomCode),
@@ -758,6 +1476,9 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
       turnDeadlineMs: data.dec(_f$turnDeadlineMs),
       spectatorCount: data.dec(_f$spectatorCount),
       pendingRebuys: data.dec(_f$pendingRebuys),
+      board: data.dec(_f$board),
+      reveals: data.dec(_f$reveals),
+      result: data.dec(_f$result),
     );
   }
 
@@ -827,6 +1548,10 @@ abstract class RoomViewCopyWith<$R, $In extends RoomView, $Out>
     PendingRebuyViewCopyWith<$R, PendingRebuyView, PendingRebuyView>
   >
   get pendingRebuys;
+  ListCopyWith<$R, PokerCard, ObjectCopyWith<$R, PokerCard, PokerCard>>
+  get board;
+  ListCopyWith<$R, Reveal, RevealCopyWith<$R, Reveal, Reveal>> get reveals;
+  HandResultCopyWith<$R, HandResult, HandResult>? get result;
   $R call({
     String? roomCode,
     int? handNumber,
@@ -844,6 +1569,9 @@ abstract class RoomViewCopyWith<$R, $In extends RoomView, $Out>
     int? turnDeadlineMs,
     int? spectatorCount,
     List<PendingRebuyView>? pendingRebuys,
+    List<PokerCard>? board,
+    List<Reveal>? reveals,
+    HandResult? result,
   });
   RoomViewCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -882,6 +1610,23 @@ class _RoomViewCopyWithImpl<$R, $Out>
     (v) => call(pendingRebuys: v),
   );
   @override
+  ListCopyWith<$R, PokerCard, ObjectCopyWith<$R, PokerCard, PokerCard>>
+  get board => ListCopyWith(
+    $value.board,
+    (v, t) => ObjectCopyWith(v, $identity, t),
+    (v) => call(board: v),
+  );
+  @override
+  ListCopyWith<$R, Reveal, RevealCopyWith<$R, Reveal, Reveal>> get reveals =>
+      ListCopyWith(
+        $value.reveals,
+        (v, t) => v.copyWith.$chain(t),
+        (v) => call(reveals: v),
+      );
+  @override
+  HandResultCopyWith<$R, HandResult, HandResult>? get result =>
+      $value.result?.copyWith.$chain((v) => call(result: v));
+  @override
   $R call({
     String? roomCode,
     int? handNumber,
@@ -899,6 +1644,9 @@ class _RoomViewCopyWithImpl<$R, $Out>
     Object? turnDeadlineMs = $none,
     int? spectatorCount,
     List<PendingRebuyView>? pendingRebuys,
+    List<PokerCard>? board,
+    List<Reveal>? reveals,
+    Object? result = $none,
   }) => $apply(
     FieldCopyWithData({
       if (roomCode != null) #roomCode: roomCode,
@@ -917,6 +1665,9 @@ class _RoomViewCopyWithImpl<$R, $Out>
       if (turnDeadlineMs != $none) #turnDeadlineMs: turnDeadlineMs,
       if (spectatorCount != null) #spectatorCount: spectatorCount,
       if (pendingRebuys != null) #pendingRebuys: pendingRebuys,
+      if (board != null) #board: board,
+      if (reveals != null) #reveals: reveals,
+      if (result != $none) #result: result,
     }),
   );
   @override
@@ -937,6 +1688,9 @@ class _RoomViewCopyWithImpl<$R, $Out>
     turnDeadlineMs: data.get(#turnDeadlineMs, or: $value.turnDeadlineMs),
     spectatorCount: data.get(#spectatorCount, or: $value.spectatorCount),
     pendingRebuys: data.get(#pendingRebuys, or: $value.pendingRebuys),
+    board: data.get(#board, or: $value.board),
+    reveals: data.get(#reveals, or: $value.reveals),
+    result: data.get(#result, or: $value.result),
   );
 
   @override

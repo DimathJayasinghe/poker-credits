@@ -11,6 +11,7 @@ use serde::Serialize;
 
 use super::{NetState, ServerMode};
 use crate::PROTOCOL_VERSION;
+use crate::protocol::CardMode;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,6 +39,7 @@ struct RoomLookup {
     max_players: usize,
     is_full: bool,
     in_progress: bool,
+    card_mode: CardMode,
 }
 
 #[derive(Serialize)]
@@ -47,6 +49,7 @@ struct Lobby {
     host_name: String,
     player_count: usize,
     max_players: usize,
+    card_mode: CardMode,
 }
 
 #[derive(Serialize)]
@@ -81,6 +84,7 @@ pub(crate) async fn lobbies(
             host_name: info.host_name,
             player_count: info.player_count,
             max_players: info.max_players,
+            card_mode: info.card_mode,
         })
         .collect();
     Json(Lobbies { lobbies }).into_response()
@@ -131,6 +135,7 @@ pub(crate) async fn room(
             max_players: info.max_players,
             is_full: info.player_count >= info.max_players,
             in_progress: info.in_progress,
+            card_mode: info.card_mode,
         }
     } else {
         if counts_misses {
@@ -142,6 +147,7 @@ pub(crate) async fn room(
             max_players: 0,
             is_full: false,
             in_progress: false,
+            card_mode: CardMode::Physical,
         }
     };
     Json(lookup).into_response()

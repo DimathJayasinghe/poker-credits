@@ -287,6 +287,67 @@ async fn a_failed_join_can_be_retried_on_the_same_socket() {
     server.stop().await;
 }
 
+async fn create_virtual(addr: SocketAddr) -> Host {
+    let mut ws = WsClient::connect(addr).await;
+    let mut config = config_json();
+    config["cardMode"] = json!("VIRTUAL");
+    ws.send(
+        json!({"v": 1, "reqId": "c", "type": "CREATE_ROOM", "hostName": "Host", "config": config}),
+    )
+    .await;
+    let created = ws.expect("ROOM_CREATED").await;
+    ws.expect("SNAPSHOT").await;
+    Host {
+        ws,
+        code: created["roomCode"].as_str().unwrap().to_owned(),
+        proof: created["hostToken"].as_str().unwrap().to_owned(),
+        token: created["sessionToken"].as_str().unwrap().to_owned(),
+    }
+}
+
+#[tokio::test]
+async fn a_client_without_the_virtual_cards_feature_is_told_to_update() {
+    let server = boot().await;
+    let addr = server.local_addr();
+    let host = create_virtual(addr).await;
+
+    let mut old = WsClient::connect(addr).await;
+    old.send(json!({"v": 1, "type": "JOIN_ROOM", "roomCode": host.code, "name": "Bob", "spectator": false})).await;
+    assert_eq!(error_code(&old.recv().await.unwrap()), "UPDATE_REQUIRED");
+
+    let mut spectator = WsClient::connect(addr).await;
+    spectator
+        .send(json!({"v": 1, "type": "JOIN_ROOM", "roomCode": host.code, "name": "Eve", "spectator": true}))
+        .await;
+    assert_eq!(
+        error_code(&spectator.recv().await.unwrap()),
+        "UPDATE_REQUIRED"
+    );
+
+    let mut resume = WsClient::connect(addr).await;
+    resume
+        .send(json!({"v": 1, "type": "RESUME", "roomCode": host.code, "sessionToken": host.token, "hostToken": host.proof}))
+        .await;
+    assert_eq!(error_code(&resume.recv().await.unwrap()), "UPDATE_REQUIRED");
+
+    let mut new = WsClient::connect(addr).await;
+    new.send(json!({"v": 1, "type": "JOIN_ROOM", "roomCode": host.code, "name": "Bob", "spectator": false, "features": ["VIRTUAL_CARDS"]})).await;
+    new.expect("JOINED").await;
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn physical_rooms_accept_clients_with_or_without_the_feature() {
+    let server = boot().await;
+    let addr = server.local_addr();
+    let host = create(addr).await;
+    let mut with = WsClient::connect(addr).await;
+    with.send(json!({"v": 1, "type": "JOIN_ROOM", "roomCode": host.code, "name": "Ann", "spectator": false, "features": ["VIRTUAL_CARDS"]})).await;
+    with.expect("JOINED").await;
+    let _ = join_as(addr, &host.code, "Bob", None).await;
+    server.stop().await;
+}
+
 // -------------------------------------------------------------------------------------------
 // Limits
 // -------------------------------------------------------------------------------------------

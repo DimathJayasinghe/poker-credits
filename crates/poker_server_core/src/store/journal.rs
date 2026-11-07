@@ -1,12 +1,12 @@
 //! Append-only journal: one JSON object per line, `fsync`ed before the change is broadcast.
 
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::Write as _;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::StoreError;
+use super::{StoreError, private};
 use crate::room::state::Op;
 
 const FILE: &str = "journal.jsonl";
@@ -64,11 +64,12 @@ impl Journal {
     /// # Errors
     /// [`StoreError::Io`].
     pub fn open(dir: &Path, last_seq: u64) -> Result<Self, StoreError> {
-        fs::create_dir_all(dir)?;
-        let file = OpenOptions::new()
+        private::create_dir(dir)?;
+        let file = private::options()
             .create(true)
             .append(true)
             .open(dir.join(FILE))?;
+        private::restrict(&file)?;
         Ok(Journal {
             file,
             next_seq: last_seq.saturating_add(1),

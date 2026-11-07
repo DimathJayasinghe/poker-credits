@@ -1,0 +1,146 @@
+{
+  "v": 1,
+  "type": "SNAPSHOT",
+  "stateVersion": 42,
+  "serverTime": 1730000000000,
+  "nextActionSeq": 4,
+  "view": {
+    "roomCode": "KQ7M",
+    "handNumber": 7,
+    "phase": "NEXT_HAND_PREP",
+    "dealerSeat": 2,
+    "smallBlindSeat": 3,
+    "bigBlindSeat": 4,
+    "currentHighBet": 60,
+    "minRaiseTo": 120,
+    "totalPot": 0,
+    "pots": [],
+    "seats": [
+      {
+        "seatIndex": 0,
+        "playerId": "p_1",
+        "name": "Alice",
+        "chips": 1150,
+        "streetBet": 0,
+        "hasFolded": false,
+        "isAllIn": false,
+        "isSittingOut": false,
+        "isConnected": true,
+        "hasCards": true
+      },
+      {
+        "seatIndex": 1,
+        "playerId": "p_2",
+        "name": "Bob",
+        "chips": 800,
+        "streetBet": 0,
+        "hasFolded": false,
+        "isAllIn": false,
+        "isSittingOut": false,
+        "isConnected": true,
+        "hasCards": true
+      },
+      {
+        "seatIndex": 2,
+        "playerId": "p_3",
+        "name": "Cy",
+        "chips": 1000,
+        "streetBet": 0,
+        "hasFolded": true,
+        "isAllIn": false,
+        "isSittingOut": false,
+        "isConnected": true,
+        "hasCards": true
+      }
+    ],
+    "paused": false,
+    "spectatorCount": 2,
+    "pendingRebuys": [
+      {
+        "playerId": "p_3",
+        "amount": 1000,
+        "approved": false
+      }
+    ],
+    "board": [
+      "Ks",
+      "7d",
+      "2c",
+      "Jh",
+      "9c"
+    ],
+    "reveals": [
+      {
+        "playerId": "p_1",
+        "name": "Alice",
+        "cards": [
+          "As",
+          "Kd"
+        ],
+        "category": "PAIR",
+        "bestFive": [
+          "Ks",
+          "Kd",
+          "As",
+          "Jh",
+          "9c"
+        ]
+      },
+      {
+        "playerId": "p_2",
+        "name": "Bob",
+        "cards": [
+          "Qh",
+          "Qc"
+        ],
+        "category": "PAIR",
+        "bestFive": [
+          "Qh",
+          "Qc",
+          "Ks",
+          "Jh",
+          "9c"
+        ]
+      }
+    ],
+    "result": {
+      "uncontested": false,
+      "pots": [
+        {
+          "potIndex": 0,
+          "amount": 150,
+          "winnerPlayerIds": [
+            "p_1"
+          ],
+          "shares": [
+            {
+              "playerId": "p_1",
+              "name": "Alice",
+              "amount": 150
+            }
+          ]
+        },
+        {
+          "potIndex": 1,
+          "amount": 60,
+          "winnerPlayerIds": [
+            "p_1",
+            "p_2"
+          ],
+          "shares": [
+            {
+              "playerId": "p_1",
+              "name": "Alice",
+              "amount": 30
+            },
+            {
+              "playerId": "p_2",
+              "name": "Bob",
+              "amount": 30
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

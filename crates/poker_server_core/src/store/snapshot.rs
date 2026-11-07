@@ -6,7 +6,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::StoreError;
+use super::{StoreError, private};
 use crate::room::state::RoomState;
 
 const FILE: &str = "snapshot.json";
@@ -29,7 +29,7 @@ pub struct SnapshotFile {
 /// # Errors
 /// [`StoreError::Io`].
 pub fn write(dir: &Path, state: &RoomState, journal_seq: u64) -> Result<(), StoreError> {
-    fs::create_dir_all(dir)?;
+    private::create_dir(dir)?;
     let body = serde_json::to_vec(&SnapshotFile {
         v: 1,
         journal_seq,
@@ -40,7 +40,12 @@ pub fn write(dir: &Path, state: &RoomState, journal_seq: u64) -> Result<(), Stor
         reason: e.to_string(),
     })?;
     let temp = dir.join(TEMP);
-    let mut file = File::create(&temp)?;
+    let mut file = private::options()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&temp)?;
+    private::restrict(&file)?;
     file.write_all(&body)?;
     file.sync_all()?;
     drop(file);

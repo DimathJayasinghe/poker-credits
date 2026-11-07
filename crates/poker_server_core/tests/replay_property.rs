@@ -9,8 +9,9 @@
 )]
 
 use poker_engine::PlayerAction;
+use poker_server_core::cards::{FixedEntropy, shuffled_deck};
 use poker_server_core::config::Timings;
-use poker_server_core::protocol::{RoomConfig, WireAllocation};
+use poker_server_core::protocol::{CardMode, RoomConfig, WireAllocation};
 use poker_server_core::room::state::{HostCommand, Op, RoomState};
 use poker_server_core::store::journal::Journal;
 use poker_server_core::store::{self, snapshot};
@@ -24,8 +25,9 @@ fn cases(default: u32) -> u32 {
         .unwrap_or(default)
 }
 
-fn config() -> RoomConfig {
+fn config(mode: CardMode) -> RoomConfig {
     RoomConfig {
+        card_mode: mode,
         starting_chips: 500,
         small_blind: 5,
         big_blind: 10,
@@ -57,13 +59,14 @@ fn join_op(state: &RoomState, names: &mut u32, at_ms: u64) -> Option<Op> {
 }
 
 /// A betting action for whoever is on turn.
-fn act_op(state: &RoomState, arg: u8, at_ms: u64) -> Option<Op> {
+fn act_op(state: &RoomState, arg: u8, at_ms: u64, shove: bool) -> Option<Op> {
     let (seat, legal) = state.game.legal_actions()?;
     let player = state
         .players
         .values()
         .find(|p| p.seat == Some(seat.get()))?;
     let action = match arg % 4 {
+        _ if shove && !arg.is_multiple_of(3) => PlayerAction::AllIn,
         0 => PlayerAction::Fold,
         1 if legal.can_check => PlayerAction::Check,
         1 | 2 => PlayerAction::Call,
@@ -145,11 +148,25 @@ fn member_op(state: &RoomState, arg: u8, at_ms: u64) -> Option<Op> {
 
 /// Turns one random byte pair into an operation that makes sense for the current state (or
 /// sometimes a deliberately wrong one, which must be refused without a trace).
-fn pick(state: &RoomState, code: u8, arg: u8, at_ms: u64, names: &mut u32) -> Option<Op> {
+fn pick(
+    state: &RoomState,
+    code: u8,
+    arg: u8,
+    at_ms: u64,
+    names: &mut u32,
+    shove: bool,
+) -> Option<Op> {
     match code % 14 {
         0 => join_op(state, names, at_ms),
-        1 | 2 => Some(host_op(HostCommand::StartHand, at_ms)),
-        3..=6 => act_op(state, arg, at_ms),
+        1 | 2 => Some(host_op(
+            HostCommand::StartHand {
+                deck: state.is_virtual().then(|| {
+                    shuffled_deck(&mut FixedEntropy::new(vec![arg, code, 7, 91])).unwrap()
+                }),
+            },
+            at_ms,
+        )),
+        3..=6 => act_op(state, arg, at_ms, shove),
         7 => Some(host_op(HostCommand::Undo, at_ms)),
         8 => Some(host_op(HostCommand::BeginShowdown, at_ms)),
         9 => Some(showdown_op(state, at_ms)),
@@ -160,6 +177,74 @@ fn pick(state: &RoomState, code: u8, arg: u8, at_ms: u64, names: &mut u32) -> Op
     }
 }
 
+/// Runs random operations against a live room, journaling like the actor, and checks after every
+/// step that restoring from disk gives back the live state.
+fn replay_equals_live(
+    mode: CardMode,
+    shove: bool,
+    steps: Vec<(u8, u8, u64, u8)>,
+) -> Result<(), TestCaseError> {
+    let timings = Timings::default();
+    let dir = tempfile::tempdir().unwrap();
+    let mut live = RoomState::new(
+        "ABCD".into(),
+        config(mode),
+        "Host",
+        "h".into(),
+        "hs".into(),
+        0,
+    )
+    .unwrap();
+    snapshot::write(dir.path(), &live, 0).unwrap();
+    let mut journal = Journal::open(dir.path(), 0).unwrap();
+    let (mut now, mut names) = (1_000_u64, 0_u32);
+
+    for (code, arg, advance, snapshot_roll) in steps {
+        now += advance;
+        let mut ops: Vec<Op> = pick(&live, code, arg, now, &mut names, shove)
+            .into_iter()
+            .collect();
+        let mut index = 0;
+        while index < ops.len() {
+            let op = ops[index].clone();
+            index += 1;
+            // Exactly what the room actor does: apply to a clone, journal if it changed.
+            let mut next = live.clone();
+            if let Ok(outcome) = next.apply(op.clone(), &timings) {
+                if outcome.changed {
+                    journal.append(&op).unwrap();
+                }
+                live = next;
+            }
+            // The server pays a finished virtual hand at once; now and then it is "killed" first
+            // and the payout is left for later, which a restore must tolerate.
+            if snapshot_roll % 7 != 0
+                && let Some(auto) = live.auto_showdown_op(now).unwrap()
+            {
+                ops.push(auto);
+            }
+        }
+        if snapshot_roll % 11 == 0 {
+            snapshot::write(dir.path(), &live, journal.last_seq()).unwrap();
+            if snapshot_roll % 2 == 0 {
+                journal.truncate().unwrap();
+            }
+        }
+        // At every step, a crash right now would restore exactly this state.
+        let restored = store::restore(dir.path(), &timings).unwrap();
+        prop_assert_eq!(&restored.state, &live);
+        prop_assert_eq!(restored.failed_replays, 0);
+    }
+    // Chips never appear or vanish: seats plus the ledger of removed players.
+    let ledger: u64 = live.ledger.values().sum();
+    let on_table = live.game.table.total_chips();
+    prop_assert!(
+        on_table + ledger <= 500 * 7 + 100 * 200,
+        "{on_table} + {ledger}"
+    );
+    Ok(())
+}
+
 proptest! {
     #![proptest_config(ProptestConfig { cases: cases(64), ..ProptestConfig::default() })]
 
@@ -167,39 +252,13 @@ proptest! {
     fn replaying_snapshot_and_journal_equals_the_live_state(
         steps in proptest::collection::vec((any::<u8>(), any::<u8>(), 1_u64..40_000, any::<u8>()), 1..120)
     ) {
-        let timings = Timings::default();
-        let dir = tempfile::tempdir().unwrap();
-        let mut live = RoomState::new("ABCD".into(), config(), "Host", "h".into(), "hs".into(), 0).unwrap();
-        snapshot::write(dir.path(), &live, 0).unwrap();
-        let mut journal = Journal::open(dir.path(), 0).unwrap();
-        let (mut now, mut names) = (1_000_u64, 0_u32);
+        replay_equals_live(CardMode::Physical, false, steps)?;
+    }
 
-        for (code, arg, advance, snapshot_roll) in steps {
-            now += advance;
-            if let Some(op) = pick(&live, code, arg, now, &mut names) {
-                // Exactly what the room actor does: apply to a clone, journal if it changed.
-                let mut next = live.clone();
-                if let Ok(outcome) = next.apply(op.clone(), &timings) {
-                    if outcome.changed {
-                        journal.append(&op).unwrap();
-                    }
-                    live = next;
-                }
-            }
-            if snapshot_roll % 11 == 0 {
-                snapshot::write(dir.path(), &live, journal.last_seq()).unwrap();
-                if snapshot_roll % 2 == 0 {
-                    journal.truncate().unwrap();
-                }
-            }
-            // At every step, a crash right now would restore exactly this state.
-            let restored = store::restore(dir.path(), &timings).unwrap();
-            prop_assert_eq!(&restored.state, &live);
-            prop_assert_eq!(restored.failed_replays, 0);
-        }
-        // Chips never appear or vanish: seats plus the ledger of removed players.
-        let ledger: u64 = live.ledger.values().sum();
-        let on_table = live.game.table.total_chips();
-        prop_assert!(on_table + ledger <= 500 * 7 + 100 * 200, "{on_table} + {ledger}");
+    #[test]
+    fn replay_equals_live_for_virtual_rooms_with_forced_all_in_runouts(
+        steps in proptest::collection::vec((any::<u8>(), any::<u8>(), 1_u64..40_000, any::<u8>()), 1..120)
+    ) {
+        replay_equals_live(CardMode::Virtual, true, steps)?;
     }
 }

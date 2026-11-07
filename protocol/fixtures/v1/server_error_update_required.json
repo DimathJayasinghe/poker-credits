@@ -1,0 +1,7 @@
+{
+  "v": 1,
+  "reqId": "c-3",
+  "type": "ERROR",
+  "code": "UPDATE_REQUIRED",
+  "message": "this room uses virtual cards; update the app"
+}

@@ -276,7 +276,11 @@ impl Connection {
                 name,
                 seat_index,
                 spectator,
+                features,
             } => {
+                if let Some(error) = missing_feature(&net, &room_code, &features).await {
+                    return Entry::Reject(error);
+                }
                 net.registry
                     .join_room(&room_code, conn, tx, req_id, name, spectator, seat_index)
                     .await
@@ -286,7 +290,11 @@ impl Connection {
                 session_token,
                 host_token,
                 last_state_version: _,
+                features,
             } => {
+                if let Some(error) = missing_feature(&net, &room_code, &features).await {
+                    return Entry::Reject(error);
+                }
                 net.registry
                     .resume_room(&room_code, conn, tx, req_id, session_token, host_token)
                     .await
@@ -382,4 +390,27 @@ enum Entry {
     Retry(RoomError),
     /// Refused; the socket closes.
     Reject(RoomError),
+}
+
+/// A virtual-card room needs a client that says it can play them; an old app is told to update
+/// instead of being seated at a table it cannot draw.
+async fn missing_feature(
+    net: &NetState,
+    room_code: &str,
+    features: &[String],
+) -> Option<RoomError> {
+    let info = net
+        .registry
+        .room_info(&room_code.trim().to_uppercase())
+        .await?;
+    let needs_cards = info.card_mode == crate::protocol::CardMode::Virtual;
+    let has_cards = features
+        .iter()
+        .any(|feature| feature == crate::protocol::FEATURE_VIRTUAL_CARDS);
+    (needs_cards && !has_cards).then(|| {
+        RoomError::new(
+            ErrorCode::UpdateRequired,
+            "this room uses virtual cards; update the app to join",
+        )
+    })
 }

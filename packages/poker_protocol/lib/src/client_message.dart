@@ -1,5 +1,6 @@
 import 'package:dart_mappable/dart_mappable.dart';
 
+import 'omit.dart';
 import 'wire_case.dart';
 
 import 'player_action.dart';
@@ -32,10 +33,13 @@ class CreateRoom extends ClientMessage with CreateRoomMappable {
   final RoomConfig config;
 }
 
+/// Feature name a client sends in `features` when it can play virtual-card rooms.
+const String featureVirtualCards = 'VIRTUAL_CARDS';
+
 /// Take a seat or watch.
-@MappableClass(discriminatorValue: 'JOIN_ROOM')
+@MappableClass(discriminatorValue: 'JOIN_ROOM', hook: OmitWhenDefault({'features': <Object?>[]}))
 class JoinRoom extends ClientMessage with JoinRoomMappable {
-  const JoinRoom({required this.roomCode, required this.name, this.seatIndex, this.spectator = false});
+  const JoinRoom({required this.roomCode, required this.name, this.seatIndex, this.spectator = false, this.features = const <String>[]});
 
   final String roomCode;
   final String name;
@@ -45,12 +49,22 @@ class JoinRoom extends ClientMessage with JoinRoomMappable {
 
   /// Always written, also when false.
   final bool spectator;
+
+  /// What this app can do (`VIRTUAL_CARDS`). A server refuses to seat an app that lacks a
+  /// feature its room needs, with `UPDATE_REQUIRED`.
+  final List<String> features;
 }
 
 /// Re-attach after a lost connection.
-@MappableClass(discriminatorValue: 'RESUME')
+@MappableClass(discriminatorValue: 'RESUME', hook: OmitWhenDefault({'features': <Object?>[]}))
 class Resume extends ClientMessage with ResumeMappable {
-  const Resume({required this.roomCode, required this.sessionToken, this.lastStateVersion, this.hostToken});
+  const Resume({
+    required this.roomCode,
+    required this.sessionToken,
+    this.lastStateVersion,
+    this.hostToken,
+    this.features = const <String>[],
+  });
 
   final String roomCode;
   final String sessionToken;
@@ -58,6 +72,9 @@ class Resume extends ClientMessage with ResumeMappable {
 
   /// Host proof, only for the host.
   final String? hostToken;
+
+  /// See [JoinRoom.features]; the host's own reconnect sends it too.
+  final List<String> features;
 }
 
 /// Host: deal the next hand.

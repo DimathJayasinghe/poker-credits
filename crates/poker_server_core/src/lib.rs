@@ -2,6 +2,7 @@
 //!
 //! Implementation starts in Phase 2; see `docs/AGENT_CODING_GUIDE.md`.
 
+pub mod cards;
 pub mod config;
 pub mod event;
 pub mod net;

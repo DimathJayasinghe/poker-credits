@@ -58,7 +58,7 @@ fn client_fixtures_round_trip() {
         );
         count += 1;
     }
-    assert_eq!(count, 24);
+    assert_eq!(count, 27);
 }
 
 #[test]
@@ -83,7 +83,7 @@ fn server_fixtures_round_trip() {
         );
         count += 1;
     }
-    assert_eq!(count, 19);
+    assert_eq!(count, 22);
 }
 
 #[test]
@@ -150,6 +150,7 @@ fn every_server_message_type_has_a_fixture() {
         "PLAYER_AWAY",
         "PRESENCE_CHECK",
         "PRESENCE_RESOLVED",
+        "HOLE_CARDS",
     ] {
         assert!(
             types.iter().any(|t| t == expected),
@@ -238,4 +239,41 @@ fn engine_errors_map_to_codes_and_carry_numbers() {
         ErrorCode::InvalidCheck
     );
     assert_eq!(PROTOCOL_VERSION, 1);
+}
+
+#[test]
+fn physical_messages_without_card_fields_still_parse_and_stay_unchanged() {
+    let old = r#"{"v":1,"type":"JOIN_ROOM","roomCode":"KQ7M","name":"Al","spectator":false}"#;
+    let parsed = parse_client(old).unwrap();
+    let ClientMessage::JoinRoom { features, .. } = parsed.body else {
+        panic!("not a join");
+    };
+    assert!(features.is_empty());
+    let config = fixtures()
+        .into_iter()
+        .find(|(n, _)| n == "client_create_room.json")
+        .unwrap()
+        .1;
+    assert!(config["config"].get("cardMode").is_none());
+}
+
+#[test]
+fn card_mode_defaults_to_physical_and_virtual_is_explicit() {
+    use poker_server_core::protocol::{CardMode, RoomConfig};
+    let json = fixtures()
+        .into_iter()
+        .find(|(n, _)| n == "client_create_room.json")
+        .unwrap()
+        .1["config"]
+        .clone();
+    let physical: RoomConfig = serde_json::from_value(json).unwrap();
+    assert_eq!(physical.card_mode, CardMode::Physical);
+    let virtual_json = fixtures()
+        .into_iter()
+        .find(|(n, _)| n == "client_create_room_virtual.json")
+        .unwrap()
+        .1["config"]
+        .clone();
+    let virtual_config: RoomConfig = serde_json::from_value(virtual_json).unwrap();
+    assert_eq!(virtual_config.card_mode, CardMode::Virtual);
 }

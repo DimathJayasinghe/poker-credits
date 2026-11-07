@@ -54,6 +54,7 @@ const Map<String, Type> serverTypes = {
   'STATE_UPDATE': StateUpdate,
   'TURN_PROMPT': TurnPrompt,
   'ACTION_PERFORMED': ActionPerformed,
+  'HOLE_CARDS': HoleCards,
   'ACK': Ack,
   'ERROR': ErrorMessage,
   'PLAYER_CONNECTION': PlayerConnection,
@@ -143,6 +144,52 @@ void main() {
       expect(map.containsKey('seatIndex'), isFalse);
       expect(map['spectator'], isFalse);
       expect(asMap(encodeClient(const StartHand())), {'v': 1, 'type': 'START_HAND'});
+    });
+
+    test('an unknown card string is a ProtocolFormatException, never a crash', () {
+      for (final bad in ['Zz', 'A', 'Asx', '1s', 'as', '', 'Ax']) {
+        final text = '{"v":1,"type":"HOLE_CARDS","handNumber":1,"cards":["$bad","Kd"]}';
+        expect(() => decodeServer(text), throwsA(isA<ProtocolFormatException>()), reason: bad);
+      }
+    });
+
+    test('a room config without a card mode is a physical room and is written without one', () {
+      final envelope = decodeClient(
+        '{"v":1,"type":"CREATE_ROOM","hostName":"H","config":{"startingChips":1000,"smallBlind":5,"bigBlind":10,"ante":0,'
+        '"isTournament":false,"blindLevelMinutes":10,"turnTimeLimitSeconds":30}}',
+      );
+      final config = (envelope.body as CreateRoom).config;
+      expect(config.cardMode, CardMode.physical);
+      expect(asMap(encodeClient(envelope.body))['config'], isNot(contains('cardMode')));
+    });
+
+    test('an unknown card mode is a physical room (the safe, cardless one)', () {
+      final envelope = decodeClient(
+        '{"v":1,"type":"CREATE_ROOM","hostName":"H","config":{"cardMode":"HOLOGRAM","startingChips":1000,"smallBlind":5,"bigBlind":10,"ante":0,'
+        '"isTournament":false,"blindLevelMinutes":10,"turnTimeLimitSeconds":30}}',
+      );
+      expect((envelope.body as CreateRoom).config.cardMode, CardMode.physical);
+    });
+
+    test('a view from an older server has no cards, no reveals and no result', () {
+      final text = File('${fixtureDir.path}${Platform.pathSeparator}server_snapshot.json').readAsStringSync();
+      final view = (decodeServer(text).body as Snapshot).view;
+      expect(view.board, isEmpty);
+      expect(view.reveals, isEmpty);
+      expect(view.result, isNull);
+      expect(view.seats.every((seat) => !seat.hasCards), isTrue);
+    });
+
+    test('the virtual snapshot fixture carries board, reveals and a split side pot', () {
+      final text = File('${fixtureDir.path}${Platform.pathSeparator}server_snapshot_virtual.json').readAsStringSync();
+      final view = (decodeServer(text).body as Snapshot).view;
+      expect(view.board, hasLength(5));
+      expect(view.reveals, isNotEmpty);
+      final result = view.result!;
+      expect(result.uncontested, isFalse);
+      expect(result.pots.any((pot) => pot.winnerPlayerIds.length > 1), isTrue, reason: 'a split pot');
+      expect(result.pots.first.potIndex, 0, reason: 'main pot first');
+      expect(view.reveals.first.name, isNotEmpty);
     });
 
     test('garbage is a ProtocolFormatException', () {

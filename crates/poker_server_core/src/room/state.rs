@@ -7,7 +7,10 @@
 use std::collections::BTreeMap;
 
 use poker_engine::blinds::{Blinds, BlindsMode, CashGame, Tournament};
-use poker_engine::{Chips, Event, GameState, MAX_CHIPS, PlayerAction, PlayerId, PokerError};
+use poker_engine::deck::Deck;
+use poker_engine::{
+    Allocation, Chips, Event, GameState, MAX_CHIPS, PlayerAction, PlayerId, PokerError,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -122,8 +125,13 @@ pub struct Presence {
     rename_all_fields = "camelCase"
 )]
 pub enum HostCommand {
-    /// Deal the next hand.
-    StartHand,
+    /// Deal the next hand. In a virtual room the actor attaches the shuffled deck before the
+    /// command is journaled; a deck from the wire is never read (the message has no such field).
+    StartHand {
+        /// The shuffled deck, virtual rooms only.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        deck: Option<Deck>,
+    },
     /// End the all-in run-out.
     BeginShowdown,
     /// Choose winners.
@@ -288,6 +296,14 @@ pub enum Op {
         /// Server time.
         at_ms: u64,
     },
+    /// The server ends a virtual hand: ranks the hands, pays every pot. Only the room actor
+    /// creates it, so no client message can stand for it.
+    AutoShowdown {
+        /// Winners of each pot, as computed from the table.
+        allocations: Vec<Allocation>,
+        /// Server time.
+        at_ms: u64,
+    },
 }
 
 /// A message for one person or for everybody in the room.
@@ -350,6 +366,10 @@ pub struct RoomState {
     pub last_activity_ms: u64,
     /// The host closed the room.
     pub ended: bool,
+    /// Names of the people dealt into the current (or just finished) virtual hand, so a result
+    /// still reads right after somebody left.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub hand_names: BTreeMap<String, String>,
 }
 
 /// First-level blinds scaled up for tournaments: numerator over 2 (1x, 1.5x, 2x, 3x, ...).
@@ -446,6 +466,7 @@ impl RoomState {
             presence: None,
             last_activity_ms: at_ms,
             ended: false,
+            hand_names: BTreeMap::new(),
         };
         state.seat_player(&host_id, &name, Role::Host, Some(0), host_session_hash)?;
         Ok(state)
@@ -552,7 +573,8 @@ impl Op {
             | Op::PresenceVote { at_ms, .. }
             | Op::PresenceAck { at_ms, .. }
             | Op::Recover { at_ms }
-            | Op::Tick { at_ms } => *at_ms,
+            | Op::Tick { at_ms }
+            | Op::AutoShowdown { at_ms, .. } => *at_ms,
         }
     }
 }

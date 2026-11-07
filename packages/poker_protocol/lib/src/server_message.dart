@@ -2,6 +2,7 @@ import 'package:dart_mappable/dart_mappable.dart';
 
 import 'wire_case.dart';
 
+import 'card.dart';
 import 'error_code.dart';
 import 'player_action.dart';
 import 'room_view.dart';
@@ -81,6 +82,20 @@ class TurnPrompt extends ServerMessage with TurnPromptMappable {
   final int? turnDeadlineMs;
   final int nextActionSeq;
   final LegalActions legal;
+}
+
+/// Virtual cards: your two cards. Sent only to you, never to anybody else.
+///
+/// Sent when a hand is dealt and again after every snapshot. A [handNumber] older than the view's
+/// belongs to a hand that is over.
+@MappableClass(discriminatorValue: 'HOLE_CARDS', includeCustomMappers: [PokerCardMapper()])
+class HoleCards extends ServerMessage with HoleCardsMappable {
+  const HoleCards({required this.handNumber, required this.cards});
+
+  final int handNumber;
+
+  /// Exactly two cards.
+  final List<PokerCard> cards;
 }
 
 /// Somebody acted (also timeouts, [auto] = true).

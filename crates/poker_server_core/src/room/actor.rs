@@ -16,6 +16,7 @@ use tokio::time::Instant;
 use super::absence::Absence;
 use super::handle::{ConnId, ConnSender, JoinOk, Outbound, RoomHandle, RoomInfo, RoomMsg};
 use super::state::{Broadcast, HostCommand, Op, Outcome, RoomError, RoomState};
+use crate::cards::{Entropy, OsEntropy, shuffled_deck};
 use crate::config::{Limits, Timings};
 use crate::protocol::{ClientMessage, ErrorCode, Role, RoomConfig, ServerMessage};
 use crate::store::journal::Journal;
@@ -57,6 +58,25 @@ impl Clock {
 
     fn instant_at(&self, at_ms: u64) -> Instant {
         self.start + Duration::from_millis(at_ms.saturating_sub(self.base_ms))
+    }
+}
+
+/// What a room needs from the outside world: time and randomness. Both can be replaced in tests.
+pub struct Deps {
+    /// Wall clock (follows `tokio::time`).
+    pub clock: Clock,
+    /// Where the shuffle comes from.
+    pub entropy: Box<dyn Entropy>,
+}
+
+impl Deps {
+    /// Real randomness from the operating system.
+    #[must_use]
+    pub fn new(clock: Clock) -> Self {
+        Deps {
+            clock,
+            entropy: Box::new(OsEntropy),
+        }
     }
 }
 
@@ -130,6 +150,7 @@ pub struct RoomActor {
     /// Earliest time an internal op may run again; stops a spin if one keeps failing.
     internal_floor_ms: u64,
     absence: Absence,
+    entropy: Box<dyn Entropy>,
 }
 
 fn internal(text: &str) -> RoomError {
@@ -146,6 +167,20 @@ pub fn create(
     timings: &Timings,
     clock: Clock,
 ) -> Result<Created, RoomError> {
+    create_with(new, limits, timings, Deps::new(clock))
+}
+
+/// [`create`] with explicit dependencies (a scripted shuffle in tests).
+///
+/// # Errors
+/// As [`create`].
+pub fn create_with(
+    new: NewRoom,
+    limits: &Limits,
+    timings: &Timings,
+    deps: Deps,
+) -> Result<Created, RoomError> {
+    let clock = deps.clock;
     let host_token = token::generate().map_err(|_| internal("no randomness"))?;
     let session_token = token::generate().map_err(|_| internal("no randomness"))?;
     let state = RoomState::new(
@@ -166,7 +201,7 @@ pub fn create(
         None => None,
     };
     let player_id = state.host_id.clone();
-    let (handle, task) = spawn(state, store, limits, timings, clock);
+    let (handle, task) = spawn(state, store, limits, timings, deps);
     Ok(Created {
         handle,
         task,
@@ -186,6 +221,20 @@ pub fn restore(
     timings: &Timings,
     clock: Clock,
 ) -> Result<(RoomHandle, JoinHandle<ExitReason>), store::StoreError> {
+    restore_with(dir, limits, timings, Deps::new(clock))
+}
+
+/// [`restore`] with explicit dependencies.
+///
+/// # Errors
+/// As [`restore`].
+pub fn restore_with(
+    dir: PathBuf,
+    limits: &Limits,
+    timings: &Timings,
+    deps: Deps,
+) -> Result<(RoomHandle, JoinHandle<ExitReason>), store::StoreError> {
+    let clock = deps.clock;
     let restored = store::restore(&dir, timings)?;
     let mut journal = Journal::open(&dir, restored.last_seq)?;
     let mut state = restored.state;
@@ -209,7 +258,7 @@ pub fn restore(
         Some(Store { dir, journal }),
         limits,
         timings,
-        clock,
+        deps,
     ))
 }
 
@@ -218,12 +267,13 @@ fn spawn(
     store: Option<Store>,
     limits: &Limits,
     timings: &Timings,
-    clock: Clock,
+    deps: Deps,
 ) -> (RoomHandle, JoinHandle<ExitReason>) {
+    let Deps { clock, entropy } = deps;
     let (tx, inbox) = mpsc::channel(limits.room_inbox);
     let handle = RoomHandle::new(state.code.clone(), tx);
     let absence = Absence::new(&state, clock.now_ms());
-    let actor = RoomActor {
+    let mut actor = RoomActor {
         state,
         limits: limits.clone(),
         timings: timings.clone(),
@@ -233,7 +283,10 @@ fn spawn(
         inbox,
         internal_floor_ms: 0,
         absence,
+        entropy,
     };
+    // A room that went down between the last bet and the payout finishes that hand now.
+    actor.settle_showdown();
     (handle, tokio::spawn(actor.run()))
 }
 
@@ -268,6 +321,7 @@ impl RoomActor {
         let due = [
             self.state.next_wakeup_ms(&self.timings),
             self.absence.next_due_ms(&self.state, &self.timings),
+            self.state.needs_auto_showdown().then_some(0),
         ]
         .into_iter()
         .flatten()
@@ -284,6 +338,12 @@ impl RoomActor {
             return Some(ExitReason::Expired);
         }
         if now < self.internal_floor_ms {
+            return None;
+        }
+        if self.state.needs_auto_showdown() {
+            // Normally done in the same breath as the last bet; this only runs if that failed.
+            self.internal_floor_ms = now.saturating_add(2_000);
+            self.settle_showdown();
             return None;
         }
         let turn_due = !self.state.game.table.paused
@@ -325,8 +385,29 @@ impl RoomActor {
     // Changing state
     // -----------------------------------------------------------------------------------------
 
-    /// Apply, journal, swap in, tell everybody. See the module docs.
+    /// Apply, journal, swap in, tell everybody. See the module docs. A virtual room whose betting
+    /// just ended then runs its own showdown.
     fn submit(&mut self, op: &Op) -> Result<Outcome, RoomError> {
+        let outcome = self.submit_one(op)?;
+        self.settle_showdown();
+        Ok(outcome)
+    }
+
+    /// Pays a virtual hand whose betting is over, as its own journaled op. Refused or failed, it
+    /// leaves the state alone and is tried again later.
+    fn settle_showdown(&mut self) {
+        match self.state.auto_showdown_op(self.clock.now_ms()) {
+            Ok(Some(op)) => {
+                if let Err(error) = self.submit_one(&op) {
+                    tracing::error!(code = ?error.code, "automatic showdown was refused");
+                }
+            }
+            Ok(None) => {}
+            Err(error) => tracing::error!(code = ?error.code, "automatic showdown could not rank"),
+        }
+    }
+
+    fn submit_one(&mut self, op: &Op) -> Result<Outcome, RoomError> {
         let mut next = self.state.clone();
         let outcome = next.apply(op.clone(), &self.timings)?;
         if !outcome.changed {
@@ -497,6 +578,7 @@ impl RoomActor {
             player_count: self.state.game.table.seats.len(),
             max_players: usize::from(MAX_SEATS),
             in_progress: self.state.game.table.phase != Phase::Lobby,
+            card_mode: self.state.config.card_mode,
         }
     }
 
@@ -672,6 +754,11 @@ impl RoomActor {
         if let Some(prompt) = self.turn_prompt_for(player_id) {
             self.reply(conn, None, prompt);
         }
+        // Private cards follow the snapshot to this connection alone, so a reconnect or a second
+        // device always gets them back and nobody else ever does.
+        if let Some(cards) = self.state.hole_cards_for(player_id) {
+            self.reply(conn, None, cards);
+        }
     }
 
     fn turn_prompt_for(&self, player_id: &str) -> Option<ServerMessage> {
@@ -684,6 +771,26 @@ impl RoomActor {
             next_action_seq: player.next_action_seq,
             legal,
         })
+    }
+
+    /// The host command a message stands for. A virtual room's `StartHand` gets its shuffled
+    /// deck here, in the one place that owns the randomness, and it travels in the journaled op.
+    fn host_command_for(
+        &mut self,
+        player_id: &str,
+        message: ClientMessage,
+    ) -> Result<HostCommand, RoomError> {
+        let command = host_command(message)
+            .ok_or_else(|| RoomError::new(ErrorCode::BadRequest, "not a host message"))?;
+        let deals = matches!(command, HostCommand::StartHand { .. })
+            && player_id == self.state.host_id
+            && self.state.is_virtual();
+        if !deals {
+            return Ok(command);
+        }
+        shuffled_deck(&mut *self.entropy)
+            .map(|deck| HostCommand::StartHand { deck: Some(deck) })
+            .map_err(|_| internal("could not shuffle the deck"))
     }
 
     fn on_client(&mut self, conn: ConnId, req_id: Option<String>, message: ClientMessage) {
@@ -751,14 +858,13 @@ impl RoomActor {
             | ClientMessage::Kick { .. }
             | ClientMessage::MoveSeat { .. }
             | ClientMessage::RoomConfigure { .. }
-            | ClientMessage::EndGame => {
-                let Some(command) = host_command(message) else {
-                    let error = RoomError::new(ErrorCode::BadRequest, "not a host message");
+            | ClientMessage::EndGame => match self.host_command_for(&player_id, message) {
+                Ok(command) => host(command),
+                Err(error) => {
                     self.reply_error(conn, req_id, &error);
                     return;
-                };
-                host(command)
-            }
+                }
+            },
             ClientMessage::CreateRoom { .. }
             | ClientMessage::JoinRoom { .. }
             | ClientMessage::Resume { .. } => {
@@ -813,7 +919,7 @@ fn host_command(message: ClientMessage) -> Option<HostCommand> {
         ClientMessage::Undo => HostCommand::Undo,
         ClientMessage::ResumeGame => HostCommand::ResumeGame,
         ClientMessage::EndGame => HostCommand::EndGame,
-        ClientMessage::StartHand => HostCommand::StartHand,
+        ClientMessage::StartHand => HostCommand::StartHand { deck: None },
         _ => return None,
     })
 }

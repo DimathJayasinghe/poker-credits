@@ -8,6 +8,52 @@
 
 part of 'room_config.dart';
 
+class CardModeMapper extends EnumMapper<CardMode> {
+  CardModeMapper._();
+
+  static CardModeMapper? _instance;
+  static CardModeMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = CardModeMapper._());
+    }
+    return _instance!;
+  }
+
+  static CardMode fromValue(dynamic value) {
+    ensureInitialized();
+    return MapperContainer.globals.fromValue(value);
+  }
+
+  @override
+  CardMode decode(dynamic value) {
+    switch (value) {
+      case r'PHYSICAL':
+        return CardMode.physical;
+      case r'VIRTUAL':
+        return CardMode.virtual;
+      default:
+        return CardMode.values[0];
+    }
+  }
+
+  @override
+  dynamic encode(CardMode self) {
+    switch (self) {
+      case CardMode.physical:
+        return r'PHYSICAL';
+      case CardMode.virtual:
+        return r'VIRTUAL';
+    }
+  }
+}
+
+extension CardModeMapperExtension on CardMode {
+  String toValue() {
+    CardModeMapper.ensureInitialized();
+    return MapperContainer.globals.toValue<CardMode>(this) as String;
+  }
+}
+
 class RoomConfigMapper extends ClassMapperBase<RoomConfig> {
   RoomConfigMapper._();
 
@@ -15,6 +61,7 @@ class RoomConfigMapper extends ClassMapperBase<RoomConfig> {
   static RoomConfigMapper ensureInitialized() {
     if (_instance == null) {
       MapperContainer.globals.use(_instance = RoomConfigMapper._());
+      CardModeMapper.ensureInitialized();
     }
     return _instance!;
   }
@@ -54,6 +101,13 @@ class RoomConfigMapper extends ClassMapperBase<RoomConfig> {
     'turnTimeLimitSeconds',
     _$turnTimeLimitSeconds,
   );
+  static CardMode _$cardMode(RoomConfig v) => v.cardMode;
+  static const Field<RoomConfig, CardMode> _f$cardMode = Field(
+    'cardMode',
+    _$cardMode,
+    opt: true,
+    def: CardMode.physical,
+  );
 
   @override
   final MappableFields<RoomConfig> fields = const {
@@ -64,10 +118,13 @@ class RoomConfigMapper extends ClassMapperBase<RoomConfig> {
     #isTournament: _f$isTournament,
     #blindLevelMinutes: _f$blindLevelMinutes,
     #turnTimeLimitSeconds: _f$turnTimeLimitSeconds,
+    #cardMode: _f$cardMode,
   };
   @override
   final bool ignoreNull = true;
 
+  @override
+  final MappingHook hook = const OmitWhenDefault({'cardMode': 'PHYSICAL'});
   static RoomConfig _instantiate(DecodingData data) {
     return RoomConfig(
       startingChips: data.dec(_f$startingChips),
@@ -77,6 +134,7 @@ class RoomConfigMapper extends ClassMapperBase<RoomConfig> {
       isTournament: data.dec(_f$isTournament),
       blindLevelMinutes: data.dec(_f$blindLevelMinutes),
       turnTimeLimitSeconds: data.dec(_f$turnTimeLimitSeconds),
+      cardMode: data.dec(_f$cardMode),
     );
   }
 
@@ -148,6 +206,7 @@ abstract class RoomConfigCopyWith<$R, $In extends RoomConfig, $Out>
     bool? isTournament,
     int? blindLevelMinutes,
     int? turnTimeLimitSeconds,
+    CardMode? cardMode,
   });
   RoomConfigCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -169,6 +228,7 @@ class _RoomConfigCopyWithImpl<$R, $Out>
     bool? isTournament,
     int? blindLevelMinutes,
     int? turnTimeLimitSeconds,
+    CardMode? cardMode,
   }) => $apply(
     FieldCopyWithData({
       if (startingChips != null) #startingChips: startingChips,
@@ -179,6 +239,7 @@ class _RoomConfigCopyWithImpl<$R, $Out>
       if (blindLevelMinutes != null) #blindLevelMinutes: blindLevelMinutes,
       if (turnTimeLimitSeconds != null)
         #turnTimeLimitSeconds: turnTimeLimitSeconds,
+      if (cardMode != null) #cardMode: cardMode,
     }),
   );
   @override
@@ -196,6 +257,7 @@ class _RoomConfigCopyWithImpl<$R, $Out>
       #turnTimeLimitSeconds,
       or: $value.turnTimeLimitSeconds,
     ),
+    cardMode: data.get(#cardMode, or: $value.cardMode),
   );
 
   @override

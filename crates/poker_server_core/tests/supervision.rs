@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use poker_server_core::config::{Limits, Timings};
-use poker_server_core::protocol::{ClientMessage, ErrorCode, RoomConfig, ServerMessage};
+use poker_server_core::protocol::{CardMode, ClientMessage, ErrorCode, RoomConfig, ServerMessage};
 use poker_server_core::registry::Registry;
 use poker_server_core::room::actor::Clock;
 use poker_server_core::room::handle::{ConnReceiver, ConnSender, Outbound};
@@ -19,6 +19,7 @@ use poker_server_core::room::session::Session;
 
 fn config() -> RoomConfig {
     RoomConfig {
+        card_mode: CardMode::Physical,
         starting_chips: 1000,
         small_blind: 5,
         big_blind: 10,

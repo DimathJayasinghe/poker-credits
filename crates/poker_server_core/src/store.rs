@@ -5,6 +5,7 @@
 //! snapshot with the journal replayed on top. A new snapshot makes the journal redundant.
 
 pub mod journal;
+mod private;
 pub mod snapshot;
 
 use std::io;

@@ -2,6 +2,7 @@
 
 use std::collections::BTreeSet;
 
+use poker_engine::deck::Deck;
 use poker_engine::{
     Allocation, Chips, Command, Event, HandStatus, MAX_CHIPS, MAX_SEATS, Phase, SeatIndex,
 };
@@ -97,6 +98,9 @@ impl RoomState {
                 Ok(())
             }
             Op::Tick { at_ms } => self.op_tick(at_ms, timings, out),
+            Op::AutoShowdown { allocations, at_ms } => {
+                self.op_auto_showdown(allocations, at_ms, out)
+            }
         }
     }
 
@@ -193,6 +197,7 @@ impl RoomState {
                     }
                 }
                 Event::HandStarted { .. } => {
+                    self.deal_hole_cards(out);
                     for player in self
                         .players
                         .values_mut()
@@ -212,6 +217,8 @@ impl RoomState {
                 | Event::BlindPosted { .. }
                 | Event::TurnStarted { .. }
                 | Event::PhaseChanged { .. }
+                | Event::BoardRevealed { .. }
+                | Event::HandsRevealed { .. }
                 | Event::UncalledReturned { .. }
                 | Event::RunoutStarted { .. }
                 | Event::ShowdownStarted { .. }
@@ -639,16 +646,21 @@ impl RoomState {
 
     fn op_host(&mut self, command: HostCommand, at_ms: u64, out: &mut Outcome) -> Done {
         match command {
-            HostCommand::StartHand => {
+            HostCommand::StartHand { deck } => {
+                let deck = self.deck_for_hand(deck)?;
                 let elapsed_ms = if self.config.is_tournament {
                     at_ms.saturating_sub(*self.tournament_started_ms.get_or_insert(at_ms))
                 } else {
                     0
                 };
-                self.engine_step(Command::StartHand { elapsed_ms }, at_ms, out)?;
+                self.engine_step(Command::StartHand { elapsed_ms, deck }, at_ms, out)?;
             }
-            HostCommand::BeginShowdown => self.engine_step(Command::BeginShowdown, at_ms, out)?,
+            HostCommand::BeginShowdown => {
+                self.require_manual_showdown()?;
+                self.engine_step(Command::BeginShowdown, at_ms, out)?;
+            }
             HostCommand::ResolveShowdown { allocations } => {
+                self.require_manual_showdown()?;
                 let allocations = allocations
                     .into_iter()
                     .map(|a| Allocation {
@@ -658,7 +670,10 @@ impl RoomState {
                     .collect();
                 self.engine_step(Command::ResolveShowdown { allocations }, at_ms, out)?;
             }
-            HostCommand::Undo => self.engine_step(Command::Undo, at_ms, out)?,
+            HostCommand::Undo => {
+                self.require_undo_keeps_cards_hidden()?;
+                self.engine_step(Command::Undo, at_ms, out)?;
+            }
             HostCommand::Pause { reason } => return self.op_pause(reason, at_ms, out),
             HostCommand::ResumeGame => return self.op_resume(at_ms, out),
             HostCommand::ApproveRebuy { player_id, amount } => {
@@ -672,7 +687,10 @@ impl RoomState {
             HostCommand::Configure { config } => {
                 let blinds = blinds_mode(&config)?;
                 self.engine_step(Command::Configure { blinds }, at_ms, out)?;
+                // Real or virtual cards is decided when the room is created, never later.
+                let card_mode = self.config.card_mode;
                 self.config = config;
+                self.config.card_mode = card_mode;
             }
             HostCommand::EndGame => {
                 self.ended = true;
@@ -680,6 +698,99 @@ impl RoomState {
                 return Ok(());
             }
         }
+        self.finish(at_ms, out);
+        Ok(())
+    }
+
+    /// A virtual room decides showdowns itself; the host's manual controls are for real cards.
+    fn require_manual_showdown(&self) -> Done {
+        if self.is_virtual() {
+            return Err(RoomError::new(
+                ErrorCode::IllegalState,
+                "this room runs showdowns automatically",
+            ));
+        }
+        Ok(())
+    }
+
+    /// With virtual cards, taking an action back must not un-reveal a card that every player
+    /// has already seen, so it only works inside the street where the action happened.
+    fn require_undo_keeps_cards_hidden(&self) -> Done {
+        if !self.is_virtual() {
+            return Ok(());
+        }
+        let table = &self.game.table;
+        let same_street = table.phase.is_betting()
+            && self
+                .game
+                .history
+                .last()
+                .is_some_and(|before| before.phase == table.phase);
+        if same_street || self.game.history.is_empty() {
+            Ok(())
+        } else {
+            Err(RoomError::new(
+                ErrorCode::IllegalState,
+                "cards were already revealed; undo only works within the same betting round",
+            ))
+        }
+    }
+
+    /// The deck for a new hand: a virtual room must be given one, a physical room never uses one.
+    fn deck_for_hand(&self, deck: Option<Deck>) -> Result<Option<Deck>, RoomError> {
+        match (self.is_virtual(), deck) {
+            (true, Some(deck)) => Ok(Some(deck)),
+            (true, None) => Err(RoomError::new(
+                ErrorCode::InternalError,
+                "a virtual hand needs a shuffled deck",
+            )),
+            (false, _) => Ok(None),
+        }
+    }
+
+    /// Remembers who is in the hand and queues each player's private cards.
+    fn deal_hole_cards(&mut self, out: &mut Outcome) {
+        self.hand_names.clear();
+        let Some(deal) = self.game.table.deal.as_ref() else {
+            return;
+        };
+        let dealt: Vec<(String, poker_engine::card::Card, poker_engine::card::Card)> = deal
+            .holes
+            .iter()
+            .map(|(id, [first, second])| (id.to_string(), *first, *second))
+            .collect();
+        let hand_number = deal.hand_number;
+        for (id, first, second) in dealt {
+            let name = self.name_of(&id);
+            self.hand_names.insert(id.clone(), name);
+            out.broadcasts.push(Broadcast::To(
+                id,
+                ServerMessage::HoleCards {
+                    hand_number,
+                    cards: [first, second],
+                },
+            ));
+        }
+    }
+
+    /// The server's showdown: ranks were computed from the table when the op was made; the
+    /// engine still checks that every winner is eligible for the pot they are given.
+    fn op_auto_showdown(
+        &mut self,
+        allocations: Vec<Allocation>,
+        at_ms: u64,
+        out: &mut Outcome,
+    ) -> Done {
+        if !self.needs_auto_showdown() {
+            return Err(RoomError::new(
+                ErrorCode::IllegalState,
+                "no showdown is waiting",
+            ));
+        }
+        if self.game.table.phase == Phase::AllInRunout {
+            self.engine_step(Command::BeginShowdown, at_ms, out)?;
+        }
+        self.engine_step(Command::ResolveShowdown { allocations }, at_ms, out)?;
         self.finish(at_ms, out);
         Ok(())
     }

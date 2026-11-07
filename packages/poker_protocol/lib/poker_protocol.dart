@@ -5,6 +5,7 @@
 /// are tested against the golden files in `protocol/fixtures/v1/`.
 library;
 
+export 'src/card.dart';
 export 'src/client_message.dart';
 export 'src/envelope.dart';
 export 'src/error_code.dart';

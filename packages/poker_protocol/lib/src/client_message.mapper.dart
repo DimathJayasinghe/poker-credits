@@ -407,6 +407,13 @@ class JoinRoomMapper extends SubClassMapperBase<JoinRoom> {
     opt: true,
     def: false,
   );
+  static List<String> _$features(JoinRoom v) => v.features;
+  static const Field<JoinRoom, List<String>> _f$features = Field(
+    'features',
+    _$features,
+    opt: true,
+    def: const <String>[],
+  );
 
   @override
   final MappableFields<JoinRoom> fields = const {
@@ -414,6 +421,7 @@ class JoinRoomMapper extends SubClassMapperBase<JoinRoom> {
     #name: _f$name,
     #seatIndex: _f$seatIndex,
     #spectator: _f$spectator,
+    #features: _f$features,
   };
   @override
   final bool ignoreNull = true;
@@ -426,12 +434,15 @@ class JoinRoomMapper extends SubClassMapperBase<JoinRoom> {
   late final ClassMapperBase superMapper =
       ClientMessageMapper.ensureInitialized();
 
+  @override
+  final MappingHook hook = const OmitWhenDefault({'features': <Object?>[]});
   static JoinRoom _instantiate(DecodingData data) {
     return JoinRoom(
       roomCode: data.dec(_f$roomCode),
       name: data.dec(_f$name),
       seatIndex: data.dec(_f$seatIndex),
       spectator: data.dec(_f$spectator),
+      features: data.dec(_f$features),
     );
   }
 
@@ -492,8 +503,15 @@ extension JoinRoomValueCopy<$R, $Out> on ObjectCopyWith<$R, JoinRoom, $Out> {
 
 abstract class JoinRoomCopyWith<$R, $In extends JoinRoom, $Out>
     implements ClientMessageCopyWith<$R, $In, $Out> {
+  ListCopyWith<$R, String, ObjectCopyWith<$R, String, String>> get features;
   @override
-  $R call({String? roomCode, String? name, int? seatIndex, bool? spectator});
+  $R call({
+    String? roomCode,
+    String? name,
+    int? seatIndex,
+    bool? spectator,
+    List<String>? features,
+  });
   JoinRoomCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
 
@@ -506,17 +524,26 @@ class _JoinRoomCopyWithImpl<$R, $Out>
   late final ClassMapperBase<JoinRoom> $mapper =
       JoinRoomMapper.ensureInitialized();
   @override
+  ListCopyWith<$R, String, ObjectCopyWith<$R, String, String>> get features =>
+      ListCopyWith(
+        $value.features,
+        (v, t) => ObjectCopyWith(v, $identity, t),
+        (v) => call(features: v),
+      );
+  @override
   $R call({
     String? roomCode,
     String? name,
     Object? seatIndex = $none,
     bool? spectator,
+    List<String>? features,
   }) => $apply(
     FieldCopyWithData({
       if (roomCode != null) #roomCode: roomCode,
       if (name != null) #name: name,
       if (seatIndex != $none) #seatIndex: seatIndex,
       if (spectator != null) #spectator: spectator,
+      if (features != null) #features: features,
     }),
   );
   @override
@@ -525,6 +552,7 @@ class _JoinRoomCopyWithImpl<$R, $Out>
     name: data.get(#name, or: $value.name),
     seatIndex: data.get(#seatIndex, or: $value.seatIndex),
     spectator: data.get(#spectator, or: $value.spectator),
+    features: data.get(#features, or: $value.features),
   );
 
   @override
@@ -570,6 +598,13 @@ class ResumeMapper extends SubClassMapperBase<Resume> {
     _$hostToken,
     opt: true,
   );
+  static List<String> _$features(Resume v) => v.features;
+  static const Field<Resume, List<String>> _f$features = Field(
+    'features',
+    _$features,
+    opt: true,
+    def: const <String>[],
+  );
 
   @override
   final MappableFields<Resume> fields = const {
@@ -577,6 +612,7 @@ class ResumeMapper extends SubClassMapperBase<Resume> {
     #sessionToken: _f$sessionToken,
     #lastStateVersion: _f$lastStateVersion,
     #hostToken: _f$hostToken,
+    #features: _f$features,
   };
   @override
   final bool ignoreNull = true;
@@ -589,12 +625,15 @@ class ResumeMapper extends SubClassMapperBase<Resume> {
   late final ClassMapperBase superMapper =
       ClientMessageMapper.ensureInitialized();
 
+  @override
+  final MappingHook hook = const OmitWhenDefault({'features': <Object?>[]});
   static Resume _instantiate(DecodingData data) {
     return Resume(
       roomCode: data.dec(_f$roomCode),
       sessionToken: data.dec(_f$sessionToken),
       lastStateVersion: data.dec(_f$lastStateVersion),
       hostToken: data.dec(_f$hostToken),
+      features: data.dec(_f$features),
     );
   }
 
@@ -644,12 +683,14 @@ extension ResumeValueCopy<$R, $Out> on ObjectCopyWith<$R, Resume, $Out> {
 
 abstract class ResumeCopyWith<$R, $In extends Resume, $Out>
     implements ClientMessageCopyWith<$R, $In, $Out> {
+  ListCopyWith<$R, String, ObjectCopyWith<$R, String, String>> get features;
   @override
   $R call({
     String? roomCode,
     String? sessionToken,
     int? lastStateVersion,
     String? hostToken,
+    List<String>? features,
   });
   ResumeCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -661,17 +702,26 @@ class _ResumeCopyWithImpl<$R, $Out> extends ClassCopyWithBase<$R, Resume, $Out>
   @override
   late final ClassMapperBase<Resume> $mapper = ResumeMapper.ensureInitialized();
   @override
+  ListCopyWith<$R, String, ObjectCopyWith<$R, String, String>> get features =>
+      ListCopyWith(
+        $value.features,
+        (v, t) => ObjectCopyWith(v, $identity, t),
+        (v) => call(features: v),
+      );
+  @override
   $R call({
     String? roomCode,
     String? sessionToken,
     Object? lastStateVersion = $none,
     Object? hostToken = $none,
+    List<String>? features,
   }) => $apply(
     FieldCopyWithData({
       if (roomCode != null) #roomCode: roomCode,
       if (sessionToken != null) #sessionToken: sessionToken,
       if (lastStateVersion != $none) #lastStateVersion: lastStateVersion,
       if (hostToken != $none) #hostToken: hostToken,
+      if (features != null) #features: features,
     }),
   );
   @override
@@ -680,6 +730,7 @@ class _ResumeCopyWithImpl<$R, $Out> extends ClassCopyWithBase<$R, Resume, $Out>
     sessionToken: data.get(#sessionToken, or: $value.sessionToken),
     lastStateVersion: data.get(#lastStateVersion, or: $value.lastStateVersion),
     hostToken: data.get(#hostToken, or: $value.hostToken),
+    features: data.get(#features, or: $value.features),
   );
 
   @override

@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "reqId": "c-3",
+  "type": "JOIN_ROOM",
+  "roomCode": "KQ7M",
+  "name": "Alice",
+  "seatIndex": 1,
+  "spectator": false,
+  "features": [
+    "VIRTUAL_CARDS"
+  ]
+}

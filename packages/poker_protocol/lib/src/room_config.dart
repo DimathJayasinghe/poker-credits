@@ -1,9 +1,19 @@
 import 'package:dart_mappable/dart_mappable.dart';
 
+import 'omit.dart';
+import 'wire_case.dart';
+
 part 'room_config.mapper.dart';
 
+/// Whether the players hold real cards or the app deals them.
+///
+/// A room is one or the other for its whole life. A mode this client does not know decodes to
+/// [physical], the room that needs no cards from the app.
+@MappableEnum(caseStyle: screamingSnake, defaultValue: CardMode.physical)
+enum CardMode { physical, virtual }
+
 /// Room settings chosen by the host.
-@MappableClass()
+@MappableClass(hook: OmitWhenDefault({'cardMode': 'PHYSICAL'}))
 class RoomConfig with RoomConfigMappable {
   const RoomConfig({
     required this.startingChips,
@@ -13,6 +23,7 @@ class RoomConfig with RoomConfigMappable {
     required this.isTournament,
     required this.blindLevelMinutes,
     required this.turnTimeLimitSeconds,
+    this.cardMode = CardMode.physical,
   });
 
   /// Stack every player starts with.
@@ -35,4 +46,7 @@ class RoomConfig with RoomConfigMappable {
 
   /// Seconds a player has to act, zero for no timer.
   final int turnTimeLimitSeconds;
+
+  /// Real cards (default) or cards dealt by the app.
+  final CardMode cardMode;
 }

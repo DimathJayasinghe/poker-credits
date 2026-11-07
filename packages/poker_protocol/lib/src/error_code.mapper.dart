@@ -95,10 +95,12 @@ class ErrorCodeMapper extends EnumMapper<ErrorCode> {
         return ErrorCode.roomCrashed;
       case r'INTERNAL_ERROR':
         return ErrorCode.internalError;
+      case r'UPDATE_REQUIRED':
+        return ErrorCode.updateRequired;
       case r'UNKNOWN':
         return ErrorCode.unknown;
       default:
-        return ErrorCode.values[34];
+        return ErrorCode.values[35];
     }
   }
 
@@ -173,6 +175,8 @@ class ErrorCodeMapper extends EnumMapper<ErrorCode> {
         return r'ROOM_CRASHED';
       case ErrorCode.internalError:
         return r'INTERNAL_ERROR';
+      case ErrorCode.updateRequired:
+        return r'UPDATE_REQUIRED';
       case ErrorCode.unknown:
         return r'UNKNOWN';
     }

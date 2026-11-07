@@ -10,13 +10,16 @@ use std::time::Duration;
 
 use poker_engine::PlayerAction;
 use poker_server_core::config::{Limits, Timings};
-use poker_server_core::protocol::{ClientMessage, ErrorCode, RoomConfig, ServerMessage, WirePhase};
+use poker_server_core::protocol::{
+    CardMode, ClientMessage, ErrorCode, RoomConfig, ServerMessage, WirePhase,
+};
 use poker_server_core::room::actor::{self, Clock, Created, ExitReason, NewRoom};
 use poker_server_core::room::handle::{ConnId, Outbound, RoomHandle};
 use tokio::sync::mpsc;
 
 fn config() -> RoomConfig {
     RoomConfig {
+        card_mode: CardMode::Physical,
         starting_chips: 1000,
         small_blind: 5,
         big_blind: 10,
@@ -487,6 +490,7 @@ async fn a_kicked_player_is_cut_off_and_cannot_resume() {
 
 fn untimed_config() -> RoomConfig {
     RoomConfig {
+        card_mode: CardMode::Physical,
         turn_time_limit_seconds: 0,
         ..config()
     }

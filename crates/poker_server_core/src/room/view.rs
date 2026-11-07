@@ -4,7 +4,10 @@
 use poker_engine::{HandStatus, Phase};
 
 use super::state::RoomState;
-use crate::protocol::{PendingRebuyView, PotView, RoomView, SeatView, WirePhase};
+use crate::protocol::{
+    HandResultView, PendingRebuyView, PotResultView, PotView, RevealView, RoomView, SeatView,
+    ShareView, WirePhase,
+};
 
 fn wire_phase(phase: Phase, paused: bool) -> WirePhase {
     if paused {
@@ -46,6 +49,7 @@ impl RoomState {
                     is_all_in: seat.status == HandStatus::AllIn,
                     is_sitting_out: seat.sitting_out,
                     is_connected: is_connected(id),
+                    has_cards: self.holds_cards(id, seat.status),
                 }
             })
             .collect();
@@ -93,6 +97,76 @@ impl RoomState {
                     approved: r.approved,
                 })
                 .collect(),
+            board: table
+                .deal
+                .as_ref()
+                .map_or_else(Vec::new, |deal| deal.visible_board().to_vec()),
+            reveals: self.reveal_views(),
+            result: self.result_view(),
         }
+    }
+
+    /// Whether this seat still holds face-down cards in the hand being played. It says nothing
+    /// about which cards.
+    fn holds_cards(&self, id: &str, status: HandStatus) -> bool {
+        let table = &self.game.table;
+        let playing =
+            table.phase.is_betting() || matches!(table.phase, Phase::AllInRunout | Phase::Showdown);
+        playing
+            && matches!(status, HandStatus::Live | HandStatus::AllIn)
+            && table
+                .deal
+                .as_ref()
+                .is_some_and(|deal| deal.hole_of(&super::state::engine_id(id)).is_some())
+    }
+
+    fn hand_name(&self, id: &str) -> String {
+        self.hand_names
+            .get(id)
+            .or_else(|| self.players.get(id).map(|p| &p.name))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Hands every contender has had to show, in seat order of the deal.
+    fn reveal_views(&self) -> Vec<RevealView> {
+        poker_engine::showdown::reveals(&self.game.table)
+            .into_iter()
+            .map(|reveal| RevealView {
+                name: self.hand_name(reveal.player_id.as_str()),
+                player_id: reveal.player_id.to_string(),
+                cards: reveal.cards,
+                category: reveal.category,
+                best_five: reveal.best_five,
+            })
+            .collect()
+    }
+
+    /// How the last hand was paid, main pot first.
+    fn result_view(&self) -> Option<HandResultView> {
+        let result = self.game.table.deal.as_ref()?.result.as_ref()?;
+        let mut pots: Vec<PotResultView> = result
+            .pots
+            .iter()
+            .map(|pot| PotResultView {
+                pot_index: pot.pot_index,
+                amount: pot.amount.get(),
+                winner_player_ids: pot.winners.iter().map(ToString::to_string).collect(),
+                shares: pot
+                    .shares
+                    .iter()
+                    .map(|(id, amount)| ShareView {
+                        name: self.hand_name(id.as_str()),
+                        player_id: id.to_string(),
+                        amount: amount.get(),
+                    })
+                    .collect(),
+            })
+            .collect();
+        pots.sort_by_key(|pot| pot.pot_index);
+        Some(HandResultView {
+            uncontested: result.uncontested,
+            pots,
+        })
     }
 }

@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "type": "HOLE_CARDS",
+  "handNumber": 7,
+  "cards": [
+    "As",
+    "Kd"
+  ]
+}

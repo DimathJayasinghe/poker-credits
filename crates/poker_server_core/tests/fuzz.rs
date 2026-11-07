@@ -17,7 +17,8 @@ mod ws_client;
 
 use std::fmt::Write as _;
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 
 use poker_server_core::config::{Limits, Timings};
@@ -29,6 +30,13 @@ use ws_client::{WsClient, http_get};
 
 /// Panics seen anywhere in the process: test thread, connection tasks and room actors alike.
 static PANICS: AtomicUsize = AtomicUsize::new(0);
+
+/// Whether the rooms the attacker creates deal virtual cards (the victim's room is set apart).
+static ATTACKER_VIRTUAL: AtomicBool = AtomicBool::new(false);
+
+/// Everything the attacker's sockets were sent, as text. In a run where the victim's room deals
+/// cards and the attacker's does not, none of the victim's hole cards may ever show up here.
+static HEARD: Mutex<String> = Mutex::new(String::new());
 
 const QUIET: Duration = Duration::from_millis(150);
 const PUMP: Duration = Duration::from_millis(3);
@@ -62,8 +70,12 @@ impl Rng {
 }
 
 fn config_json() -> Value {
-    json!({"startingChips": 1000, "smallBlind": 5, "bigBlind": 10, "ante": 0,
-           "isTournament": false, "blindLevelMinutes": 10, "turnTimeLimitSeconds": 30})
+    let mut config = json!({"startingChips": 1000, "smallBlind": 5, "bigBlind": 10, "ante": 0,
+           "isTournament": false, "blindLevelMinutes": 10, "turnTimeLimitSeconds": 30});
+    if ATTACKER_VIRTUAL.load(Ordering::SeqCst) {
+        config["cardMode"] = json!("VIRTUAL");
+    }
+    config
 }
 
 /// Limits loose enough that the fuzzer reaches the message handlers instead of being cut off by
@@ -92,6 +104,9 @@ async fn pump(ws: &mut WsClient) -> (Vec<Value>, bool) {
             Err(_) => return (messages, false),
             Ok(None | Some(ws_client::Frame::Close)) => return (messages, true),
             Ok(Some(ws_client::Frame::Text(text))) => {
+                if let Ok(mut heard) = HEARD.lock() {
+                    heard.push_str(&text);
+                }
                 messages.push(serde_json::from_str(&text).expect("the server only sends JSON"));
             }
             Ok(Some(ws_client::Frame::Ping)) => {}
@@ -135,7 +150,8 @@ struct Seat {
 async fn join(addr: SocketAddr, code: &str, name: &str) -> Seat {
     let mut ws = WsClient::connect(addr).await;
     ws.send(
-        json!({"v": 1, "type": "JOIN_ROOM", "roomCode": code, "name": name, "spectator": false}),
+        json!({"v": 1, "type": "JOIN_ROOM", "roomCode": code, "name": name, "spectator": false,
+               "features": ["VIRTUAL_CARDS"]}),
     )
     .await;
     let joined = ws.expect("JOINED").await;
@@ -152,13 +168,16 @@ struct Victim {
     room: Room,
     bob: Seat,
     cy: Seat,
+    /// Hole cards dealt to the victim's players (empty when the room deals nothing).
+    secret_cards: Vec<String>,
 }
 
 impl Victim {
-    async fn new(addr: SocketAddr) -> Victim {
+    async fn new(addr: SocketAddr, virtual_cards: bool) -> Victim {
         // A long turn clock: a soak must not see the room change because a timer ran out.
         let mut config = config_json();
         config["turnTimeLimitSeconds"] = json!(300);
+        config["cardMode"] = json!(if virtual_cards { "VIRTUAL" } else { "PHYSICAL" });
         let mut room = create_with(addr, config).await;
         let mut bob = join(addr, &room.code, "Bob").await;
         let mut cy = join(addr, &room.code, "Cy").await;
@@ -166,9 +185,26 @@ impl Victim {
             .send(json!({"v": 1, "reqId": "s", "type": "START_HAND"}))
             .await;
         room.host.drain(QUIET).await;
-        bob.ws.drain(QUIET).await;
-        cy.ws.drain(QUIET).await;
-        Victim { room, bob, cy }
+        let mut secret_cards = Vec::new();
+        for seat in [&mut room.host, &mut bob.ws, &mut cy.ws] {
+            for message in seat.drain(QUIET).await {
+                if message["type"] == "HOLE_CARDS" {
+                    secret_cards.extend(
+                        message["cards"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .filter_map(|c| c.as_str().map(str::to_owned)),
+                    );
+                }
+            }
+        }
+        Victim {
+            room,
+            bob,
+            cy,
+            secret_cards,
+        }
     }
 
     fn ids(&self) -> Vec<String> {
@@ -179,7 +215,7 @@ impl Victim {
     async fn snapshot(&self, addr: SocketAddr) -> Value {
         let mut ws = WsClient::connect(addr).await;
         ws.send(json!({"v": 1, "type": "RESUME", "roomCode": self.room.code,
-                       "sessionToken": self.bob.token}))
+                       "sessionToken": self.bob.token, "features": ["VIRTUAL_CARDS"]}))
             .await;
         let mut snapshot = ws.expect("SNAPSHOT").await;
         // The server's clock moves on its own; everything else must stay put.
@@ -465,6 +501,19 @@ async fn hostile_input_never_panics_or_reaches_another_room() {
         PANICS.fetch_add(1, Ordering::SeqCst);
         previous(info);
     }));
+    // Real cards; then a virtual victim among real-card attackers (so every card the attacker
+    // hears is a leak); then virtual on both sides (the card paths under hostile frames).
+    for (victim_virtual, attacker_virtual) in [(false, false), (true, false), (true, true)] {
+        ATTACKER_VIRTUAL.store(attacker_virtual, Ordering::SeqCst);
+        if let Ok(mut heard) = HEARD.lock() {
+            heard.clear();
+        }
+        run_fuzz(victim_virtual, attacker_virtual).await;
+    }
+}
+
+#[allow(clippy::too_many_lines, reason = "one linear scenario")]
+async fn run_fuzz(victim_virtual: bool, attacker_virtual: bool) {
     let seed: u64 = std::env::var("FUZZ_SEED")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -489,7 +538,7 @@ async fn hostile_input_never_panics_or_reaches_another_room() {
     .unwrap();
     let addr = server.local_addr();
 
-    let mut victim = Victim::new(addr).await;
+    let mut victim = Victim::new(addr, victim_virtual).await;
     let before = victim.snapshot(addr).await;
     // A second look settles whether merely looking changes anything.
     assert_eq!(
@@ -598,6 +647,19 @@ async fn hostile_input_never_panics_or_reaches_another_room() {
         before,
         "the victim room changed"
     );
+    if victim_virtual && !attacker_virtual {
+        assert!(
+            !victim.secret_cards.is_empty(),
+            "the victim's players were dealt cards"
+        );
+        let heard = HEARD.lock().unwrap().clone();
+        for card in &victim.secret_cards {
+            assert!(
+                !heard.contains(&format!("\"{card}\"")),
+                "the attacker heard the victim's hole card {card}"
+            );
+        }
+    }
     let mut map = Map::new();
     map.insert("panics".into(), json!(PANICS.load(Ordering::SeqCst)));
     assert_eq!(PANICS.load(Ordering::SeqCst), 0, "panics happened: {map:?}");

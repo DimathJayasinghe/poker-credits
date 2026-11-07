@@ -10,13 +10,14 @@ use std::fs::{self, OpenOptions};
 use std::io::Write as _;
 
 use poker_server_core::config::Timings;
-use poker_server_core::protocol::RoomConfig;
+use poker_server_core::protocol::{CardMode, RoomConfig};
 use poker_server_core::room::state::{HostCommand, Op, RoomState};
 use poker_server_core::store::journal::Journal;
 use poker_server_core::store::{self, StoreError, snapshot};
 
 fn room() -> RoomState {
     let config = RoomConfig {
+        card_mode: CardMode::Physical,
         starting_chips: 1000,
         small_blind: 5,
         big_blind: 10,
@@ -42,7 +43,7 @@ fn join(id: &str, name: &str) -> Op {
 fn start() -> Op {
     Op::Host {
         by: "p_1".into(),
-        command: HostCommand::StartHand,
+        command: HostCommand::StartHand { deck: None },
         at_ms: 1000,
     }
 }
