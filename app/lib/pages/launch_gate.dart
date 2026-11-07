@@ -6,12 +6,9 @@ import 'package:poker_credits/pages/home_page.dart';
 import 'package:poker_credits/pages/intro_page.dart';
 import 'package:poker_credits/pages/splash_page.dart';
 import 'package:poker_credits/pages/terms_page.dart';
-import 'package:poker_credits/pages/walkthrough_page.dart';
+import 'package:poker_credits/pages/tours.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_credits/provider/settings_provider.dart';
-import 'package:poker_credits/util/lesson_content.dart';
-import 'package:poker_credits/util/strings.dart';
-import 'package:poker_credits/util/tour_content.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 
 /// What the app shows before Home: the loading screen, then the safety notice until the current
@@ -61,12 +58,14 @@ class _LaunchGateState extends State<LaunchGate> with Refena {
   /// opens the tour or lesson over Home.
   void _chose(IntroChoice choice) {
     ref.notifier(settingsProvider).update((s) => s.copyWith(introDone: true));
-    final page = switch (choice) {
-      IntroChoice.tour => WalkthroughPage(title: Strings.tourTitle, steps: appTourSteps),
-      IntroChoice.learn => WalkthroughPage(title: Strings.learnTitle, steps: pokerLessonSteps),
-      IntroChoice.skip => null,
-    };
-    if (page != null) Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+    switch (choice) {
+      case IntroChoice.tour:
+        openAppTour(context, thenOther: true);
+      case IntroChoice.learn:
+        openLesson(context, thenOther: true);
+      case IntroChoice.skip:
+        break;
+    }
   }
 
   @override

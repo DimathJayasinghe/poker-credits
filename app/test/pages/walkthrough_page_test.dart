@@ -167,4 +167,68 @@ void main() {
       }
     }
   });
+
+  group('follow-up', () {
+    Future<void> openWithFollowUp(WidgetTester tester) async {
+      tester.view
+        ..physicalSize = const Size(390, 844)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        brutalHost(
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => WalkthroughPage(
+                    title: 'Lesson',
+                    steps: pokerLessonSteps,
+                    followUp: const WalkthroughFollowUp(label: 'Next: see how the app works', title: 'App tour', steps: appTourSteps),
+                  ),
+                ),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('is offered on the last step only', (tester) async {
+      await openWithFollowUp(tester);
+      expect(find.text('NEXT: SEE HOW THE APP WORKS'), findsNothing);
+      for (var i = 0; i < pokerLessonSteps.length - 1; i++) {
+        await tester.tap(find.text(Strings.walkNext.toUpperCase()));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('NEXT: SEE HOW THE APP WORKS'), findsOneWidget);
+    });
+
+    testWidgets('opens the other walkthrough in place of this one', (tester) async {
+      await openWithFollowUp(tester);
+      for (var i = 0; i < pokerLessonSteps.length - 1; i++) {
+        await tester.tap(find.text(Strings.walkNext.toUpperCase()));
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.text('NEXT: SEE HOW THE APP WORKS'));
+      await tester.pumpAndSettle();
+      expect(find.text('APP TOUR'), findsOneWidget, reason: 'the tour is open');
+      expect(find.text(appTourSteps.first.title.toUpperCase()), findsOneWidget);
+      // Leaving the tour goes back to where the lesson was opened from, not to the lesson.
+      await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
+      await tester.pumpAndSettle();
+      expect(find.text('open'), findsOneWidget);
+    });
+
+    testWidgets('a walkthrough opened without one shows no extra button', (tester) async {
+      await _open(tester, pokerLessonSteps, (_) {});
+      for (var i = 0; i < pokerLessonSteps.length - 1; i++) {
+        await tester.tap(find.text(Strings.walkNext.toUpperCase()));
+        await tester.pumpAndSettle();
+      }
+      expect(find.textContaining('NEXT:'), findsNothing);
+    });
+  });
 }

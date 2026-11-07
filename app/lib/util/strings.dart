@@ -67,6 +67,7 @@ abstract final class Strings {
   static const String forgetBody = 'You will not be able to go back to it from this device. Other players are not affected.';
   static const String forgetConfirm = 'Forget';
   static const String forgetDone = 'Saved game forgotten.';
+  static const String sectionHelp = 'Help';
   static const String sectionAbout = 'About';
   static const String versionLabel = 'Version';
   static const String protocolLabel = 'Protocol';
@@ -386,6 +387,12 @@ abstract final class Strings {
   static const String introSkip = 'Skip, I know my way';
   static const String introSkipCaption = 'Go straight to the app.';
   static const String guideTours = 'Tours';
+  static const String helpTourRow = 'App tour';
+  static const String helpTourCaption = 'Hosting, joining and playing in 7 steps';
+  static const String helpLearnRow = 'Learn poker';
+  static const String helpLearnCaption = 'The rules and hands, step by step';
+  static const String followToTour = 'Next: see how the app works';
+  static const String followToLesson = 'Next: learn the basics of poker';
   static const String guideTourRow = 'Replay the app tour';
   static const String guideTourRowCaption = 'Hosting, joining and playing in 7 steps';
   static const String guideLearnRow = 'Learn poker';

@@ -186,6 +186,26 @@ void main() {
       expect(find.text(Strings.learnTitle.toUpperCase()), findsWidgets);
     });
 
+    testWidgets('finishing the lesson from the intro offers the app tour, and the other way round', (tester) async {
+      for (final (first, followLabel, secondTitle) in <(String, String, String)>[
+        (Strings.introLearn, Strings.followToTour, Strings.tourTitle),
+        (Strings.introTour, Strings.followToLesson, Strings.learnTitle),
+      ]) {
+        final harness = TestHarness(firstRun: true);
+        await pastTerms(tester, harness);
+        await tester.tap(find.text(first.toUpperCase()));
+        await tester.pumpAndSettle();
+        for (var i = 0; i < 12 && find.text(followLabel.toUpperCase()).evaluate().isEmpty; i++) {
+          await tester.tap(find.text(Strings.walkNext.toUpperCase()));
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.text(followLabel.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(find.text(secondTitle.toUpperCase()), findsWidgets, reason: 'the other walkthrough opened');
+        await tester.pumpWidget(const SizedBox());
+      }
+    });
+
     testWidgets('once answered, the intro never comes back', (tester) async {
       final harness = TestHarness();
       await _launch(tester, harness);

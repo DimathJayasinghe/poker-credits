@@ -6,6 +6,8 @@ import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/pages/join_page.dart';
 import 'package:poker_credits/pages/support_page.dart';
+import 'package:poker_credits/pages/walkthrough_page.dart';
+import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/util/haptics.dart';
 import 'package:poker_credits/util/sound.dart';
 import 'package:poker_credits/widget/brutal/brutal_switch_row.dart';
@@ -214,5 +216,22 @@ void main() {
       await sound.yourTurn();
       expect(calls.single, contains('SystemSound.play'));
     });
+  });
+
+  testWidgets('a Help section opens the app tour and the poker lesson again', (tester) async {
+    final harness = TestHarness();
+    await _openSettings(tester, harness);
+    expect(find.text('HELP'), findsOneWidget);
+    for (final (label, title) in <(String, String)>[(Strings.helpTourRow, Strings.tourTitle), (Strings.helpLearnRow, Strings.learnTitle)]) {
+      await tester.ensureVisible(find.text(label.toUpperCase()));
+      await tester.pump();
+      await tester.tap(find.text(label.toUpperCase()));
+      await tester.pumpAndSettle();
+      expect(find.byType(WalkthroughPage), findsOneWidget, reason: label);
+      expect(find.text(title.toUpperCase()), findsWidgets);
+      await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
+      await tester.pumpAndSettle();
+      expect(find.byType(WalkthroughPage), findsNothing);
+    }
   });
 }

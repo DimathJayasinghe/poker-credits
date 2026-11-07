@@ -13,10 +13,13 @@ import 'package:poker_credits/widget/walkthrough/step_art.dart';
 /// Pops with a [WalkthroughEnd] when the player finishes or skips (or leaves with the back
 /// gesture, which counts as skipping).
 class WalkthroughPage extends StatefulWidget {
-  const WalkthroughPage({super.key, required this.title, required this.steps}) : assert(steps.length > 0);
+  const WalkthroughPage({super.key, required this.title, required this.steps, this.followUp}) : assert(steps.length > 0);
 
   final String title;
   final List<WalkthroughStep> steps;
+
+  /// Offered on the last step, above Done.
+  final WalkthroughFollowUp? followUp;
 
   @override
   State<WalkthroughPage> createState() => _WalkthroughPageState();
@@ -41,6 +44,17 @@ class _WalkthroughPageState extends State<WalkthroughPage> {
   }
 
   void _end(WalkthroughEnd how) => Navigator.of(context).pop(how);
+
+  /// Replaces this walkthrough with the follow-up one, so leaving it returns to where this was opened.
+  void _followUp() {
+    final next = widget.followUp;
+    if (next == null) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<WalkthroughEnd>(
+        builder: (_) => WalkthroughPage(title: next.title, steps: next.steps),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +106,8 @@ class _WalkthroughPageState extends State<WalkthroughPage> {
                   onBack: _index == 0 ? null : () => _go(_index - 1),
                   onNext: _last ? () => _end(WalkthroughEnd.finished) : () => _go(_index + 1),
                   last: _last,
+                  followUpLabel: _last ? widget.followUp?.label : null,
+                  onFollowUp: _followUp,
                 ),
               ],
             ),
@@ -159,13 +175,23 @@ class _StepPage extends StatelessWidget {
 
 /// The progress bar and the Back / Next buttons.
 class _Footer extends StatelessWidget {
-  const _Footer({required this.index, required this.total, required this.onBack, required this.onNext, required this.last});
+  const _Footer({
+    required this.index,
+    required this.total,
+    required this.onBack,
+    required this.onNext,
+    required this.last,
+    required this.followUpLabel,
+    required this.onFollowUp,
+  });
 
   final int index;
   final int total;
   final VoidCallback? onBack;
   final VoidCallback onNext;
   final bool last;
+  final String? followUpLabel;
+  final VoidCallback onFollowUp;
 
   @override
   Widget build(BuildContext context) {
@@ -206,6 +232,10 @@ class _Footer extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: BrutalMetrics.gapM),
+              if (followUpLabel != null) ...<Widget>[
+                BrutalButton(label: followUpLabel!, minHeight: BrutalMetrics.tapPlayer, onPressed: onFollowUp),
+                const SizedBox(height: BrutalMetrics.gapS),
+              ],
               Row(
                 children: <Widget>[
                   Expanded(

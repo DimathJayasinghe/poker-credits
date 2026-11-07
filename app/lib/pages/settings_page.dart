@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/pages/support_page.dart';
+import 'package:poker_credits/pages/tours.dart';
 import 'package:poker_credits/pages/terms_page.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_credits/provider/settings_provider.dart';
@@ -182,6 +183,9 @@ class _SettingsViewState extends State<SettingsView> with Refena {
                       caption: _notice ?? (_hasSavedGame ? Strings.forgetGameCaption : Strings.forgetGameNothing),
                       onTap: _hasSavedGame ? _forget : null,
                     ),
+                    const _Section(Strings.sectionHelp),
+                    BrutalRow(label: Strings.helpTourRow, caption: Strings.helpTourCaption, onTap: () => openAppTour(context)),
+                    BrutalRow(label: Strings.helpLearnRow, caption: Strings.helpLearnCaption, onTap: () => openLesson(context)),
                     const _Section(Strings.sectionAbout),
                     BrutalRow(
                       label: Strings.supportRow,

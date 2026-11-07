@@ -39,3 +39,15 @@ class WalkthroughStep {
 
 /// How a walkthrough ended.
 enum WalkthroughEnd { finished, skipped }
+
+/// What a walkthrough offers once its last step is reached: another walkthrough, opened in its
+/// place. The first-run intro uses it so someone who chose one tour is still told about the other.
+@immutable
+class WalkthroughFollowUp {
+  const WalkthroughFollowUp({required this.label, required this.title, required this.steps});
+
+  /// The button text.
+  final String label;
+  final String title;
+  final List<WalkthroughStep> steps;
+}

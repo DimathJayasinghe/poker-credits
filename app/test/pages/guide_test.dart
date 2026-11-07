@@ -117,9 +117,21 @@ void main() {
       expect(find.text('NEW TO POKER? START HERE.'), findsOneWidget);
     });
 
+    testWidgets('Learn poker sits right under the headline, in view without scrolling, and opens the lesson', (tester) async {
+      await _openGuideTab(tester, size: const Size(390, 844));
+      final learn = find.text(Strings.guideLearnRow.toUpperCase());
+      expect(learn.hitTestable(), findsOneWidget, reason: 'visible on a phone without a scroll');
+      expect(tester.getTopLeft(learn).dy, greaterThan(tester.getTopLeft(find.text('NEW TO POKER? START HERE.')).dy));
+      await tester.tap(learn);
+      await tester.pumpAndSettle();
+      expect(find.byType(WalkthroughPage), findsOneWidget);
+    });
+
     testWidgets('a jump cell scrolls to its section', (tester) async {
       await _openGuideTab(tester);
       expect(find.text('IF THE CONNECTION DROPS').hitTestable(), findsNothing, reason: 'far below the fold at first');
+      await tester.ensureVisible(find.text('DROPS'));
+      await tester.pump();
       await tester.tap(find.text('DROPS'));
       await tester.pumpAndSettle();
       expect(find.text('IF THE CONNECTION DROPS').hitTestable(), findsOneWidget);
