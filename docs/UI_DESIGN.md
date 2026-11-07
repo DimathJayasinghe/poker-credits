@@ -195,14 +195,13 @@ Spec and mockups: `docs/superpowers/specs/2026-11-07-virtual-cards-design.md` se
 - **Seat plates** have one fixed height (`FeltLayout.plateHeightFor`); their content shrinks to fit rather than growing the plate. **Top bar cells** (`TopBarStat`) use a fixed value slot and a label whose text scale is clamped at 1.4, so ROOM, HAND and PHASE share their lines.
 - **Tests:** `screens_layout_test` sweeps Home, Settings, Guide, Support and the first-run screens over five sizes (320x568 to 1920x1080), three text sizes and both themes, and checks every pressable cell is at least 44 px; `launch_golden_test`, `walkthrough_golden_test`, `seat_plate_test`, `top_bar_test`.
 
-## 10. Single player (ADR-018, proposed, not built)
+## 10. Single player (ADR-018, built)
 
-Spec: `docs/superpowers/specs/2026-11-07-single-player-bots-design.md` section 9. Summary:
-- **Home:** third large action "Play alone" (caption "Against computer players, no network") and a "Resume solo game" row when a saved solo game exists.
-- **Setup (`SoloSetupPage`):** one screen, no scrolling on a phone at 1.0 text: Opponents stepper (1 to 9, default 4); Skill as three equal cells (Easy, Normal, Hard) with a one-line caption for the chosen one; a Stack and blinds summary row with Quick / Standard / Deep presets; the primary Start cell. Dense `BrutalRow`s, tokens only, type scale from section 2.
-- **Table:** the Player screen layout with every seat on the felt; host-only controls hidden; menu: Pause, Guide, Leave game. The acting bot's plate carries the normal turn marker (static, no spinner); an action line ("Maya raises to 60") goes in the action feed.
-- **Lifecycle:** the game pauses when the app is backgrounded and shows a short pause banner on return.
-- **Game length:** Quick / Standard / Long cells set how often blinds rise (6 / 8 / 12 hands); a caption line shows the personal record.
-- **Tournament feel:** the top bar shows the blind level and hands until the next rise; "Maya is out (6th)" lines in the feed; no bot tag anywhere (owner decision: bots look like real players).
-- **End states:** no rebuy. Being out or winning opens a result screen (place such as "3RD OF 6", the hand that knocked you out as mini cards, a short stats block, Play again and Home cells). Spec section 10.
-- The app tour gets a "Play alone" step and the Guide a "Play alone" section.
+Spec: `docs/superpowers/specs/2026-11-07-single-player-bots-design.md` section 9. As built:
+- **Home:** "Play alone" row (caption "Against computer players, no network"), and a "Resume solo game" row above Host when a saved solo game exists. Hidden where hosting is unsupported (web).
+- **Setup (`SoloSetupPage`):** Opponents stepper (1 to 9, default 4); Skill as three equal cells (Easy, Normal, Hard) with a one-line caption for the chosen one; Game length cells (Quick 6 / Standard 8 / Long 12 hands per blind level); a caption with the personal record for that table kind; the primary Start cell. It scrolls a little on a small phone or at big text (no hard "fits without scrolling" rule); no tick marks on the stepper. Tokens only.
+- **Table:** the Player screen (`PlayerPage(solo: true)`, a mode of the normal page, not a copy). Top bar adds BLINDS and RISE IN (`BlindStatusCells`, fed by `RoomView.blinds`). The opponent strip shows stacks and frames whose turn it is. Pause / Resume and END GAME replace top up, sit out and leave. Notes under the table ("> HEADS-UP", "> MAYA IS OUT (5TH)") show for two hands. When the human is out a SEE RESULT button appears. Back asks "Save and exit" (keeps the game, Home offers it again) or END GAME.
+- **Lifecycle:** `SoloTablePage` pauses the game when the app is backgrounded; coming back keeps it paused until the player presses Resume.
+- **Result (`SoloResultPage`):** place ("3RD" with "OF 6", or "YOU WON"), stats (hands played and won, biggest win, best hand), the hand that decided it as mini cards (`ShowdownPanel`), Play again (same table kind and length) and Home. The finished game is added to the local record and the saved game is cleared.
+- **Tournament feel:** no bot tag anywhere (owner decision: bots look like real players).
+- The app tour has a "Play alone" step (8 steps now) and the Guide an "Alone" section with a jump chip.

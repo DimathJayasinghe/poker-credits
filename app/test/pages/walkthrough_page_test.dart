@@ -60,6 +60,7 @@ void main() {
         expect(step.artLabel.trim(), isNotEmpty, reason: step.title);
       }
       expect(appTourSteps.map((s) => s.art).toSet(), hasLength(appTourSteps.length), reason: 'one picture per step');
+      expect(appTourSteps.map((s) => s.title), contains('Play alone'));
       expect(pokerLessonSteps.map((s) => s.art).toSet(), hasLength(pokerLessonSteps.length));
     });
 

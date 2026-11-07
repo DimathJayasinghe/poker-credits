@@ -259,20 +259,21 @@ Full detail in `docs/RESILIENCE_AND_CRASH_HANDLING.md`. Summary of what is copie
 
 ## ADR-018: Single player mode with bots
 
-**Status:** Proposed 2026-11-07 (owner request; owner answered the open questions the same day); design in `docs/superpowers/specs/2026-11-07-single-player-bots-design.md`. Not built. Awaiting the owner's answers to its three questions and approval.
+**Status:** Accepted and built 2026-11-07 on `feature/solo-bots` (owner request; owner answered the open questions and approved the design the same day); design in `docs/superpowers/specs/2026-11-07-single-player-bots-design.md`, plan in `docs/superpowers/plans/2026-11-07-single-player-bots-plan.md`. Ships in 1.3.0 (not released yet).
 
 **Context:** the owner wants to play alone against 1 to 9 computer players with a skill level chosen at the start. Requirements: feels like real players, fair, bots read each other and the human and adapt, bots are not clones, light on battery and CPU.
 
 **Decision:**
 1. Bots are seated players inside the room actor, not socket clients. Their think time is one more wake candidate in `next_wake_ms`; their action is an ordinary journaled `Op::Action`. No polling, no threads, no network.
 2. Strategy lives in a new pure-Rust crate `crates/poker_bots` (no async, no I/O, no dependency on the server crate). Dart holds no poker rules and no bot logic.
-3. Fairness by types: the strategy gets a per-seat `BotView` (own cards, board, pots, stacks, public history, showdown reveals) and never `RoomState`, the deck or other hole cards. Property tests prove the decision does not change when hidden cards change. Bots use the same shuffle as human games and are never rigged either way.
+3. Fairness by types (as built): the strategy gets a per-seat `BotView` (own cards, board, pots, stacks, public history, showdown reveals) and never `RoomState`, the deck or other hole cards. Property tests prove the decision does not change when hidden cards change. Bots use the same shuffle as human games and are never rigged either way.
 4. Skill (Easy, Normal, Hard) changes only how well a bot uses the same information (equity samples, how fast it trusts reads, error rate). Personality (six archetypes plus jitter, mood, think speed) makes bots differ. Each bot keeps its own opponent notes; nothing is shared.
 5. Randomness: a hand-written PRNG seeded from `getrandom`; `rand` is not added.
 6. Solo is a hosted game on the device with the server bound to `127.0.0.1` only, cards in the app forced, the human's timer off by default, the game paused while the app is in the background.
 7. Bots are exempt from absence, presence and vote-kick rules.
-8. Owner decisions 2026-11-07: solo is a freeze-out tournament (no rebuy; losing shows an end screen; a hand-driven blind ladder in the engine keeps pressure on); bots look exactly like real players (no tag, `is_bot` is never sent to clients); 1 to 9 bots.
+8. As built, where the build settled what the design left open: a bot is stored in the room state only as a `BotProfile` (archetype, skill, seed), so its personality is rebuilt from the seed and there is **no** `Op::AddBot`; `RoomState::seat_bots(seed)` seats them when the room is created, from one seed drawn in the actor, and they are part of the saved state. A single optional `RoomConfig.solo { bots, skill, ladder_hands }` field marks a solo room (no separate `bots` / `bot_skill` fields). Cleaning up a finished or idle solo room is the journaled `Op::SoloSweep`. A solo room can only be created on a server built with `ServerConfig::loopback_only`, which refuses network `CREATE_ROOM` with `solo`. The solo server has its own data directory (`solo_rooms`) and the app keeps the game in its own token slot (`TokenSlot.solo`), so it never touches a hosted or joined game. `RoomView.blinds` (solo only) carries the current and next blinds and the hands left, so Dart shows the ladder without knowing it. The table is the normal `PlayerPage` in a solo mode, not a new screen.
+9. Owner decisions 2026-11-07: solo is a freeze-out tournament (no rebuy; losing shows an end screen; a hand-driven blind ladder in the engine keeps pressure on); bots look exactly like real players (no tag, `is_bot` is never sent to clients); 1 to 9 bots.
 
 **Why:** reuses the whole tested table, journal and virtual-cards stack; the types make cheating impossible rather than forbidden; the actor already sleeps until its next timer, which is the cheapest possible scheduling.
 
-**Consequences:** new crate `poker_bots`; `RoomConfig` gains optional `solo`, `bots`, `bot_skill` fields (additive); a second session slot for a solo game; opponent notes reset after a restore; release 1.3.0.
+**Consequences:** new crate `poker_bots`; `RoomConfig` gains the optional `solo` field and `RoomView` gains `finishOrder` and `blinds` (all additive, protocol stays v1); a second session slot for a solo game; opponent notes reset after a restore; the app records the owner's best place per table kind (bots and skill) locally; release 1.3.0.

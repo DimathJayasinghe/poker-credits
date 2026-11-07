@@ -45,6 +45,12 @@ void main() {
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/tour_turn_phone_light.png'));
   });
 
+  testWidgets('app tour, "play alone", phone dark', (tester) async {
+    await _show(tester, WalkthroughPage(title: Strings.tourTitle, steps: appTourSteps), const Size(390, 844), dark: true);
+    await _next(tester, 6);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/tour_alone_phone_dark.png'));
+  });
+
   testWidgets('learn poker, hands, phone dark', (tester) async {
     await _show(tester, WalkthroughPage(title: Strings.learnTitle, steps: pokerLessonSteps), const Size(390, 844), dark: true);
     await _next(tester, 6);

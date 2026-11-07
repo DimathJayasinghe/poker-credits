@@ -10,6 +10,7 @@ enum StepArt {
   cardMode,
   yourTurn,
   showdown,
+  playAlone,
   staySafe,
   // Learn poker.
   goal,

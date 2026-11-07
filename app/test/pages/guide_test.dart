@@ -138,12 +138,12 @@ void main() {
     testWidgets('the jump cells are compact and share rows instead of stacking full width', (tester) async {
       await _openGuideTab(tester, size: const Size(390, 844));
       final tops = <double>{};
-      for (final label in <String>['HANDS', 'A HAND', 'CARDS', 'WORDS', 'RULES', 'DROPS', 'SAFETY']) {
+      for (final label in <String>['HANDS', 'A HAND', 'CARDS', 'ALONE', 'WORDS', 'RULES', 'DROPS', 'SAFETY']) {
         final cell = find.ancestor(of: find.text(label), matching: find.byType(AnimatedContainer)).first;
         expect(tester.getSize(cell).width, lessThan(200), reason: '$label is a compact cell');
         tops.add(tester.getTopLeft(cell).dy);
       }
-      expect(tops.length, lessThanOrEqualTo(3), reason: 'seven cells fit in three rows or fewer on a phone: $tops');
+      expect(tops.length, lessThanOrEqualTo(3), reason: 'eight cells fit in three rows or fewer on a phone: $tops');
     });
 
     testWidgets('only the first section is open; tapping a heading opens and folds it', (tester) async {
@@ -167,6 +167,7 @@ void main() {
         Strings.guideSumHands,
         Strings.guideSumFlow,
         Strings.guideSumCards,
+        Strings.guideSumAlone,
         Strings.guideSumWords,
         Strings.guideSumRules,
         Strings.guideSumDrops,
@@ -192,6 +193,19 @@ void main() {
       await tester.tap(find.text('CLOSE ALL'));
       await tester.pumpAndSettle();
       expect(find.text('HIGH CARD'), findsNothing);
+    });
+
+    testWidgets('the Play alone section is there, folds, and its jump cell opens it', (tester) async {
+      await _openGuideTab(tester, size: const Size(390, 844));
+      expect(find.text('PLAY ALONE'), findsOneWidget, reason: 'folded: only the heading');
+      expect(find.text('FAIR PLAY'), findsNothing);
+      await tester.ensureVisible(find.text('ALONE'));
+      await tester.pump();
+      await tester.tap(find.text('ALONE'));
+      await tester.pumpAndSettle();
+      expect(find.text('FAIR PLAY'), findsOneWidget);
+      expect(find.textContaining('They never see your cards or the deck.'), findsOneWidget);
+      expect(find.text('EASY, NORMAL, HARD'), findsOneWidget);
     });
 
     testWidgets('a jump cell scrolls to its section', (tester) async {

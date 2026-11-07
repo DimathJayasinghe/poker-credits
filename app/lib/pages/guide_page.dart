@@ -127,6 +127,7 @@ class _GuideViewState extends State<GuideView> {
                               _Jump(Strings.guideTabHands, () => _jump(_Id.hands)),
                               _Jump(Strings.guideTabHand, () => _jump(_Id.flow)),
                               _Jump(Strings.guideTabCards, () => _jump(_Id.cards)),
+                              _Jump(Strings.guideTabAlone, () => _jump(_Id.alone)),
                               _Jump(Strings.guideTabWords, () => _jump(_Id.words)),
                               _Jump(Strings.guideTabRules, () => _jump(_Id.rules)),
                               _Jump(Strings.guideTabDrops, () => _jump(_Id.drops)),
@@ -141,6 +142,7 @@ class _GuideViewState extends State<GuideView> {
                     _section(_Id.hands, Strings.guideSectionHands, Strings.guideSumHands, const GuideHands()),
                     _section(_Id.flow, Strings.guideSectionFlow, Strings.guideSumFlow, const GuideSteps(guideHandFlow)),
                     _section(_Id.cards, Strings.guideSectionCards, Strings.guideSumCards, const GuideSteps(guideCards)),
+                    _section(_Id.alone, Strings.guideSectionAlone, Strings.guideSumAlone, const GuideSteps(guideAlone)),
                     _section(_Id.words, Strings.guideSectionWords, Strings.guideSumWords, const GuideTerms()),
                     _section(_Id.rules, Strings.guideSectionRules, Strings.guideSumRules, const GuideBullets(guideRules)),
                     _section(_Id.drops, Strings.guideSectionDrops, Strings.guideSumDrops, const GuideSteps(guideDrops)),
@@ -165,7 +167,7 @@ class _GuideViewState extends State<GuideView> {
 }
 
 /// The sections of the Guide, in page order.
-enum _Id { night, hands, flow, cards, words, rules, drops, safety, manners }
+enum _Id { night, hands, flow, cards, alone, words, rules, drops, safety, manners }
 
 /// A small cell that opens and scrolls to a section.
 class _Jump extends StatelessWidget {

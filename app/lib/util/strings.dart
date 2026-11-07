@@ -389,6 +389,7 @@ abstract final class Strings {
   static const String guideSectionDrops = 'If the connection drops';
   static const String guideSectionManners = 'Table manners';
   static const String guideSectionCards = 'Cards in the app';
+  static const String guideSectionAlone = 'Play alone';
   static const String guideSectionSafety = 'Play safe';
   static const String guideOpenAll = 'Open all';
   static const String guideCloseAll = 'Close all';
@@ -396,12 +397,14 @@ abstract final class Strings {
   static const String guideSumHands = 'Ten hands, strongest first, with pictures';
   static const String guideSumFlow = 'From the blinds to the showdown';
   static const String guideSumCards = 'Your two cards, the board, the showdown';
+  static const String guideSumAlone = 'Computer players, skill levels, fair play';
   static const String guideSumWords = 'What each button and term means';
   static const String guideSumRules = 'What the app keeps fair for you';
   static const String guideSumDrops = 'Lost your connection? Your seat is safe';
   static const String guideSumSafety = 'Wi-Fi, the deck and your chips';
   static const String guideSumManners = 'A few habits for real cards';
   static const String guideTabCards = 'Cards';
+  static const String guideTabAlone = 'Alone';
   static const String guideTabSafety = 'Safety';
   static const String guideSupportRow = 'Enjoying Poker Credits?';
   static const String guideSupportCaption = 'Support the developer';

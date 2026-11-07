@@ -170,6 +170,30 @@ const List<GuideStep> guideCards = <GuideStep>[
   ),
 ];
 
+/// Playing alone against computer players.
+const List<GuideStep> guideAlone = <GuideStep>[
+  GuideStep(
+    'Choose your table',
+    'Tap Play alone. Pick one to nine opponents, a skill level and how fast the blinds rise. Nobody else needs to be there, and no network is used.',
+  ),
+  GuideStep(
+    'Easy, Normal, Hard',
+    'Easy plays by instinct and makes mistakes. Normal reads the table. Hard also notices how you play and adapts, so it is harder to bluff the same way twice.',
+  ),
+  GuideStep(
+    'A game you can lose',
+    'Everyone starts with the same chips and nobody can buy back in. Players go out when their chips run out, and each gets a finishing place. The blinds rise every few hands. The last player with chips wins.',
+  ),
+  GuideStep(
+    'Fair play',
+    'Your opponents see only what a real player at the table could see: their own cards, the shared cards and the betting. They never see your cards or the deck. Each one plays in its own style.',
+  ),
+  GuideStep(
+    'Pause, leave and records',
+    'The game pauses when you leave the app, so nothing happens while the screen is off. Back saves the game and Resume solo game brings it back. Your best finishes are kept on this device only.',
+  ),
+];
+
 /// Staying safe on a shared network.
 const List<String> guideSafety = <String>[
   'Use your own Wi-Fi, or a phone hotspot with a password. Avoid public or shared Wi-Fi such as a cafe, hotel or school.',

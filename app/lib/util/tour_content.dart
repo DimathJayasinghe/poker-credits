@@ -49,6 +49,13 @@ const List<WalkthroughStep> appTourSteps = <WalkthroughStep>[
     artLabel: 'Two seats showing their cards, one of them marked as the winner.',
   ),
   WalkthroughStep(
+    title: 'Play alone',
+    body:
+        'Nobody around? Tap Play alone, then pick how many opponents you want and how well they play. It is a tournament: everyone starts with the same chips, nobody can buy back in, and the blinds keep rising. The game pauses when you leave the app.',
+    art: StepArt.playAlone,
+    artLabel: 'A choice between Easy, Normal and Hard, with the text 4 opponents below.',
+  ),
+  WalkthroughStep(
     title: 'Play safe',
     body:
         'Use your own Wi-Fi, or a phone hotspot with a password, never a public network. If your connection drops, open the app and tap Back to my game: your seat and chips are kept.',

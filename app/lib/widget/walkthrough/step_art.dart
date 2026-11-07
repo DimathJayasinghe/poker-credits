@@ -188,6 +188,22 @@ class StepArtView extends StatelessWidget {
             ),
           ],
         );
+      case StepArt.playAlone:
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            SizedBox(
+              width: 360,
+              child: BrutalSegmented<int>(
+                value: 1,
+                options: const <(int, String)>[(0, 'Easy'), (1, 'Normal'), (2, 'Hard')],
+                onChanged: (_) {},
+              ),
+            ),
+            const SizedBox(height: BrutalMetrics.gapL),
+            Text('4 OPPONENTS', style: display(40, color: c.onFelt)),
+          ],
+        );
       case StepArt.staySafe:
         return CustomPaint(size: const Size(215, 150), painter: _WifiLockPainter(c.onFelt, c.felt, c.accent));
       case StepArt.goal:

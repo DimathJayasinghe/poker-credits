@@ -261,10 +261,10 @@ In host (LAN) mode players find the host by code (ADR-012): the app probes `GET 
 * A panic in one room never exposes or corrupts another room: room actors share no mutable state. Recovery policy: `RESILIENCE_AND_CRASH_HANDLING.md` 3.3.
 * The server never logs raw tokens, only the last 4 hex characters of a hash.
 
-## 7. Bots and fairness (ADR-018, proposed, not built)
+## 7. Bots and fairness (ADR-018, built)
 
 - A bot decides from a per-seat `BotView` only; it cannot see `RoomState`, the deck, undealt cards or other hands. `poker_bots` does not depend on the server crate. Tests: `bot_view_invariance` (decision unchanged when hidden cards change) and `bot_view_has_no_foreign_cards`; the existing `cards_secrecy` and `cards_leak` tests must pass with bots seated.
 - Bots are dealt from the same unbiased shuffle; no rigging for or against the human; `no_seat_advantage` and skill-ordering simulation tests guard it.
-- A solo game binds the embedded server to `127.0.0.1` only: no LAN listener, no discovery, no lobby entry. Solo rooms are rejected from network `CREATE_ROOM`.
+- A solo game binds the embedded server to `127.0.0.1` only: no LAN listener, no discovery, no lobby entry. Solo rooms are rejected from network `CREATE_ROOM` and can only be made through the host path on a `ServerConfig::loopback_only` server; `is_bot` is never sent to a client.
 - Bot logs must not contain cards (`tool/check_no_state_logging.sh`).
 - Edge cases: every bot decision is checked against the engine's legal actions; failure falls back to check or fold so a hand cannot stall; bots are exempt from absence, presence and vote-kick; the app pausing in the background pauses the bots.
