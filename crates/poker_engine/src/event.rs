@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::card::Card;
 use crate::state::PotTier;
 use crate::types::{Chips, Phase, PlayerId, SeatIndex};
 
@@ -142,6 +143,16 @@ pub enum Event {
         player_id: PlayerId,
         /// Chips returned.
         amount: Chips,
+    },
+    /// Virtual cards: new board cards became visible (public information).
+    BoardRevealed {
+        /// The newly visible cards, in board order.
+        cards: Vec<Card>,
+    },
+    /// Virtual cards: these players' hole cards became public at showdown.
+    HandsRevealed {
+        /// Contenders whose hands are now visible.
+        players: Vec<PlayerId>,
     },
     /// Betting ended with players all-in; the dealer runs out the board.
     RunoutStarted {

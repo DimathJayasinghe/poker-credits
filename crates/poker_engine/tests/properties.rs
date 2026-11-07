@@ -9,6 +9,8 @@
 
 mod support;
 
+use poker_engine::deck::Deck;
+
 use poker_engine::command::Allocation;
 use poker_engine::{Chips, Command, GameState, MAX_CHIPS, Phase, PlayerAction, PlayerId, apply};
 use proptest::prelude::*;
@@ -68,6 +70,16 @@ fn step_strategy() -> impl Strategy<Value = (Step, u8)> {
     (step, any::<u8>())
 }
 
+/// Every other start deals virtual cards from a rotated deck, so both modes are exercised.
+fn deck_for(byte: u8) -> Option<Deck> {
+    if byte.is_multiple_of(2) {
+        return None;
+    }
+    let mut cards = Deck::standard().cards().to_vec();
+    cards.rotate_left(usize::from(byte) % 52);
+    Some(Deck::new(cards).unwrap())
+}
+
 fn command_for(state: &GameState, step: &Step, who: u8, players: usize) -> Command {
     let table = &state.table;
     let wrong_player = who.is_multiple_of(5);
@@ -99,7 +111,10 @@ fn command_for(state: &GameState, step: &Step, who: u8, players: usize) -> Comma
             action: PlayerAction::AllIn,
         },
         Step::Timeout => Command::Timeout { player_id: player },
-        Step::Start => Command::StartHand { elapsed_ms: 0 },
+        Step::Start => Command::StartHand {
+            elapsed_ms: 0,
+            deck: deck_for(who),
+        },
         Step::BeginShowdown => Command::BeginShowdown,
         Step::Resolve(selector) => {
             let allocations = table
@@ -326,6 +341,7 @@ fn legal_command(state: &GameState, byte: u8) -> Option<Command> {
         }
         Phase::NextHandPrep | Phase::Lobby => Some(Command::StartHand {
             elapsed_ms: u64::from(byte),
+            deck: deck_for(byte),
         }),
     }
 }
@@ -372,7 +388,10 @@ fn dead_money_goes_to_a_contender_who_has_paid_nothing() {
     let mut state = initial_state(&stacks, 1, 0);
     let total: u64 = stacks.iter().sum();
     for command in [
-        Command::StartHand { elapsed_ms: 0 },
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
         Command::LeaveHand { player_id: pid(3) },
         Command::LeaveHand { player_id: pid(2) },
         Command::LeaveHand { player_id: pid(1) },

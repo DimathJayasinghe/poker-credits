@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 use crate::blinds::BlindsStrategy;
 use crate::button;
 use crate::command::{Allocation, Command, PlayerAction};
+use crate::deal::{Deal, HandResult, PotResult};
+use crate::deck::Deck;
 use crate::error::{AllocationError, PokerError};
 use crate::event::{ActionKind, BlindKind, Event};
 use crate::pots::{self, Contribution};
@@ -121,7 +123,9 @@ fn run(table: &mut Table, command: Command, events: &mut Vec<Event>) -> Result<(
             events.push(Event::BlindsConfigured);
             Ok(())
         }
-        Command::StartHand { elapsed_ms } => start_hand(table, elapsed_ms, events),
+        Command::StartHand { elapsed_ms, deck } => {
+            start_hand(table, elapsed_ms, deck.as_ref(), events)
+        }
         Command::BeginShowdown => begin_showdown(table, events),
         Command::ResolveShowdown { allocations } => resolve_showdown(table, &allocations, events),
         Command::Pause => pause(table, events),
@@ -358,6 +362,7 @@ fn post_blind(
 fn start_hand(
     table: &mut Table,
     elapsed_ms: u64,
+    deck: Option<&Deck>,
     events: &mut Vec<Event>,
 ) -> Result<(), PokerError> {
     require_between_hands(table)?;
@@ -377,6 +382,19 @@ fn start_hand(
         };
     }
     table.hand_number = table.hand_number.saturating_add(1);
+    // Virtual cards: deal clockwise from the button to everyone dealt in. A physical hand (or a
+    // missing deck) clears the previous deal, which lives until exactly this point.
+    table.deal = match deck {
+        Some(deck) => {
+            let order: Vec<PlayerId> = table
+                .seats_after(positions.dealer)
+                .filter(|seat| seat.status == HandStatus::Live)
+                .map(|seat| seat.player_id.clone())
+                .collect();
+            Some(Deal::from_deck(deck, &order, table.hand_number)?)
+        }
+        None => None,
+    };
     table.hand_blinds = blinds;
     table.dealer = Some(positions.dealer);
     table.small_blind_seat = positions.small_blind;
@@ -624,6 +642,12 @@ fn close_street(table: &mut Table, events: &mut Vec<Event>) -> Result<(), PokerE
 
 fn next_street(table: &mut Table, to: Phase, events: &mut Vec<Event>) -> Result<(), PokerError> {
     change_phase(table, to, events)?;
+    let shown = match to {
+        Phase::Flop => 3,
+        Phase::Turn => 4,
+        _ => 5,
+    };
+    reveal_board(table, shown, events);
     for seat in &mut table.seats {
         seat.street_bet = Chips::ZERO;
         seat.acted_at_raise = None;
@@ -682,9 +706,41 @@ fn settle(table: &mut Table, events: &mut Vec<Event>) -> Result<(), PokerError> 
     Ok(())
 }
 
+/// Shows the board up to `count` cards in a virtual hand and tells the ticker which are new.
+fn reveal_board(table: &mut Table, count: u8, events: &mut Vec<Event>) {
+    if let Some(deal) = table.deal.as_mut() {
+        let cards = deal.show_board_to(count);
+        if !cards.is_empty() {
+            events.push(Event::BoardRevealed { cards });
+        }
+    }
+}
+
+/// Betting is over with two or more contenders: the rest of the board and every contender's
+/// hole cards become public.
+fn reveal_showdown(table: &mut Table, events: &mut Vec<Event>) {
+    reveal_board(table, 5, events);
+    let contenders: Vec<PlayerId> = table
+        .seats
+        .iter()
+        .filter(|seat| seat.is_contesting())
+        .map(|seat| seat.player_id.clone())
+        .collect();
+    if contenders.len() < 2 {
+        return;
+    }
+    if let Some(deal) = table.deal.as_mut() {
+        deal.revealed.clone_from(&contenders);
+        events.push(Event::HandsRevealed {
+            players: contenders,
+        });
+    }
+}
+
 fn enter_runout(table: &mut Table, events: &mut Vec<Event>) -> Result<(), PokerError> {
     settle(table, events)?;
     change_phase(table, Phase::AllInRunout, events)?;
+    reveal_showdown(table, events);
     events.push(Event::RunoutStarted {
         pots: table.pots.clone(),
     });
@@ -694,6 +750,7 @@ fn enter_runout(table: &mut Table, events: &mut Vec<Event>) -> Result<(), PokerE
 fn enter_showdown(table: &mut Table, events: &mut Vec<Event>) -> Result<(), PokerError> {
     settle(table, events)?;
     change_phase(table, Phase::Showdown, events)?;
+    reveal_showdown(table, events);
     events.push(Event::ShowdownStarted {
         pots: table.pots.clone(),
     });
@@ -722,12 +779,31 @@ fn finish_uncontested(table: &mut Table, events: &mut Vec<Event>) -> Result<(), 
         .find(|s| s.is_contesting())
         .map(|s| s.index);
     let pots = std::mem::take(&mut table.pots);
+    let mut results = Vec::new();
     if let Some(winner) = winner {
+        let winner_id = table.seat(winner).map(|seat| seat.player_id.clone());
         for pot in &pots {
             pay(table, pot.tier_index, winner, pot.amount, events)?;
+            if let Some(id) = &winner_id {
+                results.push(PotResult {
+                    pot_index: pot.tier_index,
+                    amount: pot.amount,
+                    winners: vec![id.clone()],
+                    shares: vec![(id.clone(), pot.amount)],
+                });
+            }
         }
     }
+    record_result(table, true, results);
     end_hand(table, events)
+}
+
+/// Keeps how the hand was paid in the deal (virtual hands only), main pot first.
+fn record_result(table: &mut Table, uncontested: bool, mut pots: Vec<PotResult>) {
+    pots.sort_by_key(|pot| pot.pot_index);
+    if let Some(deal) = table.deal.as_mut() {
+        deal.result = Some(HandResult { uncontested, pots });
+    }
 }
 
 fn pay(
@@ -837,14 +913,26 @@ fn resolve_showdown(
     let winners_by_pot = validated_winners(table, allocations)?;
     let pots = std::mem::take(&mut table.pots);
     // Highest side pot first, main pot last (GAME_LOGIC_AND_RULES.md 7.1).
+    let mut results = Vec::new();
     for pot in pots.iter().rev() {
         let winners = winners_by_pot
             .get(&pot.tier_index)
             .map_or(&[][..], Vec::as_slice);
         let ordered = pots::clockwise_from_button(winners, table.dealer);
+        let mut shares = Vec::new();
         for (seat, amount) in pots::split(pot.amount, &ordered) {
             pay(table, pot.tier_index, seat, amount, events)?;
+            if let Some(winner) = table.seat(seat) {
+                shares.push((winner.player_id.clone(), amount));
+            }
         }
+        results.push(PotResult {
+            pot_index: pot.tier_index,
+            amount: pot.amount,
+            winners: shares.iter().map(|(id, _)| id.clone()).collect(),
+            shares,
+        });
     }
+    record_result(table, false, results);
     end_hand(table, events)
 }

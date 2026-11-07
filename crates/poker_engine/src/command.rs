@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::blinds::BlindsMode;
+use crate::deck::Deck;
 use crate::types::{Chips, PlayerId, SeatIndex};
 
 /// What a player may do on their turn.
@@ -111,6 +112,10 @@ pub enum Command {
     StartHand {
         /// Tournament time elapsed, supplied by the server so replay is exact.
         elapsed_ms: u64,
+        /// Virtual-card rooms: the shuffled deck, drawn by the server and recorded in the journal
+        /// (the engine never shuffles). `None` for physical cards, and in every old journal.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        deck: Option<Deck>,
     },
     /// Host: end the all-in run-out and go to showdown.
     BeginShowdown,

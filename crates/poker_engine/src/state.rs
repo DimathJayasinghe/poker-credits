@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::blinds::{Blinds, BlindsMode, BlindsStrategy};
+use crate::deal::Deal;
 use crate::error::PokerError;
 use crate::types::{Chips, Phase, PlayerId, SeatIndex};
 use crate::validator::{self, LegalActions};
@@ -136,6 +137,10 @@ pub struct Table {
     pub short_raise_total: Chips,
     /// Pots fixed when betting ended (empty during betting).
     pub pots: Vec<PotTier>,
+    /// The cards of the current or just finished virtual hand; `None` for physical cards. It is
+    /// replaced only by the next `StartHand`, whatever the phase.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deal: Option<Deal>,
 }
 
 impl Table {
@@ -227,6 +232,7 @@ impl GameState {
                 raise_count: 0,
                 short_raise_total: Chips::ZERO,
                 pots: Vec::new(),
+                deal: None,
             },
             history: Vec::new(),
         })

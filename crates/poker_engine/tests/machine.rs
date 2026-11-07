@@ -36,7 +36,13 @@ fn blinds_are_posted_and_utg_acts_first() {
 #[test]
 fn start_hand_reports_what_happened() {
     let mut state = lobby(&[1000, 1000, 1000], 10, 20);
-    let events = step(&mut state, Command::StartHand { elapsed_ms: 0 });
+    let events = step(
+        &mut state,
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
+    );
     assert!(
         events
             .iter()
@@ -60,7 +66,13 @@ fn start_hand_reports_what_happened() {
 fn starting_a_hand_twice_is_rejected() {
     let mut state = dealt(&[1000, 1000, 1000], 10, 20);
     assert_eq!(
-        try_step(&mut state, Command::StartHand { elapsed_ms: 0 }),
+        try_step(
+            &mut state,
+            Command::StartHand {
+                elapsed_ms: 0,
+                deck: None
+            }
+        ),
         Err(PokerError::HandInProgress)
     );
 }
@@ -69,7 +81,13 @@ fn starting_a_hand_twice_is_rejected() {
 fn start_needs_two_players_with_chips() {
     let mut state = lobby(&[1000], 10, 20);
     assert_eq!(
-        try_step(&mut state, Command::StartHand { elapsed_ms: 0 }),
+        try_step(
+            &mut state,
+            Command::StartHand {
+                elapsed_ms: 0,
+                deck: None
+            }
+        ),
         Err(PokerError::NotEnoughPlayers)
     );
 }
@@ -531,7 +549,10 @@ fn commands_declare_who_may_send_them() {
         "only the server's turn timer may time a player out"
     );
     for host_only in [
-        Command::StartHand { elapsed_ms: 0 },
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
         Command::Undo,
         Command::Pause,
         Command::Resume,
@@ -653,7 +674,13 @@ fn busting_down_to_one_player_returns_to_the_lobby() {
     assert_eq!(state.table.phase, Phase::Lobby);
     assert_eq!(stack(&state, 1), 200);
     assert_eq!(
-        try_step(&mut state, Command::StartHand { elapsed_ms: 0 }),
+        try_step(
+            &mut state,
+            Command::StartHand {
+                elapsed_ms: 0,
+                deck: None
+            }
+        ),
         Err(PokerError::NotEnoughPlayers)
     );
 }
@@ -690,7 +717,13 @@ fn ante_goes_to_the_pot_but_not_to_the_street_bet() {
             },
         );
     }
-    step(&mut state, Command::StartHand { elapsed_ms: 0 });
+    step(
+        &mut state,
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
+    );
     assert_eq!(state.table.total_pot(), chips(45));
     assert_eq!(state.table.current_bet, chips(20));
     let utg = state.table.seat_of(&pid(0)).unwrap();
@@ -709,7 +742,13 @@ fn sitting_out_players_are_not_dealt_in() {
             sitting_out: true,
         },
     );
-    step(&mut state, Command::StartHand { elapsed_ms: 0 });
+    step(
+        &mut state,
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
+    );
     assert_eq!(
         state.table.seat_of(&pid(0)).unwrap().status,
         poker_engine::HandStatus::Out
@@ -737,7 +776,13 @@ fn leaving_on_your_turn_folds_and_sits_out_until_the_next_hand() {
 
     act(&mut state, 1, PlayerAction::Fold);
     assert_eq!(state.table.phase, Phase::NextHandPrep);
-    step(&mut state, Command::StartHand { elapsed_ms: 0 });
+    step(
+        &mut state,
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
+    );
     assert_eq!(
         state.table.seat_of(&pid(0)).unwrap().status,
         poker_engine::HandStatus::Out,
@@ -764,7 +809,13 @@ fn leaving_can_end_the_hand_for_the_last_opponent() {
     assert_eq!(state.table.phase, Phase::NextHandPrep);
     assert!(stack(&state, 0) > 1000, "the stayer wins the blinds");
     assert_eq!(
-        try_step(&mut state, Command::StartHand { elapsed_ms: 0 }),
+        try_step(
+            &mut state,
+            Command::StartHand {
+                elapsed_ms: 0,
+                deck: None
+            }
+        ),
         Err(PokerError::NotEnoughPlayers),
         "nobody to play until the leaver sits back in"
     );
@@ -785,7 +836,13 @@ fn leaving_between_hands_only_sets_the_sit_out_flag() {
     let mut state = lobby(&[1000, 1000, 1000], 10, 20);
     step(&mut state, Command::LeaveHand { player_id: pid(0) });
     assert!(state.table.seat_of(&pid(0)).unwrap().sitting_out);
-    step(&mut state, Command::StartHand { elapsed_ms: 0 });
+    step(
+        &mut state,
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
+    );
     assert_eq!(state.table.contesting_count(), 2);
 }
 
@@ -805,7 +862,13 @@ fn rejoining_mid_hand_waits_for_the_next_hand() {
         poker_engine::HandStatus::Folded
     );
     act(&mut state, 1, PlayerAction::Fold);
-    step(&mut state, Command::StartHand { elapsed_ms: 0 });
+    step(
+        &mut state,
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
+    );
     assert_eq!(
         state.table.seat_of(&pid(0)).unwrap().status,
         poker_engine::HandStatus::Live
@@ -846,7 +909,13 @@ fn two_missed_turns_in_a_row_sit_the_player_out_when_the_hand_ends() {
         "one miss is forgiven"
     );
 
-    step(&mut state, Command::StartHand { elapsed_ms: 0 });
+    step(
+        &mut state,
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
+    );
     assert_eq!(state.table.active, Some(seat(1)));
     act(&mut state, 1, raise_to(60));
     act(&mut state, 2, PlayerAction::Call);
@@ -863,7 +932,13 @@ fn two_missed_turns_in_a_row_sit_the_player_out_when_the_hand_ends() {
     );
     assert!(state.table.seat_of(&pid(0)).unwrap().sitting_out);
 
-    step(&mut state, Command::StartHand { elapsed_ms: 0 });
+    step(
+        &mut state,
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
+    );
     assert_eq!(
         state.table.seat_of(&pid(0)).unwrap().status,
         poker_engine::HandStatus::Out
@@ -888,7 +963,13 @@ fn a_real_action_clears_the_missed_turn_count() {
     let mut state = dealt(&[1000, 1000, 1000], 10, 20);
     step(&mut state, Command::Timeout { player_id: pid(0) });
     act(&mut state, 1, PlayerAction::Fold);
-    step(&mut state, Command::StartHand { elapsed_ms: 0 });
+    step(
+        &mut state,
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
+    );
     act(&mut state, 1, PlayerAction::Call);
     act(&mut state, 2, PlayerAction::Call);
     act(&mut state, 0, PlayerAction::Check);

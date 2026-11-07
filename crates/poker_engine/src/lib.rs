@@ -1,6 +1,6 @@
 //! Pure, deterministic Texas Hold'em betting and pot engine.
 //!
-//! No async, no I/O, no clock, no randomness (cards are physical). Given the same state
+//! No async, no I/O, no clock, no randomness (a virtual-card deck is an input, see ADR-016). Given the same state
 //! and commands the result is always identical, which makes journal replay exact.
 //!
 //! The single entry point is [`apply`]: `apply(&GameState, Command) -> Result<Transition, PokerError>`.
@@ -9,11 +9,16 @@
 
 pub mod blinds;
 pub mod button;
+pub mod card;
 pub mod command;
+pub mod deal;
+pub mod deck;
 pub mod error;
 pub mod event;
+pub mod hand_rank;
 pub mod machine;
 pub mod pots;
+pub mod showdown;
 pub mod state;
 pub mod types;
 pub mod undo;

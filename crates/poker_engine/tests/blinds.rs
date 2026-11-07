@@ -94,6 +94,7 @@ fn tournament_time_comes_from_the_start_hand_command() {
         &mut state,
         Command::StartHand {
             elapsed_ms: 1_000_000,
+            deck: None,
         },
     );
     assert_eq!(state.table.hand_blinds, level(15, 30, 0));
@@ -119,7 +120,13 @@ fn host_can_change_blinds_between_hands_only() {
             blinds: cash(25, 50, 0),
         },
     );
-    step(&mut state, Command::StartHand { elapsed_ms: 0 });
+    step(
+        &mut state,
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
+    );
     assert_eq!(state.table.hand_blinds, level(25, 50, 0));
     assert_eq!(state.table.phase, Phase::PreFlop);
     assert_eq!(

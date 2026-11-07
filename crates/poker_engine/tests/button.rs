@@ -48,7 +48,13 @@ fn the_button_and_blinds_move_one_seat_each_hand() {
     let mut state = lobby(&[1000, 1000, 1000], 10, 20);
     let mut seen = Vec::new();
     for _ in 0..4 {
-        step(&mut state, Command::StartHand { elapsed_ms: 0 });
+        step(
+            &mut state,
+            Command::StartHand {
+                elapsed_ms: 0,
+                deck: None,
+            },
+        );
         seen.push((
             state.table.dealer.unwrap().get(),
             state.table.small_blind_seat.map(SeatIndex::get),
@@ -141,7 +147,13 @@ fn big_blind_never_skips_a_player_across_many_hands() {
     let mut state = lobby(&[1000, 1000, 1000, 1000, 1000], 10, 20);
     let mut big_blinds = Vec::new();
     for _ in 0..10 {
-        step(&mut state, Command::StartHand { elapsed_ms: 0 });
+        step(
+            &mut state,
+            Command::StartHand {
+                elapsed_ms: 0,
+                deck: None,
+            },
+        );
         big_blinds.push(state.table.big_blind_seat.unwrap().get());
         while state.table.phase.is_betting() {
             let (active, _) = state.legal_actions().unwrap();

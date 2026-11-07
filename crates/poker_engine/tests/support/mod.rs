@@ -56,7 +56,13 @@ pub fn lobby(stacks: &[u64], small_blind: u64, big_blind: u64) -> GameState {
 /// A table with the first hand already dealt.
 pub fn dealt(stacks: &[u64], small_blind: u64, big_blind: u64) -> GameState {
     let mut state = lobby(stacks, small_blind, big_blind);
-    step(&mut state, Command::StartHand { elapsed_ms: 0 });
+    step(
+        &mut state,
+        Command::StartHand {
+            elapsed_ms: 0,
+            deck: None,
+        },
+    );
     state
 }
 

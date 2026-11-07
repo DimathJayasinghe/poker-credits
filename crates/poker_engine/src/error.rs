@@ -114,6 +114,12 @@ pub enum PokerError {
     /// Undo with an empty history.
     #[error("nothing to undo")]
     NothingToUndo,
+    /// A deck that is not 52 distinct cards.
+    #[error("a deck must hold 52 distinct cards")]
+    InvalidDeck,
+    /// A hand to rank must be 5 to 7 distinct cards.
+    #[error("a hand must be 5 to 7 distinct cards")]
+    InvalidHand,
     /// Showdown allocation rejected.
     #[error("invalid showdown allocation: {0}")]
     InvalidAllocation(AllocationError),
