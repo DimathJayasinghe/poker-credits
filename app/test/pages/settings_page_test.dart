@@ -5,6 +5,7 @@ import 'package:poker_credits/main.dart';
 import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/pages/join_page.dart';
+import 'package:poker_credits/pages/support_page.dart';
 import 'package:poker_credits/util/haptics.dart';
 import 'package:poker_credits/util/sound.dart';
 import 'package:poker_credits/widget/brutal/brutal_switch_row.dart';
@@ -43,6 +44,18 @@ void main() {
     await tester.pump();
     expect(_themeMode(tester), ThemeMode.light);
     expect(harness.settings.value.theme, ThemeChoice.light);
+  });
+
+  testWidgets('Settings leads to the Support screen and back', (tester) async {
+    final harness = TestHarness();
+    await _openSettings(tester, harness);
+    await tester.scrollUntilVisible(find.text('SUPPORT THE DEVELOPER'), 200, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('SUPPORT THE DEVELOPER'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SupportPage), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SupportPage), findsNothing);
   });
 
   testWidgets('the home bar toggles between light and dark', (tester) async {

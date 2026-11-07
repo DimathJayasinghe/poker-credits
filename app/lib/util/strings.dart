@@ -326,4 +326,22 @@ abstract final class Strings {
   static const String guideTabRules = 'Rules';
   static const String guideTabDrops = 'Drops';
   static const String guideRankLabel = 'Rank';
+
+  // Support
+  static const String supportRow = 'Support the developer';
+  static const String supportRowCaption = 'Star the project, follow, report a bug';
+  static const String supportTitle = 'Support';
+  static const String supportHeadline = 'Free, open source, made by one person';
+  static const String supportBody =
+      'Poker Credits is built and maintained by Dimath Jayasinghe. It has no ads, no accounts and no tracking, and it never sends anything outside your own Wi-Fi. If it made your game night better, these three taps help more than you think.';
+  static const String supportStar = 'Star the project on GitHub';
+  static const String supportStarCaption = 'A star helps other people find the app';
+  static const String supportFollow = 'Follow Dimath on GitHub';
+  static const String supportFollowCaption = 'Get updates and see what comes next';
+  static const String supportIssues = 'Report a bug or suggest something';
+  static const String supportIssuesCaption = 'Open an issue; every one is read';
+  static const String supportScan = 'Or scan with another phone';
+  static const String supportThanks = 'Thank you for playing.';
+  static const String linkCopied = 'Link copied. Paste it into your browser.';
+  static const String linkFailed = 'Could not open or copy the link. Type the address shown below.';
 }

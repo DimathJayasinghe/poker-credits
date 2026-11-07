@@ -1,5 +1,6 @@
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:poker_credits/net/socket_client.dart';
+import 'package:poker_credits/platform/external_links.dart';
 import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/platform/host_keep_alive.dart';
 import 'package:poker_credits/platform/host_server.dart';
@@ -21,6 +22,7 @@ final hapticsProvider = Provider<Haptics>((ref) => Haptics(enabled: () => ref.re
 final soundProvider = Provider<Sound>((ref) => Sound(enabled: () => ref.read(settingsProvider).sound));
 final hostKeepAliveProvider = Provider<HostKeepAlive>((ref) => createHostKeepAlive());
 final hostFinderProvider = Provider<HostFinder>((ref) => createHostFinder());
+final externalLinksProvider = Provider<ExternalLinks>((ref) => const ClipboardExternalLinks());
 final localAddressesProvider = Provider<LocalAddressLister>((ref) => listLocalAddresses);
 
 /// The app version shown in Settings. A missing plugin (tests) or any failure shows a dash.

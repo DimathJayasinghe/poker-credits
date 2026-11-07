@@ -6,6 +6,7 @@ import 'package:poker_credits/net/socket_client.dart';
 import 'package:poker_credits/net/transport.dart';
 import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/platform/host_keep_alive.dart';
+import 'package:poker_credits/platform/external_links.dart';
 import 'package:poker_credits/platform/host_server.dart';
 import 'package:poker_credits/platform/settings_store.dart';
 import 'package:poker_credits/platform/token_store.dart';
@@ -336,3 +337,17 @@ SeatView seatView(
   isConnected: connected,
   hasCards: hasCards,
 );
+
+/// Records the links the app asked to open, and answers with [result].
+class FakeExternalLinks implements ExternalLinks {
+  FakeExternalLinks([this.result = LinkResult.opened]);
+
+  LinkResult result;
+  final List<Uri> requested = <Uri>[];
+
+  @override
+  Future<LinkResult> open(Uri url) async {
+    requested.add(url);
+    return result;
+  }
+}
