@@ -23,7 +23,7 @@ SeatView _seat(int index, String id) => SeatView(
 );
 
 Widget _host(Widget child, {bool reduced = false}) => MaterialApp(
-  theme: ThemeData(extensions: <ThemeExtension<dynamic>>[BrutalTheme(colors: BrutalColors.light)]),
+  theme: ThemeData(extensions: <ThemeExtension<dynamic>>[const BrutalTheme(colors: BrutalColors.light)]),
   home: MediaQuery(
     data: MediaQueryData(disableAnimations: reduced),
     child: Scaffold(body: child),
