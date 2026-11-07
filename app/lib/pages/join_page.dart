@@ -214,7 +214,7 @@ class _JoinPageState extends State<JoinPage> with Refena {
           for (final lobby in _nearby)
             BrutalRow(
               label: lobby.hostName.isEmpty ? lobby.roomCode : lobby.hostName,
-              caption: Strings.nearbySeats(lobby.roomCode, lobby.playerCount, lobby.maxPlayers),
+              caption: Strings.nearbySeats(lobby.roomCode, lobby.playerCount, lobby.maxPlayers, virtual: lobby.isVirtual),
               emphasis: picked == lobby.roomCode,
               onTap: busy ? null : () => _pickNearby(lobby),
             ),

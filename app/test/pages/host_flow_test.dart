@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/main.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/pages/table_page.dart';
+import 'package:poker_credits/util/strings.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
 import '../support/fakes.dart';
@@ -41,6 +42,7 @@ void main() {
     expect(resume.roomCode, 'KQ7M');
     expect(resume.sessionToken, 'sess');
     expect(resume.hostToken, 'host-secret');
+    expect(resume.features, contains(featureVirtualCards), reason: 'host loopback resume needs the feature too');
 
     harness.network.last.serverSends(
       snapshot(
@@ -66,6 +68,42 @@ void main() {
     await tester.pump();
     expect(harness.network.last.sent.last, isA<StartHand>());
 
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('the cards cell defaults to real cards and says nothing about trust', (tester) async {
+    tester.view
+      ..physicalSize = const Size(1280, 800)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = TestHarness();
+    await _startHosting(tester, harness);
+    expect(harness.host.lastConfig!.cardMode, CardMode.physical);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('choosing cards in the app starts a virtual room and shows the trust note', (tester) async {
+    tester.view
+      ..physicalSize = const Size(1280, 800)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = TestHarness();
+    await tester.pumpWidget(harness.scope(const PokerCreditsApp()));
+    await tester.pump();
+    await tester.tap(find.text('HOST A GAME'));
+    await tester.pumpAndSettle();
+    expect(find.text(Strings.hostTrustNote.toUpperCase()), findsNothing);
+    await tester.ensureVisible(find.text('CARDS IN THE APP'));
+    await tester.tap(find.text('CARDS IN THE APP'));
+    await tester.pumpAndSettle();
+    expect(find.text(Strings.hostTrustNote.toUpperCase()), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, 'Dimath');
+    await tester.ensureVisible(find.text('START HOSTING'));
+    await tester.tap(find.text('START HOSTING'));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(harness.host.lastConfig!.cardMode, CardMode.virtual);
     await tester.pumpWidget(const SizedBox());
   });
 

@@ -44,6 +44,9 @@ enum LinkFailure {
   /// The server refused too many attempts from this address.
   rateLimited,
 
+  /// The room needs a feature this app lacks (virtual cards): update the app.
+  updateRequired,
+
   /// The server refused the join and the socket was closed (full room, ...).
   refused,
 }

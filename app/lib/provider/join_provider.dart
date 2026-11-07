@@ -1,5 +1,6 @@
 import 'package:logging/logging.dart';
 import 'package:poker_credits/model/join_link.dart';
+import 'package:poker_credits/net/features.dart';
 import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/services.dart';
@@ -35,7 +36,7 @@ class JoinService {
         .notifier(sessionProvider)
         .attach(
           uri: link.webSocketUri,
-          first: JoinRoom(roomCode: link.roomCode, name: name.trim(), spectator: spectator),
+          first: JoinRoom(roomCode: link.roomCode, name: name.trim(), spectator: spectator, features: appFeatures),
           host: false,
         );
   }
@@ -52,7 +53,7 @@ class JoinService {
         .notifier(sessionProvider)
         .attach(
           uri: uri,
-          first: Resume(roomCode: stored.roomCode, sessionToken: stored.sessionToken),
+          first: Resume(roomCode: stored.roomCode, sessionToken: stored.sessionToken, features: appFeatures),
           host: false,
           playerId: stored.playerId,
         );

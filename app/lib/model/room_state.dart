@@ -13,6 +13,7 @@ class RoomState {
     this.clockOffsetMs = 0,
     this.nextActionSeq = 0,
     this.prompt,
+    this.holeCards,
     this.ticker = const <ActionPerformed>[],
     this.presenceCheck,
     this.lastError,
@@ -35,6 +36,11 @@ class RoomState {
   /// What the player on turn may do (only while it is this player's turn).
   final TurnPrompt? prompt;
 
+  /// Virtual cards: this player's own cards, from the private `HOLE_CARDS` message.
+  ///
+  /// Never read this to draw cards: use [visibleHoleCards], which checks the hand number.
+  final HoleCards? holeCards;
+
   /// Recent actions, newest last, for the ticker.
   final List<ActionPerformed> ticker;
 
@@ -52,6 +58,28 @@ class RoomState {
 
   /// How many actions the ticker keeps.
   static const int tickerLength = 20;
+
+  /// The two cards to show: [holeCards] only while they belong to the hand on the table. Between
+  /// a new hand's `STATE_UPDATE` and its `HOLE_CARDS` this is `null` and the dock shows backs.
+  List<PokerCard>? get visibleHoleCards {
+    final cards = holeCards;
+    final current = view;
+    if (cards == null || current == null || cards.handNumber != current.handNumber) return null;
+    return cards.cards;
+  }
+
+  /// Whether the hand on the table is a virtual-card hand. The view carries no room-wide card
+  /// mode, so this reads the signs a virtual hand leaves: a seat holding cards, community cards, a
+  /// payout, revealed hands, or cards dealt to me. A real-cards room shows none of them.
+  bool get showsCards {
+    final current = view;
+    if (current == null) return false;
+    return visibleHoleCards != null ||
+        current.board.isNotEmpty ||
+        current.result != null ||
+        current.reveals.isNotEmpty ||
+        current.seats.any((s) => s.hasCards);
+  }
 
   /// Whether the first snapshot has arrived.
   bool get hasView => view != null;
@@ -76,6 +104,7 @@ class RoomState {
           stateVersion: message.stateVersion,
           clockOffsetMs: message.serverTime - localNow.millisecondsSinceEpoch,
           nextActionSeq: message.nextActionSeq,
+          holeCards: _cardsFor(message.view),
           ticker: ticker,
           presenceCheck: presenceCheck,
         );
@@ -91,7 +120,13 @@ class RoomState {
           prompt: stale ? null : prompt,
           clearPrompt: stale,
           clearError: true,
+          clearHoleCards: _cardsFor(message.view) == null,
         );
+      case HoleCards():
+        final held = holeCards;
+        if (held != null && message.handNumber < held.handNumber) return this;
+        if (held == message) return this;
+        return _copy(holeCards: message);
       case TurnPrompt():
         return _copy(prompt: message, nextActionSeq: message.nextActionSeq);
       case ActionPerformed():
@@ -124,6 +159,13 @@ class RoomState {
     }
   }
 
+  /// The held cards unless [next] makes them stale: a lobby, or a later hand.
+  HoleCards? _cardsFor(RoomView next) {
+    final held = holeCards;
+    if (held == null || next.phase == WirePhase.lobby || next.handNumber > held.handNumber) return null;
+    return held;
+  }
+
   /// Clears the resync flag after a `RESUME` was sent.
   RoomState resyncRequested() => _copy(needsResync: false);
 
@@ -133,6 +175,8 @@ class RoomState {
     int? nextActionSeq,
     TurnPrompt? prompt,
     bool clearPrompt = false,
+    HoleCards? holeCards,
+    bool clearHoleCards = false,
     List<ActionPerformed>? ticker,
     ErrorMessage? lastError,
     bool clearError = false,
@@ -147,6 +191,7 @@ class RoomState {
       clockOffsetMs: clockOffsetMs,
       nextActionSeq: nextActionSeq ?? this.nextActionSeq,
       prompt: clearPrompt ? null : (prompt ?? this.prompt),
+      holeCards: clearHoleCards ? null : (holeCards ?? this.holeCards),
       ticker: ticker ?? this.ticker,
       presenceCheck: clearPresence ? null : (presenceCheck ?? this.presenceCheck),
       lastError: clearError ? null : (lastError ?? this.lastError),

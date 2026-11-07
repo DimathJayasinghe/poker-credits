@@ -18,6 +18,13 @@ class BrutalColors {
     required this.muted,
     required this.grain,
     required this.grainOpacity,
+    this.cardFace = const Color(0xFFFFFAF0),
+    this.cardBack = const Color(0xFF8C1F0C),
+    this.cardBackMark = const Color(0xFFF2D9B0),
+    this.suitRed = const Color(0xFF9E2210),
+    this.suitBlack = const Color(0xFF15120F),
+    this.suitGreen = const Color(0xFF14602F),
+    this.suitBlue = const Color(0xFF1A3F8F),
   });
 
   /// Page background, under the grain.
@@ -56,6 +63,30 @@ class BrutalColors {
 
   /// How strongly the noise tile shows.
   final double grainOpacity;
+
+  // Playing cards are drawn like real ones: a light face in both themes, so a card reads the
+  // same on paper, in the dark and on the felt. The edge is always an ink hairline.
+
+  /// The face of a card.
+  final Color cardFace;
+
+  /// The back of a card.
+  final Color cardBack;
+
+  /// The pattern on the back of a card.
+  final Color cardBackMark;
+
+  /// Hearts and diamonds. At least 7:1 on [cardFace].
+  final Color suitRed;
+
+  /// Spades and clubs.
+  final Color suitBlack;
+
+  /// Clubs in the four-colour deck.
+  final Color suitGreen;
+
+  /// Diamonds in the four-colour deck.
+  final Color suitBlue;
 
   /// Every hairline.
   Color get line => ink;

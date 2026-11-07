@@ -101,4 +101,88 @@ void main() {
     state = apply(state, const PresenceResolved(subjectPlayerId: 'p3', removed: true));
     expect(state.presenceCheck, isNull);
   });
+
+  group('showsCards (is this a virtual hand?)', () {
+    test('a real-cards room never does', () {
+      final state = apply(const RoomState(), snapshot(view: roomView(hand: 1, seats: <SeatView>[seatView(0, 'A'), seatView(1, 'B')])));
+      expect(state.showsCards, isFalse);
+    });
+
+    test('a seat holding cards, a board, a result or my own cards each make it one', () {
+      final held = apply(const RoomState(), snapshot(view: roomView(hand: 1, seats: <SeatView>[seatView(0, 'A', hasCards: true)])));
+      expect(held.showsCards, isTrue);
+      final board = apply(const RoomState(), snapshot(view: roomView(hand: 1, board: <PokerCard>[card('As'), card('Kd'), card('2c')])));
+      expect(board.showsCards, isTrue);
+      const paid = HandResult(uncontested: true, pots: <PotResult>[]);
+      final result = apply(const RoomState(), snapshot(view: roomView(hand: 1, result: paid)));
+      expect(result.showsCards, isTrue);
+      final mine = apply(apply(const RoomState(), snapshot(view: roomView(hand: 2))), holeCards('As', 'Kd', hand: 2));
+      expect(mine.showsCards, isTrue, reason: 'a player who folded still holds the hand they were dealt');
+    });
+
+    test('without a view it does not', () => expect(const RoomState().showsCards, isFalse));
+  });
+
+  group('hole cards', () {
+    test('hole cards survive a snapshot of the same hand', () {
+      var state = apply(const RoomState(), snapshot(version: 1, view: roomView(hand: 3)));
+      state = apply(state, holeCards('As', 'Kd', hand: 3));
+      expect(state.visibleHoleCards, [card('As'), card('Kd')]);
+      state = apply(state, snapshot(version: 2, view: roomView(hand: 3)));
+      expect(state.visibleHoleCards, [card('As'), card('Kd')], reason: 'a reconnect must not blink the cards away');
+    });
+
+    test('a higher hand number replaces hole cards', () {
+      var state = apply(const RoomState(), snapshot(view: roomView(hand: 3)));
+      state = apply(state, holeCards('As', 'Kd', hand: 3));
+      state = apply(state, StateUpdate(stateVersion: 2, view: roomView(hand: 4)));
+      expect(state.visibleHoleCards, isNull, reason: 'between the hand 4 update and its cards the dock shows backs');
+      state = apply(state, holeCards('2c', '7h', hand: 4));
+      expect(state.visibleHoleCards, [card('2c'), card('7h')]);
+    });
+
+    test('cards that arrive before their hand view wait for it', () {
+      var state = apply(const RoomState(), snapshot(view: roomView(hand: 3)));
+      state = apply(state, holeCards('2c', '7h', hand: 4));
+      expect(state.visibleHoleCards, isNull);
+      state = apply(state, StateUpdate(stateVersion: 2, view: roomView(hand: 4)));
+      expect(state.visibleHoleCards, [card('2c'), card('7h')]);
+    });
+
+    test('an older hand\'s cards never replace newer ones', () {
+      var state = apply(const RoomState(), snapshot(view: roomView(hand: 5)));
+      state = apply(state, holeCards('2c', '7h', hand: 5));
+      state = apply(state, holeCards('As', 'Kd', hand: 4));
+      expect(state.visibleHoleCards, [card('2c'), card('7h')]);
+    });
+
+    test('a lobby view clears hole cards', () {
+      var state = apply(const RoomState(), snapshot(view: roomView(hand: 3)));
+      state = apply(state, holeCards('As', 'Kd', hand: 3));
+      state = apply(state, StateUpdate(stateVersion: 2, view: roomView(hand: 3, phase: WirePhase.lobby)));
+      expect(state.holeCards, isNull);
+    });
+
+    test('duplicate hole cards are a no-op', () {
+      var state = apply(const RoomState(), snapshot(view: roomView(hand: 3)));
+      state = apply(state, holeCards('As', 'Kd', hand: 3));
+      final again = apply(state, holeCards('As', 'Kd', hand: 3));
+      expect(identical(again, state), isTrue);
+    });
+
+    test('stale hole cards are not shown after a new deal', () {
+      var state = apply(const RoomState(), snapshot(view: roomView(hand: 3)));
+      state = apply(state, holeCards('As', 'Kd', hand: 3));
+      state = apply(state, snapshot(version: 2, view: roomView(hand: 4)));
+      expect(state.visibleHoleCards, isNull);
+      expect(state.holeCards, isNull, reason: 'a newer view drops the old hand\'s cards entirely');
+    });
+
+    test('the cards stay readable through the next-hand screen of the same hand', () {
+      var state = apply(const RoomState(), snapshot(view: roomView(hand: 3)));
+      state = apply(state, holeCards('As', 'Kd', hand: 3));
+      state = apply(state, StateUpdate(stateVersion: 2, view: roomView(hand: 3, phase: WirePhase.nextHandPrep)));
+      expect(state.visibleHoleCards, [card('As'), card('Kd')]);
+    });
+  });
 }

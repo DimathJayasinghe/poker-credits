@@ -3,6 +3,7 @@ import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/pages/table_page.dart';
 import 'package:poker_credits/provider/host_provider.dart';
 import 'package:poker_credits/provider/settings_provider.dart';
+import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/app_shell.dart';
@@ -10,6 +11,7 @@ import 'package:poker_credits/widget/brutal/brutal_banner.dart';
 import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_credits/widget/brutal/brutal_card.dart';
+import 'package:poker_credits/widget/brutal/brutal_segmented.dart';
 import 'package:poker_credits/widget/brutal/brutal_text_field.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -32,6 +34,7 @@ class _HostPageState extends State<HostPage> with Refena {
   final _big = TextEditingController(text: '${defaultRoomConfig.bigBlind}');
   final _seconds = TextEditingController(text: '${defaultRoomConfig.turnTimeLimitSeconds}');
   bool _submitted = false;
+  CardMode _cards = defaultRoomConfig.cardMode;
 
   @override
   void dispose() {
@@ -54,6 +57,7 @@ class _HostPageState extends State<HostPage> with Refena {
     final seconds = _number(_seconds);
     if (!_nameRule.hasMatch(name) || chips == null || small == null || big == null || seconds == null) return;
     final config = RoomConfig(
+      cardMode: _cards,
       startingChips: chips,
       smallBlind: small,
       bigBlind: big,
@@ -154,6 +158,25 @@ class _HostPageState extends State<HostPage> with Refena {
                               keyboardType: TextInputType.number,
                               errorText: _numberError(_seconds),
                             ),
+                            const SizedBox(height: BrutalMetrics.gapM),
+                            Text(
+                              Strings.cardsLabel,
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: BrutalTheme.of(context).colors.ink),
+                            ),
+                            const SizedBox(height: BrutalMetrics.gapS),
+                            BrutalSegmented<CardMode>(
+                              semanticLabel: Strings.cardsLabel,
+                              value: _cards,
+                              options: const <(CardMode, String)>[
+                                (CardMode.physical, Strings.cardsReal),
+                                (CardMode.virtual, Strings.cardsVirtual),
+                              ],
+                              onChanged: busy ? (_) {} : (v) => setState(() => _cards = v),
+                            ),
+                            if (_cards == CardMode.virtual) ...<Widget>[
+                              const SizedBox(height: BrutalMetrics.gapS),
+                              const BrutalBanner(message: Strings.hostTrustNote, kind: BrutalBannerKind.info),
+                            ],
                           ],
                         ),
                       ),

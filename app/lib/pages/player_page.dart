@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:poker_credits/model/room_state.dart';
+import 'package:poker_credits/model/runout_pacer.dart';
 import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/join_provider.dart';
@@ -23,7 +24,13 @@ import 'package:poker_credits/widget/brutal/brutal_dialog.dart';
 import 'package:poker_credits/widget/brutal/brutal_sheet.dart';
 import 'package:poker_credits/widget/brutal/brutal_tag.dart';
 import 'package:poker_credits/widget/table/seat_order_sheet.dart';
+import 'package:poker_credits/widget/cards/board_view.dart';
+import 'package:poker_credits/widget/cards/card_row.dart';
+import 'package:poker_credits/widget/cards/hole_cards_dock.dart';
+import 'package:poker_credits/widget/cards/playing_card.dart';
+import 'package:poker_credits/widget/cards/showdown_panel.dart';
 import 'package:poker_credits/widget/player/action_buttons.dart';
+import 'package:poker_credits/widget/player/opponent_strip.dart';
 import 'package:poker_credits/widget/player/raise_slider.dart';
 import 'package:poker_credits/widget/player/rebuy_sheet.dart';
 import 'package:poker_credits/widget/player/turn_alert.dart';
@@ -49,6 +56,14 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
   /// The action counter of the action already sent, so a second tap before the answer is ignored.
   int? _sentSeq;
 
+  /// Whether my own cards are face up, and for which hand that was decided. A new hand starts from
+  /// the setting again, so cards never carry over open.
+  bool _faceUp = false;
+  int? _cardsHand;
+
+  /// Reveals a run-out one street at a time; the result waits until the last card is down.
+  final RunoutPacer _pacer = RunoutPacer();
+
   @override
   void initState() {
     super.initState();
@@ -66,6 +81,10 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
     // Back from the background: the socket is probably dead, so reconnect and let the server
     // send a fresh snapshot (a `RESUME`, never a second join).
     if (state == AppLifecycleState.resumed) ref.notifier(sessionProvider).reconnect();
+    // Leaving the app (switcher thumbnails, a notification pulled down) never leaves cards open.
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive || state == AppLifecycleState.hidden) {
+      if (_faceUp) setState(() => _faceUp = false);
+    }
   }
 
   @override
@@ -250,8 +269,35 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
     );
   }
 
-  Widget _controller(BuildContext context, SessionState session, RoomView view, SeatView seat) {
+  /// Starts every hand from the "show my cards at once" setting.
+  void _syncCards(RoomView view, bool startOpen) {
+    if (_cardsHand == view.handNumber) return;
+    _cardsHand = view.handNumber;
+    _faceUp = startOpen;
+  }
+
+  Widget _dock(RoomState room, SeatView seat, bool fourColour) {
+    final cards = seat.hasFolded ? null : room.visibleHoleCards;
+    // Dealt but the private message is still on its way: show the backs, not "no cards".
+    if (cards == null && seat.hasCards && !seat.hasFolded) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: BrutalMetrics.gapS),
+        child: CardRow(cards: <PokerCard?>[null, null], size: CardSize.hero, gap: BrutalMetrics.gapS, alignment: MainAxisAlignment.center),
+      );
+    }
+    return HoleCardsDock(cards: cards, faceUp: _faceUp, onToggle: () => setState(() => _faceUp = !_faceUp), fourColour: fourColour);
+  }
+
+  Widget _controller(BuildContext context, SessionState session, RoomView rawView, SeatView rawSeat) {
     final c = BrutalTheme.of(context).colors;
+    final settings = context.ref.watch(settingsProvider);
+    final showCards = session.room.showsCards;
+    _syncCards(rawView, settings.cardsFaceUp);
+    // While a run-out is dealt the screen shows the table as it was: see RunoutPacer.paced.
+    final view = _pacer.paced(rawView, ref.read(clockProvider)(), instant: MediaQuery.of(context).disableAnimations);
+    final seat = view.seats.where((s) => s.playerId == rawSeat.playerId).firstOrNull ?? rawSeat;
+    final board = view.board;
+    final result = view.result;
     final room = session.room;
     final live = session.link.isLive;
     final now = ref.read(clockProvider)();
@@ -296,6 +342,7 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
                 padding: const EdgeInsets.all(BrutalMetrics.gapM),
                 child: _StackBlock(seat: seat),
               ),
+              if (showCards) ...<Widget>[OpponentStrip(seats: view.seats, myPlayerId: seat.playerId), const SizedBox(height: BrutalMetrics.gapS)],
               if (guestMayChooseSeat(view.phase))
                 Padding(
                   padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapM, 0, BrutalMetrics.gapM, BrutalMetrics.gapM),
@@ -319,6 +366,21 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
                           textAlign: TextAlign.center,
                           style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 28, color: c.ink),
                         ),
+                        if (showCards) ...<Widget>[
+                          const SizedBox(height: BrutalMetrics.gapM),
+                          Center(
+                            child: BoardView(shown: board, fourColour: settings.fourColourDeck),
+                          ),
+                        ],
+                        if (result != null) ...<Widget>[
+                          const SizedBox(height: BrutalMetrics.gapM),
+                          ShowdownPanel(
+                            reveals: view.reveals,
+                            result: result,
+                            fourColour: settings.fourColourDeck,
+                            myPlayerId: seat.playerId,
+                          ),
+                        ],
                         if (room.ticker.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: BrutalMetrics.gapS),
@@ -339,6 +401,7 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
+                    if (showCards) _dock(room, seat, settings.fourColourDeck),
                     if (myPrompt != null) ...<Widget>[
                       ActionButtons(
                         legal: myPrompt.legal,

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:logging/logging.dart';
 import 'package:poker_credits/model/hosting.dart';
+import 'package:poker_credits/net/features.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_protocol/poker_protocol.dart';
@@ -120,7 +121,12 @@ class HostNotifier extends Notifier<HostState> {
         .notifier(sessionProvider)
         .attach(
           uri: _loopback(room.port),
-          first: Resume(roomCode: room.roomCode, sessionToken: room.sessionToken, hostToken: room.hostToken),
+          first: Resume(
+            roomCode: room.roomCode,
+            sessionToken: room.sessionToken,
+            hostToken: room.hostToken,
+            features: appFeatures,
+          ),
           host: true,
           playerId: room.playerId.isEmpty ? null : room.playerId,
         );

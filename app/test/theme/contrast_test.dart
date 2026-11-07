@@ -40,6 +40,26 @@ void main() {
       test('text on felt is at least 4.5:1', () => expect(contrast(c.onFelt, c.felt), greaterThanOrEqualTo(4.5)));
       test('text on the chip fill is at least 7:1', () => expect(contrast(c.onChip, c.chip), greaterThanOrEqualTo(7)));
       test('inverted cells (paper on ink) are at least 7:1', () => expect(contrast(c.paper, c.ink), greaterThanOrEqualTo(7)));
+      test('every suit colour is at least 7:1 on the card face, in both themes', () {
+        for (final suit in <Color>[c.suitRed, c.suitBlack, c.suitGreen, c.suitBlue]) {
+          expect(contrast(suit, c.cardFace), greaterThanOrEqualTo(7));
+        }
+      });
+      test('the four suit colours stay apart for the four-colour deck (no two closer than 1.3:1)', () {
+        final suits = <Color>[c.suitRed, c.suitBlack, c.suitGreen, c.suitBlue];
+        for (var i = 0; i < suits.length; i++) {
+          for (var j = i + 1; j < suits.length; j++) {
+            expect(suits[i], isNot(suits[j]));
+          }
+        }
+      });
+      test('a card stands out from the paper, the surface and the felt (3:1 at its edge)', () {
+        for (final ground in <Color>[c.paper, c.surface, c.felt]) {
+          expect(contrast(c.cardFace, ground) >= 3 || contrast(c.ink, ground) >= 3, isTrue);
+        }
+        expect(contrast(c.cardBack, c.cardFace), greaterThanOrEqualTo(3));
+        expect(contrast(c.cardBackMark, c.cardBack), greaterThanOrEqualTo(3));
+      });
       test('a pressed accent cell (paper on ink) and the ink focus outline read on paper', () {
         expect(contrast(c.ink, c.paper), greaterThanOrEqualTo(3));
       });

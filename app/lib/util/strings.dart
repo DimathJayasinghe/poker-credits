@@ -2,7 +2,7 @@
 /// Widgets uppercase presentation text themselves (docs/UI_DESIGN.md section 6).
 abstract final class Strings {
   static const String appName = 'Poker Credits';
-  static const String tagline = 'Chips and pots for physical cards';
+  static const String tagline = 'Chips and pots, with real or in-app cards';
   static const String initErrorTitle = 'Startup failed';
   static const String initErrorHint = 'Copy this report when asking for help.';
   static const String copy = 'Copy report';
@@ -47,6 +47,11 @@ abstract final class Strings {
   static const String keepAwakeLabel = 'Keep screen on';
   static const String keepAwakeCaption = 'While a game is open, so the screen never dims.';
   static const String sectionYou = 'You';
+  static const String sectionCards = 'Cards';
+  static const String fourColourLabel = 'Four-colour deck';
+  static const String fourColourCaption = 'Clubs green and diamonds blue, so the suits differ by colour as well as shape.';
+  static const String cardsFaceUpLabel = 'Show my cards at once';
+  static const String cardsFaceUpCaption = 'Off: your cards stay face down until you tap them, so nobody beside you sees them.';
   static const String defaultNameLabel = 'Default name';
   static const String defaultNameHint = 'Filled in when you join a game';
   static const String sectionData = 'Data';
@@ -139,6 +144,7 @@ abstract final class Strings {
   static const String linkFailedCrashed = 'The room crashed and was frozen';
   static const String linkFailedExpired = 'The room expired';
   static const String linkFailedVersion = 'Update the app: it speaks a different protocol version';
+  static const String linkFailedUpdate = 'This room uses virtual cards. Update the app to join';
   static const String linkFailedRate = 'Too many attempts from this address. Wait a few minutes';
   static const String linkFailedRefused = 'The server refused the connection';
   static const String roomEndedTitle = 'Room closed';
@@ -174,7 +180,8 @@ abstract final class Strings {
   static const String nearbyNone = 'No open games found. Ask the host for the room code, or search again.';
   static const String nearbyAgain = 'Search again';
   static const String nearbyPick = 'Tap a game, then your name, then join.';
-  static String nearbySeats(String code, int count, int max) => 'Room $code, $count of $max seats taken';
+  static String nearbySeats(String code, int count, int max, {bool virtual = false}) =>
+      'Room $code, $count of $max seats taken${virtual ? '. Cards in the app' : ''}';
   static const String searchingHost = 'Looking for the game on this Wi-Fi';
   static const String hostNotFound =
       'No game with that code found on this Wi-Fi. Check the code, and that you are on the same Wi-Fi as the host (not a guest network). Or enter the host address';
@@ -202,6 +209,65 @@ abstract final class Strings {
   static const String errNameInvalid = 'Use 1 to 20 letters, digits, spaces, - or _';
   static const String errRoomNotFound = 'No game with that code on this address';
   static const String errHandInProgress = 'A hand is being played. You join the next one';
+  static const String errUpdateRequired = 'This room uses virtual cards. Update the app to join';
+  // Cards
+  static const String cardBack = 'Face-down card';
+
+  /// In [CardRank] order, lowest first.
+  static const List<String> rankNames = <String>[
+    'Two',
+    'Three',
+    'Four',
+    'Five',
+    'Six',
+    'Seven',
+    'Eight',
+    'Nine',
+    'Ten',
+    'Jack',
+    'Queen',
+    'King',
+    'Ace',
+  ];
+
+  /// In [CardSuit] order: clubs, diamonds, hearts, spades.
+  static const List<String> suitNames = <String>['clubs', 'diamonds', 'hearts', 'spades'];
+  static String cardOf(String rank, String suit) => '$rank of $suit';
+  static const String handHighCard = 'High card';
+  static const String handPair = 'Pair';
+  static const String handTwoPair = 'Two pair';
+  static const String handThreeOfAKind = 'Three of a kind';
+  static const String handStraight = 'Straight';
+  static const String handFlush = 'Flush';
+  static const String handFullHouse = 'Full house';
+  static const String handFourOfAKind = 'Four of a kind';
+  static const String handStraightFlush = 'Straight flush';
+  static const String opponents = 'Other players';
+  static const String hasCards = 'has cards';
+  static const String undoVirtualNote = 'Undo works inside one betting round. Once a card is turned it cannot be taken back.';
+  static const String winsTag = 'Wins';
+  static String potWonBy(String pot, int amount, String who) => '$pot $amount: $who';
+  static const String winnerTag = 'Wins';
+  static const String youTag = 'You';
+  static const String showdownTitle = 'Showdown';
+  static const String wonUncontested = 'Everyone else folded';
+  static const String mainPot = 'Main pot';
+  static String sidePotNumber(int n) => 'Side pot $n';
+  static const String noCards = 'No cards';
+  static const String yourCards = 'Your cards';
+  static const String tapToShow = 'Tap to show your cards';
+  static const String tapToHide = 'Tap to hide your cards';
+  static const String holdToLook = 'Hold to look at your cards';
+  static const String hideCards = 'Hide';
+  static const String showCards = 'Look';
+  static const String boardLabel = 'Board';
+  static const String cardsHiddenSemantics = 'Your cards are hidden';
+
+  // Card mode
+  static const String cardsLabel = 'Cards';
+  static const String cardsReal = 'Real cards';
+  static const String cardsVirtual = 'Cards in the app';
+  static const String hostTrustNote = 'This phone deals and holds every hand. Keep it with you and play fair';
   static const String errGeneric = 'The server said no';
 
   // Player controller

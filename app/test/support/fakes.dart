@@ -66,10 +66,20 @@ class FakeNetwork {
 /// Loads the bundled fonts so widget text has real glyph metrics.
 Future<void> loadFonts() => loadBrutalFonts();
 
-RoomView roomView({int hand = 1, int? activeSeat, int pot = 0, List<SeatView>? seats, int? deadline}) => RoomView(
+RoomView roomView({
+  int hand = 1,
+  int? activeSeat,
+  int pot = 0,
+  List<SeatView>? seats,
+  int? deadline,
+  WirePhase phase = WirePhase.preFlop,
+  List<PokerCard> board = const <PokerCard>[],
+  List<Reveal> reveals = const <Reveal>[],
+  HandResult? result,
+}) => RoomView(
   roomCode: 'KQ7M',
   handNumber: hand,
-  phase: WirePhase.preFlop,
+  phase: phase,
   activeSeat: activeSeat,
   currentHighBet: 0,
   minRaiseTo: 0,
@@ -79,7 +89,16 @@ RoomView roomView({int hand = 1, int? activeSeat, int pot = 0, List<SeatView>? s
   paused: false,
   turnDeadlineMs: deadline,
   spectatorCount: 0,
+  board: board,
+  reveals: reveals,
+  result: result,
 );
+
+/// A card from its wire text, for example `card('As')`.
+PokerCard card(String text) => PokerCard.parse(text);
+
+/// `HOLE_CARDS` for [hand].
+HoleCards holeCards(String first, String second, {int hand = 1}) => HoleCards(handNumber: hand, cards: [card(first), card(second)]);
 
 Snapshot snapshot({int version = 1, int serverTime = 0, int nextActionSeq = 0, RoomView? view}) =>
     Snapshot(stateVersion: version, serverTime: serverTime, nextActionSeq: nextActionSeq, view: view ?? roomView());
@@ -96,6 +115,7 @@ class FakeHostServer implements HostServer {
   final HostException? failure;
   final int portNumber;
   int started = 0;
+  RoomConfig? lastConfig;
   int ensured = 0;
   int stopped = 0;
   bool running = false;
@@ -117,6 +137,7 @@ class FakeHostServer implements HostServer {
   @override
   Future<HostedRoom> hostGame({required String hostName, required RoomConfig config}) async {
     await startServer();
+    lastConfig = config;
     return HostedRoom(roomCode: 'KQ7M', playerId: 'p_host', sessionToken: 'sess', hostToken: 'host-secret', port: portNumber);
   }
 
@@ -302,6 +323,7 @@ SeatView seatView(
   bool allIn = false,
   bool away = false,
   bool connected = true,
+  bool hasCards = false,
 }) => SeatView(
   seatIndex: index,
   playerId: 'p_$index',
@@ -312,4 +334,5 @@ SeatView seatView(
   isAllIn: allIn,
   isSittingOut: away,
   isConnected: connected,
+  hasCards: hasCards,
 );

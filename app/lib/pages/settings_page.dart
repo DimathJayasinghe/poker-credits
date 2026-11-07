@@ -149,6 +149,19 @@ class _SettingsViewState extends State<SettingsView> with Refena {
                       value: settings.keepAwake,
                       onChanged: (v) => _change((s) => s.copyWith(keepAwake: v)),
                     ),
+                    const _Section(Strings.sectionCards),
+                    BrutalSwitchRow(
+                      label: Strings.fourColourLabel,
+                      caption: Strings.fourColourCaption,
+                      value: settings.fourColourDeck,
+                      onChanged: (v) => _change((s) => s.copyWith(fourColourDeck: v)),
+                    ),
+                    BrutalSwitchRow(
+                      label: Strings.cardsFaceUpLabel,
+                      caption: Strings.cardsFaceUpCaption,
+                      value: settings.cardsFaceUp,
+                      onChanged: (v) => _change((s) => s.copyWith(cardsFaceUp: v)),
+                    ),
                     const _Section(Strings.sectionYou),
                     Padding(
                       padding: const EdgeInsets.all(BrutalMetrics.gapM),

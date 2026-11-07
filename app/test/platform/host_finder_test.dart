@@ -189,6 +189,21 @@ void main() {
       );
     });
 
+    test('a lobby is virtual only when the server says so exactly', () {
+      DiscoveredLobby? parse(Object? mode) => DiscoveredLobby.tryParse(<String, Object?>{
+        'roomCode': 'KQ7M',
+        'hostName': 'a',
+        'playerCount': 1,
+        'maxPlayers': 10,
+        'cardMode': ?mode,
+      }, 'h:1');
+      expect(parse('VIRTUAL')!.isVirtual, isTrue);
+      expect(parse('PHYSICAL')!.isVirtual, isFalse);
+      expect(parse(null)!.isVirtual, isFalse, reason: 'an older host says nothing: real cards');
+      expect(parse(7)!.isVirtual, isFalse);
+      expect(parse('virtual')!.isVirtual, isFalse);
+    });
+
     test('the same game answered twice is listed once', () async {
       final server = await lobbyHost(<String, Object?>{
         'lobbies': <Object?>[entry('KQ7M'), entry('KQ7M')],

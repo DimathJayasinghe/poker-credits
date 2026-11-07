@@ -97,6 +97,7 @@ void main() {
     expect(harness.network.uris.last.toString(), 'ws://192.168.1.5:7878/v1/ws');
     final join = harness.network.last.sent.single as JoinRoom;
     expect((join.roomCode, join.name, join.spectator), ('KQ7M', 'Alice', false));
+    expect(join.features, contains(featureVirtualCards), reason: 'join_sends_virtual_cards_feature');
     expect(find.text('CONNECTING'), findsOneWidget);
 
     harness.network.last
@@ -318,6 +319,7 @@ void main() {
     expect(harness.network.opened.length, opened + 1);
     final resume = harness.network.last.sent.single as Resume;
     expect((resume.roomCode, resume.sessionToken, resume.hostToken), ('KQ7M', 'alice-token', null));
+    expect(resume.features, contains(featureVirtualCards));
     await _close(tester);
   });
 

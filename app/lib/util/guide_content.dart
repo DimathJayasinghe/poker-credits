@@ -38,16 +38,16 @@ const List<GuideStep> guideNight = <GuideStep>[
   GuideStep('One phone hosts', 'Tap Host a game. The screen shows a room code and a QR code. Everyone must be on the same Wi-Fi.'),
   GuideStep('Everyone joins', 'Friends tap Join a game, type the code and a name, and sit down with the same number of chips.'),
   GuideStep(
-    'Deal real cards',
-    'The app never sees a card. Shuffle and deal a normal deck: two private cards each, and the shared cards face up in the middle.',
+    'Real cards, or cards in the app',
+    'The host picks when starting. With real cards the app never sees a card: shuffle and deal a normal deck. With cards in the app it shuffles and deals for you: your two cards sit face down on your phone until you tap them.',
   ),
   GuideStep(
     'Play on your phone',
     'When it is your turn a big YOUR TURN block appears. Tap Fold, Check, Call or Raise. The app keeps every chip count.',
   ),
   GuideStep(
-    'Show cards, host picks the winner',
-    'At the end, players still in show their cards. Whoever hosts taps the winner and the app pays the pot. Then the next hand starts.',
+    'Show cards, then the pot is paid',
+    'At the end, players still in show their cards. With real cards the host taps the winner. With cards in the app everyone sees every hand and the app pays the pots itself. Then the next hand starts.',
   ),
 ];
 

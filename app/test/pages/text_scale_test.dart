@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/main.dart';
+import 'package:poker_credits/widget/cards/hole_cards_dock.dart';
 import 'package:poker_credits/widget/table/seat_plate.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
@@ -164,6 +165,72 @@ void main() {
         await _pump(tester, size, scale, harness);
         await _joinAsAlice(tester, harness, view: _betting(active: 2));
         _noOverflow(tester);
+        await tester.pumpWidget(const SizedBox());
+      });
+
+      testWidgets('player page, virtual hand with a full board and a showdown, holds at $where', (tester) async {
+        final harness = TestHarness();
+        await _pump(tester, size, scale, harness);
+        final board = <PokerCard>[card('9c'), card('Jh'), card('2d'), card('Ks'), card('3c')];
+        final seats = <SeatView>[
+          for (final seat in _seats)
+            SeatView(
+              seatIndex: seat.seatIndex,
+              playerId: seat.playerId,
+              name: seat.name,
+              chips: seat.chips,
+              streetBet: seat.streetBet,
+              hasFolded: seat.hasFolded,
+              isAllIn: seat.isAllIn,
+              isSittingOut: seat.isSittingOut,
+              isConnected: seat.isConnected,
+              hasCards: !seat.hasFolded,
+            ),
+        ];
+        await _joinAsAlice(
+          tester,
+          harness,
+          view: _betting().copyWith(seats: seats, board: board),
+        );
+        harness.network.last.serverSends(holeCards('As', 'Kd', hand: 12));
+        await tester.pump();
+        await tester.pump();
+        await tester.tap(find.byType(HoleCardsDock), warnIfMissed: false);
+        await tester.pumpAndSettle();
+        _noOverflow(tester, 'cards face up');
+
+        Reveal reveal(String id, String name) => Reveal(
+          playerId: id,
+          name: name,
+          cards: <PokerCard>[card('As'), card('Kd')],
+          category: HandCategory.pair,
+          bestFive: <PokerCard>[card('Kd'), card('Ks'), card('Jh'), card('9c'), card('3c')],
+        );
+        harness.network.last.serverSends(
+          StateUpdate(
+            stateVersion: 2,
+            view: _betting().copyWith(
+              seats: seats,
+              board: board,
+              phase: WirePhase.showdown,
+              reveals: <Reveal>[for (final seat in seats.where((s) => !s.hasFolded)) reveal(seat.playerId, seat.name)],
+              result: const HandResult(
+                uncontested: false,
+                pots: <PotResult>[
+                  PotResult(
+                    potIndex: 0,
+                    amount: 98765,
+                    winnerPlayerIds: <String>['p_1'],
+                    shares: <Share>[Share(playerId: 'p_1', name: 'Alice', amount: 98765)],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+        _noOverflow(tester, 'showdown');
         await tester.pumpWidget(const SizedBox());
       });
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:poker_credits/model/room_state.dart';
+import 'package:poker_credits/model/runout_pacer.dart';
 import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/host_provider.dart';
@@ -21,6 +22,8 @@ import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_dialog.dart';
 import 'package:poker_credits/widget/brutal/brutal_sheet.dart';
+import 'package:poker_credits/widget/cards/board_view.dart';
+import 'package:poker_credits/widget/cards/hole_cards_dock.dart';
 import 'package:poker_credits/widget/player/action_buttons.dart';
 import 'package:poker_credits/widget/player/raise_slider.dart';
 import 'package:poker_credits/widget/player/turn_alert.dart';
@@ -28,6 +31,7 @@ import 'package:poker_credits/widget/table/action_ticker.dart';
 import 'package:poker_credits/widget/table/felt_layout.dart';
 import 'package:poker_credits/widget/table/host_controls.dart';
 import 'package:poker_credits/widget/table/pot_display.dart';
+import 'package:poker_credits/widget/table/pot_results.dart';
 import 'package:poker_credits/widget/table/qr_panel.dart';
 import 'package:poker_credits/widget/table/seat_plate.dart';
 import 'package:poker_credits/widget/table/seat_order_sheet.dart';
@@ -61,6 +65,14 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
   final TurnAlertGate _gate = TurnAlertGate();
   int? _sentSeq;
 
+  /// The seated host's own cards: face up or not, and for which hand that was decided (see
+  /// `PlayerPage`). On a screen others can see, cards only show while a finger is held on them.
+  bool _faceUp = false;
+  int? _cardsHand;
+
+  /// Reveals a run-out one street at a time; plates, winners and START HAND wait for the last card.
+  final RunoutPacer _pacer = RunoutPacer();
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +89,9 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive || state == AppLifecycleState.hidden) {
+      if (_faceUp) setState(() => _faceUp = false);
+    }
     if (state == AppLifecycleState.resumed) {
       if (widget.watching) {
         ref.notifier(sessionProvider).reconnect();
@@ -247,8 +262,8 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
         ),
       );
     }
-    final view = session.room.view;
-    if (view == null) {
+    final rawView = session.room.view;
+    if (rawView == null) {
       return Column(
         children: <Widget>[
           if (session.link.isReconnecting) _linkBanner(session.link),
@@ -265,6 +280,8 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
     }
     final room = session.room;
     final now = ref.read(clockProvider)();
+    final view = _pacer.paced(rawView, now, instant: MediaQuery.of(context).disableAnimations);
+    final settled = _pacer.settled(rawView.board);
     final remaining = room.turnRemainingMs(now);
     final limit = view.turnDeadlineMs == null ? null : (room.view?.turnDeadlineMs);
     final myId = host.room?.playerId;
@@ -273,6 +290,30 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
     final mine = _myPrompt(session, view);
     _alertOnce(session, view, mine);
     final inFlight = _sentSeq == room.nextActionSeq && room.lastError == null;
+    final settings = context.ref.watch(settingsProvider);
+    final showCards = room.showsCards;
+    final board = view.board;
+    final result = view.result;
+    final revealsById = <String, Reveal>{for (final r in view.reveals) r.playerId: r};
+    final winners = <String>{
+      if (result != null)
+        for (final pot in result.pots) ...pot.winnerPlayerIds,
+    };
+    final mySeat = widget.watching ? null : session.mySeat;
+    if (_cardsHand != view.handNumber) {
+      _cardsHand = view.handNumber;
+      _faceUp = settings.cardsFaceUp;
+    }
+    final sharedScreen = MediaQuery.sizeOf(context).width >= FeltLayout.narrowWidth;
+    final dock = showCards && mySeat != null
+        ? HoleCardsDock(
+            cards: mySeat.hasFolded ? null : room.visibleHoleCards,
+            faceUp: _faceUp,
+            pressToPeek: sharedScreen,
+            fourColour: settings.fourColourDeck,
+            onToggle: () => setState(() => _faceUp = !_faceUp),
+          )
+        : null;
     Widget felt({required bool shrink}) => FeltLayout(
       shrinkWrap: shrink,
       seatCount: tableSeats,
@@ -283,7 +324,14 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 PotDisplay(total: view.totalPot, pots: view.pots),
-                if (acting != null) ...<Widget>[
+                if (showCards) ...<Widget>[
+                  const SizedBox(height: BrutalMetrics.gapS),
+                  BoardView(shown: board, fourColour: settings.fourColourDeck, slotColor: c.onFelt),
+                ],
+                if (result != null) ...<Widget>[
+                  const SizedBox(height: BrutalMetrics.gapS),
+                  PotResults(result: result, color: c.onFelt),
+                ] else if (acting != null) ...<Widget>[
                   const SizedBox(height: BrutalMetrics.gapM),
                   Text(
                     '> ${Strings.acting.toUpperCase()}: ${acting.name.toUpperCase()}${remaining == null ? '' : '  ${clock(remaining)}'}',
@@ -305,10 +353,16 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
           turnFraction: fraction,
           seatNumber: seatsLocked(view.phase) ? null : seatNumber(index),
           onTap: session.isHost && seat.playerId != myId ? () => _seatMenu(seat) : null,
+          cards: revealsById[seat.playerId]?.cards ?? (showCards && seat.hasCards && !seat.hasFolded ? const <PokerCard?>[null, null] : null),
+          isWinner: winners.contains(seat.playerId),
         );
       },
     );
     final actionBlock = <Widget>[
+      if (dock != null)
+        Center(
+          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: dock),
+        ),
       if (mine != null)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
@@ -366,6 +420,8 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
                     onPickWinners: () => _pickWinners(view),
                     onSeats: () => showSeatOrderSheet(context, isHost: true),
                     onEndGame: _endGame,
+                    virtual: showCards,
+                    holdStart: !settled,
                   ),
                 ],
               ),
@@ -386,7 +442,7 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
             builder: (context, box) {
               // Roomy: the oval fills what the controls leave. Cramped: the whole middle scrolls
               // and the controls come first, so nothing is ever drawn over anything else.
-              if (_cramped(context, box, myTurn: mine != null, host: session.isHost, lobby: view.phase == WirePhase.lobby)) {
+              if (_cramped(context, box, myTurn: mine != null, host: session.isHost, lobby: view.phase == WirePhase.lobby, dock: dock != null)) {
                 // Short content sits with the controls at the bottom edge; long content scrolls.
                 return SingleChildScrollView(
                   child: ConstrainedBox(
@@ -435,13 +491,20 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
   /// a phone.
   static const double _turnBlockHeight = 150;
 
+  /// The seated host's cards and their caption.
+  static const double _dockHeight = 170;
+
   static double _hostBlockHeight({required double width, required bool lobby}) {
     final rows = width < 480 ? 2 : 1;
     return 16 + (lobby ? 44 : 0) + 56 + BrutalMetrics.gapS + rows * 48 + (rows - 1) * BrutalMetrics.gapS;
   }
 
-  bool _cramped(BuildContext context, BoxConstraints box, {required bool myTurn, required bool host, required bool lobby}) {
-    final chrome = (myTurn ? _turnBlockHeight : 0) + (host ? _hostBlockHeight(width: box.maxWidth, lobby: lobby) : 0) + 2 * BrutalMetrics.gapM;
+  bool _cramped(BuildContext context, BoxConstraints box, {required bool myTurn, required bool host, required bool lobby, required bool dock}) {
+    final chrome =
+        (dock ? _dockHeight : 0) +
+        (myTurn ? _turnBlockHeight : 0) +
+        (host ? _hostBlockHeight(width: box.maxWidth, lobby: lobby) : 0) +
+        2 * BrutalMetrics.gapM;
     if (box.maxWidth < FeltLayout.narrowWidth) return box.maxHeight < 420 + chrome;
     return box.maxHeight < FeltLayout.minOvalHeight(context) + chrome;
   }

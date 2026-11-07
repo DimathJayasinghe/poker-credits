@@ -24,8 +24,27 @@ Future<TestHarness> _openJoin(WidgetTester tester, {TestHarness? harness}) async
   return h;
 }
 
+const _vic = DiscoveredLobby(
+  hostAndPort: '192.168.1.42:7880',
+  roomCode: 'VCRD',
+  hostName: 'Vic',
+  playerCount: 2,
+  maxPlayers: 10,
+  isVirtual: true,
+);
+
 void main() {
   setUpAll(loadFonts);
+
+  testWidgets('a room that deals cards in the app says so in the list', (tester) async {
+    final harness = await _openJoin(tester);
+    harness.finder.browses.single.show(const <DiscoveredLobby>[_sam, _vic]);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Room VCRD, 2 of 10 seats taken. Cards in the app'), findsOneWidget);
+    expect(find.text('Room ABCD, 5 of 10 seats taken'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets('the join page starts looking for open games at once and says so', (tester) async {
     final harness = await _openJoin(tester);

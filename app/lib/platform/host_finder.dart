@@ -29,6 +29,7 @@ class DiscoveredLobby {
     required this.hostName,
     required this.playerCount,
     required this.maxPlayers,
+    this.isVirtual = false,
   });
 
   /// Reads one entry of the server's `lobbies` list. The answer comes from the network, so
@@ -50,6 +51,7 @@ class DiscoveredLobby {
       hostName: cleaned.length > 20 ? cleaned.substring(0, 20) : cleaned,
       playerCount: count.clamp(0, max),
       maxPlayers: max,
+      isVirtual: json['cardMode'] == 'VIRTUAL',
     );
   }
 
@@ -60,6 +62,9 @@ class DiscoveredLobby {
   final int playerCount;
   final int maxPlayers;
 
+  /// The room deals cards in the app. Older hosts do not say, which means real cards.
+  final bool isVirtual;
+
   @override
   bool operator ==(Object other) =>
       other is DiscoveredLobby &&
@@ -67,10 +72,11 @@ class DiscoveredLobby {
       other.roomCode == roomCode &&
       other.hostName == hostName &&
       other.playerCount == playerCount &&
-      other.maxPlayers == maxPlayers;
+      other.maxPlayers == maxPlayers &&
+      other.isVirtual == isVirtual;
 
   @override
-  int get hashCode => Object.hash(hostAndPort, roomCode, hostName, playerCount, maxPlayers);
+  int get hashCode => Object.hash(hostAndPort, roomCode, hostName, playerCount, maxPlayers, isVirtual);
 }
 
 /// A scan of the local network for open games. [lobbies] emits the full list each time it grows;

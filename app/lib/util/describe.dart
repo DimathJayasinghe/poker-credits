@@ -39,6 +39,22 @@ String clock(int milliseconds) {
   return '$minutes:${seconds.toString().padLeft(2, '0')}';
 }
 
+/// "Ace of spades": what a screen reader says for a card.
+String cardName(PokerCard card) => Strings.cardOf(Strings.rankNames[card.rank.index], Strings.suitNames[card.suit.index]);
+
+/// "Full house".
+String handCategoryText(HandCategory category) => switch (category) {
+  HandCategory.highCard => Strings.handHighCard,
+  HandCategory.pair => Strings.handPair,
+  HandCategory.twoPair => Strings.handTwoPair,
+  HandCategory.threeOfAKind => Strings.handThreeOfAKind,
+  HandCategory.straight => Strings.handStraight,
+  HandCategory.flush => Strings.handFlush,
+  HandCategory.fullHouse => Strings.handFullHouse,
+  HandCategory.fourOfAKind => Strings.handFourOfAKind,
+  HandCategory.straightFlush => Strings.handStraightFlush,
+};
+
 /// Words for a link that gave up.
 String linkFailureText(LinkFailure failure) => switch (failure) {
   LinkFailure.roomGone => Strings.linkFailedRoomGone,
@@ -47,6 +63,7 @@ String linkFailureText(LinkFailure failure) => switch (failure) {
   LinkFailure.roomCrashed => Strings.linkFailedCrashed,
   LinkFailure.roomExpired => Strings.linkFailedExpired,
   LinkFailure.versionMismatch => Strings.linkFailedVersion,
+  LinkFailure.updateRequired => Strings.linkFailedUpdate,
   LinkFailure.rateLimited => Strings.linkFailedRate,
   LinkFailure.refused => Strings.linkFailedRefused,
 };
@@ -60,5 +77,6 @@ String errorText(ErrorCode code) => switch (code) {
   ErrorCode.nameInvalid => Strings.errNameInvalid,
   ErrorCode.roomNotFound => Strings.errRoomNotFound,
   ErrorCode.handInProgress => Strings.errHandInProgress,
+  ErrorCode.updateRequired => Strings.errUpdateRequired,
   _ => Strings.errGeneric,
 };

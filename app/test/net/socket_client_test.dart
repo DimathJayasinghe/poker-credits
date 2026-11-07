@@ -73,6 +73,7 @@ void main() {
       expect(resume.sessionToken, 'tok');
       expect(resume.lastStateVersion, 4);
       expect(resume.hostToken, isNull);
+      expect(resume.features, contains(featureVirtualCards));
       client.close();
     });
   });
@@ -82,6 +83,7 @@ void main() {
       final client = make(const Resume(roomCode: 'KQ7M', sessionToken: 's', hostToken: 'h'))..start();
       async.flushMicrotasks();
       expect((net.last.sent.single as Resume).hostToken, 'h');
+      expect((net.last.sent.single as Resume).features, contains(featureVirtualCards));
       net.last.serverSends(snapshot());
       async.flushMicrotasks();
       net.last.drop();
@@ -161,6 +163,21 @@ void main() {
       async.flushMicrotasks();
       final second = client.state.nextAttemptAt!.difference(_start.add(async.elapsed));
       expect(second, greaterThan(const Duration(milliseconds: 700)), reason: 'second step is about 1 s, not 0.5 s');
+      client.close();
+    });
+  });
+
+  test('an app too old for the room stops the retries and asks for an update', () {
+    _scenario((async, net, make) {
+      final client = make(_join)..start();
+      async.flushMicrotasks();
+      net.last.serverSends(const ErrorMessage(code: ErrorCode.updateRequired, message: 'old'));
+      async.flushMicrotasks();
+      expect(client.state.phase, LinkPhase.failed);
+      expect(client.state.failure, LinkFailure.updateRequired);
+      async.elapse(const Duration(minutes: 1));
+      async.flushMicrotasks();
+      expect(net.opened, hasLength(1), reason: 'retrying cannot make the app newer');
       client.close();
     });
   });

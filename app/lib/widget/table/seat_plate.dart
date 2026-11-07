@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
+import 'package:poker_credits/util/describe.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
 import 'package:poker_credits/widget/brutal/brutal_number.dart';
 import 'package:poker_credits/widget/brutal/brutal_tag.dart';
+import 'package:poker_credits/widget/cards/card_row.dart';
+import 'package:poker_credits/widget/cards/playing_card.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
 /// A rectangular name plate for one seat. The player who must act is the only accent fill;
@@ -20,6 +23,8 @@ class SeatPlate extends StatelessWidget {
     this.turnFraction,
     this.seatNumber,
     this.onTap,
+    this.cards,
+    this.isWinner = false,
   });
 
   final SeatView seat;
@@ -31,6 +36,13 @@ class SeatPlate extends StatelessWidget {
   /// Fraction of the turn clock left (1 = full), drawn as a bar under the plate.
   final double? turnFraction;
   final VoidCallback? onTap;
+
+  /// Virtual cards: two cards on the plate. Null entries are face down; null = none (folded, or a
+  /// room with real cards).
+  final List<PokerCard?>? cards;
+
+  /// Won a pot at the last showdown.
+  final bool isWinner;
 
   /// Shown at the right of the name between hands, so the screen can be checked against who sits
   /// where in the room. Hidden during a hand.
@@ -50,6 +62,7 @@ class SeatPlate extends StatelessWidget {
       decorationThickness: 3,
     );
     final tags = <Widget>[
+      if (isWinner) const BrutalTag(Strings.winsTag, kind: BrutalTagKind.signal),
       if (isDealer) const BrutalTag(Strings.dealer),
       if (isSmallBlind) const BrutalTag(Strings.smallBlindTag, kind: BrutalTagKind.info),
       if (isBigBlind) const BrutalTag(Strings.bigBlindTag, kind: BrutalTagKind.info),
@@ -111,10 +124,20 @@ class SeatPlate extends StatelessWidget {
                         ),
                         if (seat.streetBet > 0) ...<Widget>[
                           const SizedBox(width: BrutalMetrics.gapS),
-                          Text(
-                            '${Strings.bet.toUpperCase()} ${seat.streetBet}',
-                            style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, color: text),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '${Strings.bet.toUpperCase()} ${seat.streetBet}',
+                                style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, color: text),
+                              ),
+                            ),
                           ),
+                        ],
+                        if (cards != null) ...<Widget>[
+                          const Spacer(),
+                          const SizedBox(width: BrutalMetrics.gapXs),
+                          CardRow(cards: cards!, size: CardSize.tiny, gap: 3, alignment: MainAxisAlignment.end),
                         ],
                       ],
                     ),
@@ -152,6 +175,13 @@ class SeatPlate extends StatelessWidget {
     if (isActive) parts.add('acting');
     if (seat.hasFolded) parts.add('folded');
     if (seat.isAllIn) parts.add('all in');
+    if (isWinner) parts.add(Strings.winsTag.toLowerCase());
+    final shown = cards;
+    if (shown != null && shown.every((c) => c != null)) {
+      parts.add(shown.map((c) => cardName(c!)).join(' and '));
+    } else if (shown != null) {
+      parts.add(Strings.hasCards);
+    }
     if (seat.isSittingOut) parts.add('away');
     if (!seat.isConnected) parts.add('offline');
     return parts.join(', ');

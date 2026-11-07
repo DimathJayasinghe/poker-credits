@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/seat_order.dart';
 import 'package:poker_credits/util/strings.dart';
@@ -16,6 +17,8 @@ class HostControls extends StatelessWidget {
     required this.onPickWinners,
     required this.onSeats,
     required this.onEndGame,
+    this.virtual = false,
+    this.holdStart = false,
   });
 
   final RoomView view;
@@ -26,6 +29,13 @@ class HostControls extends StatelessWidget {
   final VoidCallback onPickWinners;
   final VoidCallback onSeats;
   final VoidCallback onEndGame;
+
+  /// Cards are dealt by the app: the server runs the showdown and pays the pots itself, so there
+  /// is nothing for the host to begin or pick.
+  final bool virtual;
+
+  /// The run-out is still being dealt on screen; the next hand waits for its last card.
+  final bool holdStart;
 
   @override
   Widget build(BuildContext context) {
@@ -39,8 +49,10 @@ class HostControls extends StatelessWidget {
         kind: BrutalButtonKind.primary,
         heavy: true,
         minHeight: BrutalMetrics.tapPlayer,
-        onPressed: send(const StartHand()),
+        onPressed: holdStart ? null : send(const StartHand()),
       ),
+      WirePhase.allInRunout when virtual => null,
+      WirePhase.showdown when virtual => null,
       WirePhase.allInRunout => BrutalButton(
         label: Strings.beginShowdown,
         kind: BrutalButtonKind.primary,
@@ -75,6 +87,14 @@ class HostControls extends StatelessWidget {
         // The one thing to do next gets a row of its own, the full width of the controls.
         if (primary != null) ...<Widget>[primary, const SizedBox(height: BrutalMetrics.gapS)],
         _ButtonGrid(children: secondary),
+        if (virtual && inHand) ...<Widget>[
+          const SizedBox(height: BrutalMetrics.gapS),
+          Text(
+            Strings.undoVirtualNote,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, height: 1.35, color: BrutalTheme.of(context).colors.muted),
+          ),
+        ],
       ],
     );
   }

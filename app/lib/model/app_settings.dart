@@ -15,6 +15,8 @@ class AppSettings {
     this.sound = true,
     this.vibration = true,
     this.keepAwake = true,
+    this.fourColourDeck = false,
+    this.cardsFaceUp = false,
     this.defaultName = '',
   });
 
@@ -37,15 +39,32 @@ class AppSettings {
   /// Keep the display on while a table or player screen is open.
   final bool keepAwake;
 
+  /// Clubs green and diamonds blue, so the four suits differ by colour as well as shape.
+  final bool fourColourDeck;
+
+  /// Your own cards start face up. Off by default: a glance from the next seat shows nothing.
+  final bool cardsFaceUp;
+
   /// Prefills the name field when joining. Empty = none.
   final String defaultName;
 
-  AppSettings copyWith({ThemeChoice? theme, bool? texture, bool? sound, bool? vibration, bool? keepAwake, String? defaultName}) => AppSettings(
+  AppSettings copyWith({
+    ThemeChoice? theme,
+    bool? texture,
+    bool? sound,
+    bool? vibration,
+    bool? keepAwake,
+    bool? fourColourDeck,
+    bool? cardsFaceUp,
+    String? defaultName,
+  }) => AppSettings(
     theme: theme ?? this.theme,
     texture: texture ?? this.texture,
     sound: sound ?? this.sound,
     vibration: vibration ?? this.vibration,
     keepAwake: keepAwake ?? this.keepAwake,
+    fourColourDeck: fourColourDeck ?? this.fourColourDeck,
+    cardsFaceUp: cardsFaceUp ?? this.cardsFaceUp,
     defaultName: defaultName ?? this.defaultName,
   );
 
@@ -56,6 +75,8 @@ class AppSettings {
     'sound': sound,
     'vibration': vibration,
     'keepAwake': keepAwake,
+    'fourColourDeck': fourColourDeck,
+    'cardsFaceUp': cardsFaceUp,
     'defaultName': defaultName,
   };
 
@@ -73,6 +94,8 @@ class AppSettings {
       sound: flag('sound', defaults.sound),
       vibration: flag('vibration', defaults.vibration),
       keepAwake: flag('keepAwake', defaults.keepAwake),
+      fourColourDeck: flag('fourColourDeck', defaults.fourColourDeck),
+      cardsFaceUp: flag('cardsFaceUp', defaults.cardsFaceUp),
       defaultName: name,
     );
   }
@@ -85,8 +108,10 @@ class AppSettings {
       other.sound == sound &&
       other.vibration == vibration &&
       other.keepAwake == keepAwake &&
+      other.fourColourDeck == fourColourDeck &&
+      other.cardsFaceUp == cardsFaceUp &&
       other.defaultName == defaultName;
 
   @override
-  int get hashCode => Object.hash(theme, texture, sound, vibration, keepAwake, defaultName);
+  int get hashCode => Object.hash(theme, texture, sound, vibration, keepAwake, fourColourDeck, cardsFaceUp, defaultName);
 }

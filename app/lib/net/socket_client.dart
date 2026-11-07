@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:logging/logging.dart';
 import 'package:poker_credits/net/backoff.dart';
 import 'package:poker_credits/net/connection_state.dart';
+import 'package:poker_credits/net/features.dart';
 import 'package:poker_credits/net/transport.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
@@ -183,6 +184,7 @@ class RoomClient {
       sessionToken: creds.sessionToken,
       hostToken: creds.hostToken,
       lastStateVersion: _lastStateVersion < 0 ? null : _lastStateVersion,
+      features: appFeatures,
     );
   }
 
@@ -264,6 +266,7 @@ class RoomClient {
       ErrorCode.superseded => LinkFailure.superseded,
       ErrorCode.roomCrashed => LinkFailure.roomCrashed,
       ErrorCode.versionMismatch => LinkFailure.versionMismatch,
+      ErrorCode.updateRequired => LinkFailure.updateRequired,
       ErrorCode.rateLimited => LinkFailure.rateLimited,
       // The server closes the socket after these while joining; once live they are not about us.
       ErrorCode.roomFull || ErrorCode.spectatorsFull when !_state.isLive => LinkFailure.refused,

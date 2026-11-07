@@ -103,6 +103,7 @@ final class NativeHostServer implements HostServer {
     isTournament: c.isTournament,
     blindLevelMinutes: c.blindLevelMinutes,
     turnTimeLimitSeconds: c.turnTimeLimitSeconds,
+    cardMode: c.cardMode == CardMode.virtual ? RsCardMode.virtual : RsCardMode.physical,
   );
 
   static Future<String> _defaultDataDir() async {

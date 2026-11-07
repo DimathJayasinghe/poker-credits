@@ -12,6 +12,14 @@ void main() {
       expect(AppSettings.fromJson(jsonDecode(jsonEncode(settings.toJson()))), settings);
     });
 
+    test('the card options round trip and default to off', () {
+      expect(AppSettings.defaults.fourColourDeck, isFalse);
+      expect(AppSettings.defaults.cardsFaceUp, isFalse, reason: 'a glance from the next seat must show nothing');
+      const settings = AppSettings(fourColourDeck: true, cardsFaceUp: true);
+      expect(AppSettings.fromJson(jsonDecode(jsonEncode(settings.toJson()))), settings);
+      expect(AppSettings.fromJson(<String, Object?>{'fourColourDeck': 'yes', 'cardsFaceUp': 1}), AppSettings.defaults);
+    });
+
     test('anything that is not an object gives the defaults', () {
       for (final junk in <Object?>[null, 'text', 42, <Object?>[], true]) {
         expect(AppSettings.fromJson(junk), AppSettings.defaults, reason: '$junk');

@@ -5,6 +5,7 @@ import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/model/join_link.dart';
 import 'package:poker_credits/model/room_state.dart';
 import 'package:poker_credits/net/connection_state.dart';
+import 'package:poker_credits/net/features.dart';
 import 'package:poker_credits/net/socket_client.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_protocol/poker_protocol.dart';
@@ -165,6 +166,7 @@ class SessionNotifier extends Notifier<SessionState> {
         failure != null &&
         failure != LinkFailure.refused &&
         failure != LinkFailure.versionMismatch &&
+        failure != LinkFailure.updateRequired &&
         failure != LinkFailure.rateLimited) {
       // The room or the session is gone; the stored tokens are useless now.
       unawaited(ref.read(tokenStoreProvider).clear());
@@ -197,7 +199,7 @@ class SessionNotifier extends Notifier<SessionState> {
     if (_client == null || state.link.isLive) return;
     attach(
       uri: moved,
-      first: Resume(roomCode: stored.roomCode, sessionToken: stored.sessionToken),
+      first: Resume(roomCode: stored.roomCode, sessionToken: stored.sessionToken, features: appFeatures),
       host: false,
       playerId: stored.playerId,
       keepRoom: true,

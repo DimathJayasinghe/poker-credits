@@ -82,6 +82,21 @@ void main() {
     expect(grain(), isTrue);
   });
 
+  testWidgets('the card switches are off by default and save when changed', (tester) async {
+    final harness = TestHarness();
+    await _openSettings(tester, harness);
+    expect(harness.settings.value.fourColourDeck, isFalse);
+    expect(harness.settings.value.cardsFaceUp, isFalse);
+    await tester.ensureVisible(find.text('Four-colour deck'));
+    await tester.tap(find.text('Four-colour deck'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Show my cards at once'));
+    await tester.tap(find.text('Show my cards at once'));
+    await tester.pump();
+    expect(harness.settings.value.fourColourDeck, isTrue);
+    expect(harness.settings.value.cardsFaceUp, isTrue);
+  });
+
   testWidgets('every switch reports its state to screen readers', (tester) async {
     final handle = tester.ensureSemantics();
     await _openSettings(tester, TestHarness());
