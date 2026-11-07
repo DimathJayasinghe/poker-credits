@@ -259,7 +259,7 @@ Full detail in `docs/RESILIENCE_AND_CRASH_HANDLING.md`. Summary of what is copie
 
 ## ADR-018: Single player mode with bots
 
-**Status:** Proposed 2026-11-07 (owner request); design in `docs/superpowers/specs/2026-11-07-single-player-bots-design.md`. Not built. Awaiting the owner's answers to its three questions and approval.
+**Status:** Proposed 2026-11-07 (owner request; owner answered the open questions the same day); design in `docs/superpowers/specs/2026-11-07-single-player-bots-design.md`. Not built. Awaiting the owner's answers to its three questions and approval.
 
 **Context:** the owner wants to play alone against 1 to 9 computer players with a skill level chosen at the start. Requirements: feels like real players, fair, bots read each other and the human and adapt, bots are not clones, light on battery and CPU.
 
@@ -271,6 +271,7 @@ Full detail in `docs/RESILIENCE_AND_CRASH_HANDLING.md`. Summary of what is copie
 5. Randomness: a hand-written PRNG seeded from `getrandom`; `rand` is not added.
 6. Solo is a hosted game on the device with the server bound to `127.0.0.1` only, cards in the app forced, the human's timer off by default, the game paused while the app is in the background.
 7. Bots are exempt from absence, presence and vote-kick rules.
+8. Owner decisions 2026-11-07: solo is a freeze-out tournament (no rebuy; losing shows an end screen; a hand-driven blind ladder in the engine keeps pressure on); bots look exactly like real players (no tag, `is_bot` is never sent to clients); 1 to 9 bots.
 
 **Why:** reuses the whole tested table, journal and virtual-cards stack; the types make cheating impossible rather than forbidden; the actor already sleeps until its next timer, which is the cheapest possible scheduling.
 

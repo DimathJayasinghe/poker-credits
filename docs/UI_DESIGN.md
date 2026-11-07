@@ -202,5 +202,7 @@ Spec: `docs/superpowers/specs/2026-11-07-single-player-bots-design.md` section 9
 - **Setup (`SoloSetupPage`):** one screen, no scrolling on a phone at 1.0 text: Opponents stepper (1 to 9, default 4); Skill as three equal cells (Easy, Normal, Hard) with a one-line caption for the chosen one; a Stack and blinds summary row with Quick / Standard / Deep presets; the primary Start cell. Dense `BrutalRow`s, tokens only, type scale from section 2.
 - **Table:** the Player screen layout with every seat on the felt; host-only controls hidden; menu: Pause, Guide, Leave game. The acting bot's plate carries the normal turn marker (static, no spinner); an action line ("Maya raises to 60") goes in the action feed.
 - **Lifecycle:** the game pauses when the app is backgrounded and shows a short pause banner on return.
-- **End states:** a busted human sees Rebuy or Leave table; Leave shows a one-screen summary; a busted bot is replaced by a fresh one before the next hand.
+- **Game length:** Quick / Standard / Long cells set how often blinds rise (6 / 8 / 12 hands); a caption line shows the personal record.
+- **Tournament feel:** the top bar shows the blind level and hands until the next rise; "Maya is out (6th)" lines in the feed; no bot tag anywhere (owner decision: bots look like real players).
+- **End states:** no rebuy. Being out or winning opens a result screen (place such as "3RD OF 6", the hand that knocked you out as mini cards, a short stats block, Play again and Home cells). Spec section 10.
 - The app tour gets a "Play alone" step and the Guide a "Play alone" section.

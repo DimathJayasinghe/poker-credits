@@ -1,6 +1,6 @@
 # Single Player Mode with Bots: Design
 
-Status: **Proposed. Nothing is built.** Date: 2026-11-07. Author: assistant, from the owner's conversation. Calls marked **(my call)** were made by the assistant; the owner can change any of them. Three questions for the owner are in section 15. Building starts only when the owner approves this document, then comes the plan (`superpowers:writing-plans`). Target release: **1.3.0** (the unreleased 1.2.1 rolls into it; the owner has said no release until the bigger feature is done).
+Status: **Proposed, owner answers received. Nothing is built.** Date: 2026-11-07. Author: assistant, from the owner's conversation. Owner decisions (2026-11-07): **no rebuy, losing ends the game with an end screen** (rebuys would make the game boring because the player never gets defeated); **bots look exactly like real players, no bot tag**; **1 to 9 bots**. The owner asked for suggestions to keep play interesting: section 10. Calls marked **(my call)** were made by the assistant; the owner can change any of them. Building starts only when the owner approves this document, then comes the plan (`superpowers:writing-plans`). Target release: **1.3.0** (the unreleased 1.2.1 rolls into it; the owner has said no release until the bigger feature is done).
 
 ## 1. Intent
 
@@ -11,10 +11,11 @@ Why: the app is useless without friends in the room. A solo mode makes it a game
 ## 2. Goals, non-goals, anti-goals
 
 **Goals**
-- Pick 1 to 9 bots (**my call**: the engine allows 10 seats) and a skill level (Easy, Normal, Hard) on a setup screen, then play.
+- Pick 1 to 9 bots (owner decision; the engine allows 10 seats) and a skill level (Easy, Normal, Hard) on a setup screen, then play.
 - Bots play legal, believable poker with their own style, and change how they play against each opponent as they learn that opponent's habits.
 - Fairness a reader can verify in code and tests (section 5).
 - Near-zero cost when idle and small cost per decision (section 8).
+- A real game with stakes: a **tournament** that you can lose (section 10), with rising blinds, eliminations, a finishing place and an end screen.
 - Runs fully offline, works after an app restart (the room is journaled like any other).
 - All rules stay in Rust (`crates/poker_engine`); bot strategy is Rust too. Dart holds no poker rules and no bot logic.
 
@@ -54,7 +55,7 @@ Single player is a **hosted game on the player's own device** with some seats fi
 - Tests: a restored solo room with bots at the head of a hand still has the bots act; a ten-minute pause never sits a bot out.
 
 ### 3.3 Identity of bots
-A bot is a `Player` with `is_bot: true`, a generated id (`bot-1`, ...), a name from a pool of 40 plain first names (**my call**, no jokes, so they read as people), a seat and a stack. It has no token and no session. It is journaled in with a new op `Op::AddBot { id, name, seat, chips, personality }`; the personality is stored in the journal so a restored room has the same bots.
+A bot is a `Player` with `is_bot: true` (internal only, never sent to clients), a generated id (`bot-1`, ...), a name from a pool of 40 plain first names (**my call**, no jokes, so they read as people), a seat and a stack. It has no token and no session. It is journaled in with a new op `Op::AddBot { id, name, seat, chips, personality }`; the personality is stored in the journal so a restored room has the same bots.
 
 ## 4. Strategy design (`crates/poker_bots`)
 
@@ -145,9 +146,9 @@ Bots are dealt from the same unbiased shuffle (`cards::shuffled_deck`, ADR-016) 
 
 ## 7. Room config, protocol and session
 
-- `RoomConfig` gains optional fields with serde defaults, so old clients and fixtures keep working: `solo: bool` (default false), `bots: u8` (default 0), `bot_skill: Easy|Normal|Hard` (default Normal). Server validation: `solo` requires `card_mode = virtual`, `bots` between 1 and `MAX_SEATS - 1`, and is accepted only on the host path (`create_room_detached`), never from the network.
+- `RoomConfig` gains optional fields with serde defaults, so old clients and fixtures keep working: `solo: bool` (default false), `bots: u8` (default 0), `bot_skill: Easy|Normal|Hard` (default Normal), `blind_ladder_hands: u32` (hands per blind level in a solo game, default 8; see 10.2). Server validation: `solo` requires `card_mode = virtual`, `bots` between 1 and `MAX_SEATS - 1`, and is accepted only on the host path (`create_room_detached`), never from the network.
 - **Forced settings (my call):** solo forces cards in the app; the setup screen offers no real-card choice. The human's turn timer defaults to **off** (`turn_time_limit_seconds = 0`), because pausing to think is normal against computers; the setup advanced section can turn it on (30 s).
-- **Wire (my call, the owner can change):** `isBot` is **not** sent to clients and there is no bot badge by default (the owner's wish: "feel like real players"). The setup screen says plainly that every opponent is a computer player, and the Guide states it. See question 2 in section 15. If the owner wants a tag, a serde-default `isBot` boolean is added to the player view and the Dart `poker_protocol` models, with fixtures in `protocol_fixtures`.
+- **Wire (owner decision):** bots look exactly like real players. `is_bot` stays inside the server and is **never** sent to clients; there is no bot tag anywhere in the table UI, so no wire change is needed for it. The setup screen and the Guide say plainly that every opponent is a computer player (honesty is in the framing, not on the plates).
 - **Wire version:** the new `RoomConfig` fields are additive and optional. `API_AND_EVENTS.md` section 10 records them; protocol fixtures get a solo `CREATE_ROOM` example.
 - **Solo server binding (my call):** a solo game starts the embedded server on **`127.0.0.1` only**, not `0.0.0.0`. No LAN listener, no address discovery, no lobby listing, no host keep-alive; nothing outside the device can reach the game. This is both the security and the battery default.
 - **Session storage (my call):** `StoredSession` is a single slot, and a solo game would overwrite a saved hosted game. A second named slot is added to `TokenStore` (`solo`); the Home screen shows "Resume solo game" next to "Resume game" when each exists. Starting a new solo game replaces only the solo slot.
@@ -170,34 +171,59 @@ Bots are dealt from the same unbiased shuffle (`cards::shuffled_deck`, ADR-016) 
 - **Setup screen (`SoloSetupPage`):** one screen of dense `BrutalRow`s and cells, no scrolling on a phone at 1.0 text:
   - **Opponents:** a stepper cell, 1 to 9, default 4.
   - **Skill:** three equal cells (Easy / Normal / Hard) with a one-line caption under the chosen one ("Plays by instinct", "Reads the table", "Reads you and adapts").
-  - **Stack and blinds:** a summary row (default 1000 chips, blinds 10 and 20) opening the existing blinds sheet; presets Quick / Standard / Deep.
+  - **Game length:** three cells Quick / Standard / Long (starting stack 1000, blinds start 10 and 20, blinds rise every 6 / 8 / 12 hands, section 10.2) with the chosen one's caption ("about 20 minutes", about 35, about 60 against 5 bots; estimates to be measured).
+  - **Your record** (one caption line under the cells, shown after the first game): best finish and wins at this level and count of bots, stored on the device.
   - **Start** (primary cell). Name defaults to the saved default name.
 - **Table:** the Player screen layout (hole cards, action buttons, raise slider) with the felt showing all seats, because the human is a player, not the host display. The host-only controls (undo, seat order, kick, add player) are hidden in solo; the menu keeps Pause, Rules/Guide and Leave game. (The plan confirms by reading `player_page.dart` and `host_controls.dart` whether to reuse `TablePage` or `PlayerPage`.)
 - **Bots at the table:** seat plates show name and stack like any player. The acting bot's plate has the standard turn marker. A short, low-key action line ("Maya raises to 60") appears in the existing action feed. Reveals at showdown use the existing virtual-cards showdown view.
 - **Pause banner** appears after returning from the background.
-- **End states:** see section 10.
+- **End states:** you are out, or you win: section 10.4.
 - **Walkthrough and Guide:** the app tour gets a new step "Play alone"; the Guide gets a "Play alone" section (levels, fairness, battery). Strings in `util/strings.dart`.
 
-## 10. Busting and ending
-- **Bot busts:** the bot stands up after the hand, and a fresh bot (new name, new archetype, level unchanged, starting stack) sits in the same seat before the next hand, so the table stays full and varied. (my call; a "tournament" variant is a later feature.)
-- **Human busts (default, my call, see question 1):** the table shows "You are out of chips" with two cells: **Rebuy** (the starting stack, uses the existing `PendingRebuy` flow) and **Leave table**. Leaving shows a one-screen summary (hands played, best hand, biggest pot; counted from events in Dart and not stored) then returns Home.
-- **Quit mid-game:** the room is saved; Home offers "Resume solo game".
-- **Winning everything:** if the human holds all chips and all bots are busted, the replacement rule keeps playing; there is no game-over state (cash-game feel).
+## 10. Making it interesting: a tournament you can lose (owner decision plus suggestions)
+
+The owner decided that rebuys would make solo boring, since the player would never be defeated. So solo is a **freeze-out tournament**: everyone starts with the same stack, nobody can rebuy, busted players are out, and the game ends when you are out or when you hold every chip. Suggestions to make that fun (my calls, all cheap):
+
+### 10.1 Elimination, final table, finishing place
+- A busted bot stands up after the hand and is **not** replaced; the table gets smaller and the play changes (shorter-handed means wider ranges and more aggression, which the strategy already reads from the player count). A brief line in the action feed says "Maya is out" and gives her place ("finished 6th").
+- Every elimination fixes a **finishing place** (last in is 1st). With bots 1 to 9 the player's result reads "You finished 3rd of 6".
+- When two players remain the table announces **heads-up**; the strategy shifts to heads-up ranges.
+- Bots that bust other bots keep a visible reason to exist: a bot that knocked someone out gets a small mood boost (a very light "confidence" in 4.7).
+
+### 10.2 Rising blinds by hands, not by clock (my call)
+The tension of a tournament comes from blinds that rise. The engine's `Tournament` strategy rises by elapsed time (`BlindsStrategy::blinds(hand_number, elapsed_ms)`), which is wrong for solo: the clock keeps running while the app is paused, and a clock-driven change needs a timer. Solo adds a **hand-driven ladder**: a new `BlindsMode::Ladder { levels, hands_per_level }` in `crates/poker_engine/src/blinds.rs` that ignores `elapsed_ms` and uses `hand_number`, so it is deterministic, replay-safe, needs no timer, and pauses naturally. Levels grow about 1.5x (10/20, 15/30, 25/50, 40/80, 60/120, ...) and the last level repeats. The room shows "Blinds 25/50, rise in 3 hands" in the top bar. A bot's strategy reads the blinds relative to its stack (it gets short-stacked and pushes), which creates natural drama.
+
+### 10.3 A rival
+At creation one or two bots are marked internally as **rivals** (a higher `read_weight`, and a more distinctive archetype such as LAG or Nit-trapper). Nothing is shown to the player; rivals simply play more memorably against the human, so each game has a character the player remembers.
+
+### 10.4 End screens (no rebuy)
+- **You are out:** a full-screen result, in the same brutal style: big place ("3RD OF 6"), the hand that knocked you out (your two cards and the board as mini cards, from the last hand's events), a short stats block (hands played, hands won, biggest pot, best hand shown) counted from events in Dart and kept in memory only, and two cells: **Play again** (same settings, new bots) and **Home**. No rebuy, no continue.
+- **You win:** the same screen with "YOU WON" and the knocked-out bots listed in order.
+- The result updates **your record** (10.5) before the screen shows.
+- Quit mid-game: the room is saved; Home offers "Resume solo game" (the game continues, nothing is lost).
+- All results are on the device only; nothing is uploaded.
+
+### 10.5 Personal record (local, tiny)
+`AppSettings` gains a small map of results keyed by (level, bot count bucket): games played, wins, best finish. It shows as one caption line on the setup screen. This gives the player a reason to try Hard and 9 bots without any online system (leaderboards remain a non-goal).
+
+### 10.6 Considered and left out for now
+Bounties, side game modes, daily challenges, table chat and achievements: each adds surface and review cost for little gain before the core is proven. They fit this design later (the tournament structure and the result screen are the hooks).
 
 ## 11. Testing and gates
 - Unit: strength table values, pot odds, bet sizing rounding and legality, stat smoothing, personality sampling (all parameters within range, distinct neighbours).
 - Property: every `decide` returns a legal action for random legal views (use the engine validator); never panics; `bot_view_invariance`.
 - Headless simulation test harness in `poker_server_core/tests/bots_sim.rs`: runs N hands with bots only using the real actor with `bot_think_scale = 0`: no stalls, chips conserved, hands finish, the skill ordering and no-seat-advantage tests, and archetype distinctness (VPIP and PFR differ measurably between archetypes over about 10,000 hands).
-- Integration: solo room over the bridge; absence exemption; restore with bots; pause and resume; solo rejected from the network.
+- Integration: solo room over the bridge; eliminated bots stay out and places are right; the game ends on the human's bust and on a full win; absence exemption; restore with bots; pause and resume; solo rejected from the network.
 - Flutter: setup screen layout sweep (the existing sweeps add it), text scale 3.0, widget tests for the stepper, the skill cells, the rebuy/leave state, the Home rows; goldens for setup and a solo table with five bots.
 - Gates as always: `fvm flutter analyze`, tests, protocol tests, `tool/check_web_safe.sh` (solo uses the existing platform seams; the web build is deferred and stubs host features), `tool/check_no_state_logging.sh` (bot logs carry no cards), cargo fmt, clippy, test.
 
 ## 12. Delivery order (for the plan)
+0. **Engine:** `BlindsMode::Ladder` (hand-driven levels) with unit and property tests; validate and serialise it; replay-safe.
 1. **Core:** `poker_bots` crate with `BotView`, strength, decision, RNG, personalities; headless harness; fairness tests. Green on its own.
 2. **Room integration:** `Op::AddBot`, `room/bots.rs`, scheduling in the actor, absence exemption, config validation, journal and restore, loopback binding. Sim tests with the real actor.
 3. **Adaptation and skill:** notes, reads, skill tuning, mood; simulation assertions tuned.
 4. **Bridge and Dart:** `RoomConfig` models, `startSoloGame` API, session slot, lifecycle pause.
-5. **UI:** Home rows, setup screen, solo table, end states, strings.
+5. **UI:** Home rows, setup screen, solo table, elimination lines, end screens, personal record, strings.
 6. **Docs, Guide, tour, goldens, version 1.3.0 bump.** Release only when the owner says.
 Each step is committed on its own on a feature branch (`feature/solo-bots`); steps 1 to 3 are the Rust-heavy, high-risk parts and are planned and reviewed with the strongest model, the UI and string work can go to a cheaper tier (`MODEL_STRATEGY.md`).
 
@@ -209,12 +235,13 @@ Each step is committed on its own on a feature branch (`feature/solo-bots`); ste
 - **Scope:** large, so the delivery order is incremental and each step ships green.
 
 ## 14. Calls the assistant made (check these while reading)
-Bots live in the room actor, not as socket clients; bots exempt from absence and votes; new crate `poker_bots` with no server dependency; hand-written PRNG instead of `rand`; 169-entry preflop table plus capped Monte Carlo; three skill levels as in 4.4; six archetypes plus tilt; notes reset on restore; solo forces cards in the app and turns the human timer off; solo binds `127.0.0.1` only; no bot badge on the wire by default; second storage slot for the solo session; bots replaced when they bust; 1 to 9 opponents; pause on background; name pool of 40; release 1.3.0 after the owner agrees.
+Bots live in the room actor, not as socket clients; bots exempt from absence and votes; new crate `poker_bots` with no server dependency; hand-written PRNG instead of `rand`; 169-entry preflop table plus capped Monte Carlo; three skill levels as in 4.4; six archetypes plus tilt; notes reset on restore; solo forces cards in the app and turns the human timer off; solo binds `127.0.0.1` only; no bot badge (owner decision); second storage slot for the solo session; no replacement of busted bots (freeze-out tournament with a hand-driven blind ladder, owner asked for a game you can lose); 1 to 9 opponents (owner decision); pause on background; name pool of 40; release 1.3.0 after the owner agrees.
 
-## 15. Questions for the owner
-1. When you bust, is **Rebuy or Leave** right, or do you want an automatic restart or an end screen instead?
-2. Should bots carry a visible **bot tag**, or look exactly like people? (Default here: no tag; the setup screen and Guide say all opponents are computers.)
-3. Is **1 to 9 bots** right? (The engine's limit is 10 seats.)
+## 15. Owner answers (2026-11-07)
+1. Busting: **no rebuy, show an end screen**; the owner asked for suggestions to keep it interesting (section 10).
+2. Bots: **look exactly like real players, no tag.**
+3. Count: **1 to 9 bots.**
+Still open for the owner: approve the spec, and say whether the suggestions in section 10 are right (especially the hand-driven blind ladder and the Quick / Standard / Long lengths).
 
 ## 16. Builder check
-Subagents are disallowed in this project, so the document was reread as the builder: the gaps found were the absence exemption (3.2), restore of notes (4.5), PRNG without a new dependency (4.6), the single storage slot (7), loopback binding (7), and the missing sim harness (11); each is now decided above. What is still left to the builder: exact constants (sample counts, thresholds, think times, archetype parameter ranges), which are tuned by the simulation tests and recorded in `docs/GAME_LOGIC_AND_RULES.md` section 11 once built; and the choice between reusing `TablePage` or `PlayerPage` for the solo table (section 9).
+Subagents are disallowed in this project, so the document was reread as the builder: the gaps found were the hand-driven blind ladder (10.2; the engine's tournament mode is clock-driven), the absence exemption (3.2), restore of notes (4.5), PRNG without a new dependency (4.6), the single storage slot (7), loopback binding (7), and the missing sim harness (11); each is now decided above. What is still left to the builder: exact constants (sample counts, thresholds, think times, archetype parameter ranges), which are tuned by the simulation tests and recorded in `docs/GAME_LOGIC_AND_RULES.md` section 11 once built; and the choice between reusing `TablePage` or `PlayerPage` for the solo table (section 9).
