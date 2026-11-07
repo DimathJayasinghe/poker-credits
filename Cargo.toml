@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/poker_engine",
+    "crates/poker_bots",
     "crates/poker_server_core",
     "server",
     "packages/poker_bridge/rust",
