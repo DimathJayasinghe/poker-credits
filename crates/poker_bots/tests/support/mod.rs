@@ -7,6 +7,8 @@
     clippy::indexing_slicing
 )]
 
+pub mod sim;
+
 use poker_bots::BotRng;
 use poker_engine::blinds::{Blinds, BlindsMode, CashGame};
 use poker_engine::card::{Card, Rank, Suit};

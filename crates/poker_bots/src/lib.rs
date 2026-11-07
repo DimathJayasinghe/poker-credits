@@ -5,12 +5,20 @@
 //! betting. It never sees the deck or another player's hole cards (the type has no field for them),
 //! and [`observe::view_for_seat`] is the one function that reads a table to build it.
 
+pub mod decide;
 pub mod equity;
+pub mod names;
+pub mod notes;
 pub mod observe;
+pub mod personality;
 pub mod rng;
+pub mod skill;
 pub mod strength;
 pub mod view;
 
+pub use decide::{BotMind, Decision, decide};
 pub use observe::view_for_seat;
+pub use personality::{Archetype, Personality};
 pub use rng::BotRng;
+pub use skill::Skill;
 pub use view::{BotView, PublicAction, Reveal, SeatView};
