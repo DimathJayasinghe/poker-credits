@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use flutter_rust_bridge::frb;
 use poker_server_core::config::{Limits, Timings};
 use poker_server_core::event::ServerEvent;
-use poker_server_core::protocol::{CardMode, RoomConfig};
+use poker_server_core::protocol::{CardMode, RoomConfig, SoloConfig};
 use poker_server_core::{ServerConfig, ServerHandle, ServerMode, StartError};
 use tokio::sync::{Mutex, mpsc};
 
@@ -128,6 +128,29 @@ pub enum RsCardMode {
     Virtual,
 }
 
+/// How well the computer players of a solo game play.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum RsBotSkill {
+    /// Plays by instinct and makes mistakes.
+    Easy,
+    /// A sensible all-round player (default).
+    #[default]
+    Normal,
+    /// Reads the table fast and rarely errs.
+    Hard,
+}
+
+/// Extra settings of a single-player game against computer players.
+#[derive(Clone, Copy, Debug)]
+pub struct RsSoloConfig {
+    /// Computer players at the table, 1 to 9.
+    pub bots: u8,
+    /// How well they play.
+    pub skill: RsBotSkill,
+    /// Hands played at each blind level.
+    pub ladder_hands: u32,
+}
+
 /// Table settings the host picks before the first hand.
 #[derive(Clone, Debug)]
 pub struct RsRoomConfig {
@@ -147,6 +170,8 @@ pub struct RsRoomConfig {
     pub turn_time_limit_seconds: u32,
     /// Real or virtual cards.
     pub card_mode: RsCardMode,
+    /// Set for a single-player game (needs virtual cards, and a server that is not on the LAN).
+    pub solo: Option<RsSoloConfig>,
 }
 
 /// A new room and the secrets of its host. The host UI connects with these like a reconnecting
@@ -184,6 +209,8 @@ impl std::error::Error for RsRoomError {}
 #[frb(opaque)]
 pub struct RsServerHandle {
     port: u16,
+    /// Only this device can reach the server (a single-player game needs that).
+    loopback_only: bool,
     inner: Mutex<Option<ServerHandle>>,
     /// Events wait here until Dart subscribes, so `Listening` is never missed.
     pending_events: std::sync::Mutex<Option<mpsc::Receiver<ServerEvent>>>,
@@ -207,6 +234,13 @@ impl RsServerHandle {
         host_name: String,
         config: RsRoomConfig,
     ) -> Result<RsCreatedRoom, RsRoomError> {
+        if config.solo.is_some() && !self.loopback_only {
+            return Err(RsRoomError {
+                code: "BAD_REQUEST".to_owned(),
+                message: "a single-player game needs a server that is not on the network"
+                    .to_owned(),
+            });
+        }
         let guard = self.inner.lock().await;
         let server = guard.as_ref().ok_or_else(|| RsRoomError {
             code: "INTERNAL_ERROR".to_owned(),
@@ -287,6 +321,7 @@ pub(crate) async fn start_with_events(
     let server = poker_server_core::start(to_core(config, events)).await?;
     Ok(RsServerHandle {
         port: server.local_addr().port(),
+        loopback_only: server.local_addr().ip().is_loopback(),
         inner: Mutex::new(Some(server)),
         pending_events: std::sync::Mutex::new(Some(receiver)),
     })
@@ -315,7 +350,15 @@ impl TryFrom<RsRoomConfig> for RoomConfig {
             is_tournament: config.is_tournament,
             blind_level_minutes: config.blind_level_minutes,
             turn_time_limit_seconds: config.turn_time_limit_seconds,
-            solo: None,
+            solo: config.solo.map(|solo| SoloConfig {
+                bots: solo.bots,
+                skill: match solo.skill {
+                    RsBotSkill::Easy => poker_bots::Skill::Easy,
+                    RsBotSkill::Normal => poker_bots::Skill::Normal,
+                    RsBotSkill::Hard => poker_bots::Skill::Hard,
+                },
+                ladder_hands: solo.ladder_hands,
+            }),
         })
     }
 }
@@ -440,6 +483,7 @@ mod tests {
             blind_level_minutes: 10,
             turn_time_limit_seconds: 30,
             card_mode: RsCardMode::Physical,
+            solo: None,
         }
     }
 
@@ -454,6 +498,60 @@ mod tests {
         .unwrap();
         assert_eq!(virtual_room.card_mode, CardMode::Virtual);
         assert_eq!(RsCardMode::default(), RsCardMode::Physical);
+    }
+
+    fn solo_config(bots: u8) -> RsRoomConfig {
+        RsRoomConfig {
+            card_mode: RsCardMode::Virtual,
+            turn_time_limit_seconds: 0,
+            solo: Some(RsSoloConfig {
+                bots,
+                skill: RsBotSkill::Hard,
+                ladder_hands: 6,
+            }),
+            ..room_config()
+        }
+    }
+
+    #[test]
+    fn solo_settings_cross_the_bridge() {
+        let config = RoomConfig::try_from(solo_config(4)).unwrap();
+        let solo = config.solo.expect("solo");
+        assert_eq!((solo.bots, solo.ladder_hands), (4, 6));
+        assert_eq!(solo.skill, poker_bots::Skill::Hard);
+        assert!(RoomConfig::try_from(room_config()).unwrap().solo.is_none());
+    }
+
+    #[tokio::test]
+    async fn solo_server_binds_loopback_only_and_hosts_a_solo_room() {
+        let (tx, rx) = mpsc::channel(8);
+        let handle = start_with_events(&config(false), tx, rx)
+            .await
+            .expect("starts");
+        assert!(handle.loopback_only);
+        let room = handle
+            .create_room("Host".to_owned(), solo_config(3))
+            .await
+            .expect("solo room");
+        assert_eq!(room.room_code.len(), 4);
+        let bad = handle.create_room("Host".to_owned(), solo_config(0)).await;
+        assert_eq!(bad.err().map(|e| e.code), Some("BAD_REQUEST".to_owned()));
+        handle.stop().await;
+    }
+
+    #[tokio::test]
+    async fn a_server_on_the_network_refuses_a_solo_room() {
+        let (tx, rx) = mpsc::channel(8);
+        let handle = start_with_events(&config(true), tx, rx)
+            .await
+            .expect("starts");
+        assert!(!handle.loopback_only);
+        let error = handle
+            .create_room("Host".to_owned(), solo_config(3))
+            .await
+            .err();
+        assert_eq!(error.map(|e| e.code), Some("BAD_REQUEST".to_owned()));
+        handle.stop().await;
     }
 
     #[tokio::test]

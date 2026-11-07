@@ -1311,6 +1311,123 @@ class _HandResultCopyWithImpl<$R, $Out>
   ) => _HandResultCopyWithImpl<$R2, $Out2>($value, $cast, t);
 }
 
+class FinishMapper extends ClassMapperBase<Finish> {
+  FinishMapper._();
+
+  static FinishMapper? _instance;
+  static FinishMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = FinishMapper._());
+    }
+    return _instance!;
+  }
+
+  @override
+  final String id = 'Finish';
+
+  static String _$playerId(Finish v) => v.playerId;
+  static const Field<Finish, String> _f$playerId = Field(
+    'playerId',
+    _$playerId,
+  );
+  static String _$name(Finish v) => v.name;
+  static const Field<Finish, String> _f$name = Field('name', _$name);
+  static int _$place(Finish v) => v.place;
+  static const Field<Finish, int> _f$place = Field('place', _$place);
+
+  @override
+  final MappableFields<Finish> fields = const {
+    #playerId: _f$playerId,
+    #name: _f$name,
+    #place: _f$place,
+  };
+  @override
+  final bool ignoreNull = true;
+
+  static Finish _instantiate(DecodingData data) {
+    return Finish(
+      playerId: data.dec(_f$playerId),
+      name: data.dec(_f$name),
+      place: data.dec(_f$place),
+    );
+  }
+
+  @override
+  final Function instantiate = _instantiate;
+
+  static Finish fromMap(Map<String, dynamic> map) {
+    return ensureInitialized().decodeMap<Finish>(map);
+  }
+
+  static Finish fromJson(String json) {
+    return ensureInitialized().decodeJson<Finish>(json);
+  }
+}
+
+mixin FinishMappable {
+  String toJson() {
+    return FinishMapper.ensureInitialized().encodeJson<Finish>(this as Finish);
+  }
+
+  Map<String, dynamic> toMap() {
+    return FinishMapper.ensureInitialized().encodeMap<Finish>(this as Finish);
+  }
+
+  FinishCopyWith<Finish, Finish, Finish> get copyWith =>
+      _FinishCopyWithImpl<Finish, Finish>(this as Finish, $identity, $identity);
+  @override
+  String toString() {
+    return FinishMapper.ensureInitialized().stringifyValue(this as Finish);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return FinishMapper.ensureInitialized().equalsValue(this as Finish, other);
+  }
+
+  @override
+  int get hashCode {
+    return FinishMapper.ensureInitialized().hashValue(this as Finish);
+  }
+}
+
+extension FinishValueCopy<$R, $Out> on ObjectCopyWith<$R, Finish, $Out> {
+  FinishCopyWith<$R, Finish, $Out> get $asFinish =>
+      $base.as((v, t, t2) => _FinishCopyWithImpl<$R, $Out>(v, t, t2));
+}
+
+abstract class FinishCopyWith<$R, $In extends Finish, $Out>
+    implements ClassCopyWith<$R, $In, $Out> {
+  $R call({String? playerId, String? name, int? place});
+  FinishCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
+}
+
+class _FinishCopyWithImpl<$R, $Out> extends ClassCopyWithBase<$R, Finish, $Out>
+    implements FinishCopyWith<$R, Finish, $Out> {
+  _FinishCopyWithImpl(super.value, super.then, super.then2);
+
+  @override
+  late final ClassMapperBase<Finish> $mapper = FinishMapper.ensureInitialized();
+  @override
+  $R call({String? playerId, String? name, int? place}) => $apply(
+    FieldCopyWithData({
+      if (playerId != null) #playerId: playerId,
+      if (name != null) #name: name,
+      if (place != null) #place: place,
+    }),
+  );
+  @override
+  Finish $make(CopyWithData data) => Finish(
+    playerId: data.get(#playerId, or: $value.playerId),
+    name: data.get(#name, or: $value.name),
+    place: data.get(#place, or: $value.place),
+  );
+
+  @override
+  FinishCopyWith<$R2, Finish, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t) =>
+      _FinishCopyWithImpl<$R2, $Out2>($value, $cast, t);
+}
+
 class RoomViewMapper extends ClassMapperBase<RoomView> {
   RoomViewMapper._();
 
@@ -1325,6 +1442,7 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
       PendingRebuyViewMapper.ensureInitialized();
       RevealMapper.ensureInitialized();
       HandResultMapper.ensureInitialized();
+      FinishMapper.ensureInitialized();
     }
     return _instance!;
   }
@@ -1427,6 +1545,13 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
     _$result,
     opt: true,
   );
+  static List<Finish> _$finishOrder(RoomView v) => v.finishOrder;
+  static const Field<RoomView, List<Finish>> _f$finishOrder = Field(
+    'finishOrder',
+    _$finishOrder,
+    opt: true,
+    def: const <Finish>[],
+  );
 
   @override
   final MappableFields<RoomView> fields = const {
@@ -1449,6 +1574,7 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
     #board: _f$board,
     #reveals: _f$reveals,
     #result: _f$result,
+    #finishOrder: _f$finishOrder,
   };
   @override
   final bool ignoreNull = true;
@@ -1457,6 +1583,7 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
   final MappingHook hook = const OmitWhenDefault({
     'board': <Object?>[],
     'reveals': <Object?>[],
+    'finishOrder': <Object?>[],
   });
   static RoomView _instantiate(DecodingData data) {
     return RoomView(
@@ -1479,6 +1606,7 @@ class RoomViewMapper extends ClassMapperBase<RoomView> {
       board: data.dec(_f$board),
       reveals: data.dec(_f$reveals),
       result: data.dec(_f$result),
+      finishOrder: data.dec(_f$finishOrder),
     );
   }
 
@@ -1552,6 +1680,7 @@ abstract class RoomViewCopyWith<$R, $In extends RoomView, $Out>
   get board;
   ListCopyWith<$R, Reveal, RevealCopyWith<$R, Reveal, Reveal>> get reveals;
   HandResultCopyWith<$R, HandResult, HandResult>? get result;
+  ListCopyWith<$R, Finish, FinishCopyWith<$R, Finish, Finish>> get finishOrder;
   $R call({
     String? roomCode,
     int? handNumber,
@@ -1572,6 +1701,7 @@ abstract class RoomViewCopyWith<$R, $In extends RoomView, $Out>
     List<PokerCard>? board,
     List<Reveal>? reveals,
     HandResult? result,
+    List<Finish>? finishOrder,
   });
   RoomViewCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -1627,6 +1757,13 @@ class _RoomViewCopyWithImpl<$R, $Out>
   HandResultCopyWith<$R, HandResult, HandResult>? get result =>
       $value.result?.copyWith.$chain((v) => call(result: v));
   @override
+  ListCopyWith<$R, Finish, FinishCopyWith<$R, Finish, Finish>>
+  get finishOrder => ListCopyWith(
+    $value.finishOrder,
+    (v, t) => v.copyWith.$chain(t),
+    (v) => call(finishOrder: v),
+  );
+  @override
   $R call({
     String? roomCode,
     int? handNumber,
@@ -1647,6 +1784,7 @@ class _RoomViewCopyWithImpl<$R, $Out>
     List<PokerCard>? board,
     List<Reveal>? reveals,
     Object? result = $none,
+    List<Finish>? finishOrder,
   }) => $apply(
     FieldCopyWithData({
       if (roomCode != null) #roomCode: roomCode,
@@ -1668,6 +1806,7 @@ class _RoomViewCopyWithImpl<$R, $Out>
       if (board != null) #board: board,
       if (reveals != null) #reveals: reveals,
       if (result != $none) #result: result,
+      if (finishOrder != null) #finishOrder: finishOrder,
     }),
   );
   @override
@@ -1691,6 +1830,7 @@ class _RoomViewCopyWithImpl<$R, $Out>
     board: data.get(#board, or: $value.board),
     reveals: data.get(#reveals, or: $value.reveals),
     result: data.get(#result, or: $value.result),
+    finishOrder: data.get(#finishOrder, or: $value.finishOrder),
   );
 
   @override

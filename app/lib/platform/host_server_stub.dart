@@ -22,6 +22,13 @@ final class _UnsupportedHostServer implements HostServer {
       Future<HostedRoom>.error(const HostException(HostFailure.unavailable, 'Hosting is not available on this platform'));
 
   @override
+  Future<int> startSoloServer() => Future<int>.error(const HostException(HostFailure.unavailable, 'Hosting is not available on this platform'));
+
+  @override
+  Future<HostedRoom> hostSolo({required String hostName, required SoloConfig solo}) =>
+      Future<HostedRoom>.error(const HostException(HostFailure.unavailable, 'Hosting is not available on this platform'));
+
+  @override
   Future<void> ensureRunning() async {}
 
   @override

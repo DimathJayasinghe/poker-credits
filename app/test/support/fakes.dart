@@ -143,6 +143,24 @@ class FakeHostServer implements HostServer {
     return HostedRoom(roomCode: 'KQ7M', playerId: 'p_host', sessionToken: 'sess', hostToken: 'host-secret', port: portNumber);
   }
 
+  SoloConfig? lastSolo;
+  int soloStarted = 0;
+
+  @override
+  Future<int> startSoloServer() async {
+    if (failure != null) throw failure!;
+    running = true;
+    soloStarted++;
+    return portNumber;
+  }
+
+  @override
+  Future<HostedRoom> hostSolo({required String hostName, required SoloConfig solo}) async {
+    await startSoloServer();
+    lastSolo = solo;
+    return HostedRoom(roomCode: 'SOLO', playerId: 'p_1', sessionToken: 'solo-sess', hostToken: 'solo-host', port: portNumber);
+  }
+
   @override
   Future<void> ensureRunning() async => ensured++;
 

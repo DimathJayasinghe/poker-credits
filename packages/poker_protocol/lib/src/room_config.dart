@@ -12,6 +12,26 @@ part 'room_config.mapper.dart';
 @MappableEnum(caseStyle: screamingSnake, defaultValue: CardMode.physical)
 enum CardMode { physical, virtual }
 
+/// How well the computer players of a single-player game play. An unknown level decodes to
+/// [normal].
+@MappableEnum(caseStyle: screamingSnake, defaultValue: BotSkill.normal)
+enum BotSkill { easy, normal, hard }
+
+/// The extra settings of a single-player game against computer players.
+@MappableClass()
+class SoloConfig with SoloConfigMappable {
+  const SoloConfig({required this.bots, required this.skill, required this.ladderHands});
+
+  /// Computer players at the table, 1 to 9.
+  final int bots;
+
+  /// How well they play.
+  final BotSkill skill;
+
+  /// Hands played at each blind level.
+  final int ladderHands;
+}
+
 /// Room settings chosen by the host.
 @MappableClass(hook: OmitWhenDefault({'cardMode': 'PHYSICAL'}))
 class RoomConfig with RoomConfigMappable {
@@ -24,6 +44,7 @@ class RoomConfig with RoomConfigMappable {
     required this.blindLevelMinutes,
     required this.turnTimeLimitSeconds,
     this.cardMode = CardMode.physical,
+    this.solo,
   });
 
   /// Stack every player starts with.
@@ -49,4 +70,7 @@ class RoomConfig with RoomConfigMappable {
 
   /// Real cards (default) or cards dealt by the app.
   final CardMode cardMode;
+
+  /// Set for a single-player game, which is also always virtual cards. Absent for every other room.
+  final SoloConfig? solo;
 }

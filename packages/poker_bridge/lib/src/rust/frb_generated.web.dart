@@ -64,6 +64,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RsServerConfig dco_decode_box_autoadd_rs_server_config(dynamic raw);
 
   @protected
+  RsSoloConfig dco_decode_box_autoadd_rs_solo_config(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
@@ -71,6 +74,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  RsSoloConfig? dco_decode_opt_box_autoadd_rs_solo_config(dynamic raw);
+
+  @protected
+  RsBotSkill dco_decode_rs_bot_skill(dynamic raw);
 
   @protected
   RsCardMode dco_decode_rs_card_mode(dynamic raw);
@@ -98,6 +107,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RsServerEventKind dco_decode_rs_server_event_kind(dynamic raw);
+
+  @protected
+  RsSoloConfig dco_decode_rs_solo_config(dynamic raw);
 
   @protected
   int dco_decode_u_16(dynamic raw);
@@ -157,6 +169,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RsSoloConfig sse_decode_box_autoadd_rs_solo_config(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
@@ -164,6 +181,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  RsSoloConfig? sse_decode_opt_box_autoadd_rs_solo_config(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RsBotSkill sse_decode_rs_bot_skill(SseDeserializer deserializer);
 
   @protected
   RsCardMode sse_decode_rs_card_mode(SseDeserializer deserializer);
@@ -195,6 +220,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RsServerEventKind sse_decode_rs_server_event_kind(
     SseDeserializer deserializer,
   );
+
+  @protected
+  RsSoloConfig sse_decode_rs_solo_config(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_16(SseDeserializer deserializer);
@@ -263,6 +291,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_rs_solo_config(
+    RsSoloConfig self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
@@ -273,6 +307,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     Uint8List self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_opt_box_autoadd_rs_solo_config(
+    RsSoloConfig? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_rs_bot_skill(RsBotSkill self, SseSerializer serializer);
 
   @protected
   void sse_encode_rs_card_mode(RsCardMode self, SseSerializer serializer);
@@ -309,6 +352,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     RsServerEventKind self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_rs_solo_config(RsSoloConfig self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_16(int self, SseSerializer serializer);

@@ -58,7 +58,7 @@ fn client_fixtures_round_trip() {
         );
         count += 1;
     }
-    assert_eq!(count, 27);
+    assert_eq!(count, 28);
 }
 
 #[test]
@@ -83,7 +83,7 @@ fn server_fixtures_round_trip() {
         );
         count += 1;
     }
-    assert_eq!(count, 22);
+    assert_eq!(count, 23);
 }
 
 #[test]
@@ -276,4 +276,33 @@ fn card_mode_defaults_to_physical_and_virtual_is_explicit() {
         .clone();
     let virtual_config: RoomConfig = serde_json::from_value(virtual_json).unwrap();
     assert_eq!(virtual_config.card_mode, CardMode::Virtual);
+}
+
+#[test]
+fn solo_settings_and_finish_order_ride_on_the_existing_messages() {
+    let by_name = |wanted: &str| {
+        fixtures()
+            .into_iter()
+            .find(|(n, _)| n == wanted)
+            .map(|(_, v)| v)
+            .unwrap()
+    };
+    let solo: ClientMessage =
+        serde_json::from_value(by_name("client_create_room_solo.json")).unwrap();
+    let ClientMessage::CreateRoom { config, .. } = solo else {
+        panic!("not a create room");
+    };
+    let solo = config.solo.expect("solo");
+    assert_eq!((solo.bots, solo.ladder_hands), (5, 8));
+    assert_eq!(solo.skill, poker_bots::Skill::Hard);
+    // An ordinary room serialises exactly as before: no `solo` key.
+    let plain: ClientMessage = serde_json::from_value(by_name("client_create_room.json")).unwrap();
+    assert!(!serde_json::to_string(&plain).unwrap().contains("solo"));
+    let ServerMessage::StateUpdate { view, .. } =
+        serde_json::from_value(by_name("server_state_update_solo.json")).unwrap()
+    else {
+        panic!("not a state update");
+    };
+    assert_eq!(view.finish_order.len(), 2);
+    assert_eq!(view.finish_order[0].place, 4);
 }

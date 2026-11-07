@@ -124,8 +124,25 @@ class HandResult with HandResultMappable {
   final List<PotResult> pots;
 }
 
+/// One finishing place in a single-player game.
+@MappableClass()
+class Finish with FinishMappable {
+  const Finish({required this.playerId, required this.name, required this.place});
+
+  final String playerId;
+
+  /// Kept here because the seat is gone once a player is out.
+  final String name;
+
+  /// 1 = winner, 2 = runner-up, and so on.
+  final int place;
+}
+
 /// The public state of a room, as sent in `SNAPSHOT` and `STATE_UPDATE`.
-@MappableClass(includeCustomMappers: [PokerCardMapper()], hook: OmitWhenDefault({'board': <Object?>[], 'reveals': <Object?>[]}))
+@MappableClass(
+  includeCustomMappers: [PokerCardMapper()],
+  hook: OmitWhenDefault({'board': <Object?>[], 'reveals': <Object?>[], 'finishOrder': <Object?>[]}),
+)
 class RoomView with RoomViewMappable {
   const RoomView({
     required this.roomCode,
@@ -147,6 +164,7 @@ class RoomView with RoomViewMappable {
     this.board = const <PokerCard>[],
     this.reveals = const <Reveal>[],
     this.result,
+    this.finishOrder = const <Finish>[],
   });
 
   final String roomCode;
@@ -178,4 +196,7 @@ class RoomView with RoomViewMappable {
 
   /// Virtual cards: how the last hand was paid. Stays until the next hand is dealt.
   final HandResult? result;
+
+  /// Single-player games: who has gone out, in order, with the winner last. Empty otherwise.
+  final List<Finish> finishOrder;
 }

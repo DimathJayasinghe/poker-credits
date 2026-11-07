@@ -30,6 +30,9 @@ final class NativeHostServer implements HostServer {
   final Future<void> Function() _init;
   RsServerConfig? _lastConfig;
 
+  /// The running server is the loopback-only one of a single-player game.
+  bool _soloServer = false;
+
   @override
   bool get isSupported => true;
 
@@ -40,6 +43,11 @@ final class NativeHostServer implements HostServer {
   Future<int> startServer() async {
     return _guard(() async {
       await _init();
+      if (_soloServer) {
+        // A single-player server never serves a hosted game: switch to the open one.
+        await _controller.stop();
+        _soloServer = false;
+      }
       // The default port, then one fixed fallback (players probe exactly these two), and only then
       // any free port: players cannot find that one by code, they need the typed address.
       for (final port in <int>[defaultHostPort, defaultHostPort + 1, 0]) {
@@ -60,6 +68,37 @@ final class NativeHostServer implements HostServer {
     final port = await startServer();
     return _guard(() async {
       final created = await _controller.createRoom(hostName, _toBridge(config));
+      return HostedRoom(
+        roomCode: created.roomCode,
+        playerId: created.playerId,
+        sessionToken: created.sessionToken,
+        hostToken: created.hostToken,
+        port: port,
+      );
+    });
+  }
+
+  @override
+  Future<int> startSoloServer() async {
+    return _guard(() async {
+      await _init();
+      if (_controller.hasServer && !_soloServer) {
+        await _controller.stop();
+      }
+      // Any free port: nobody types it, and it is only reachable from this device.
+      final config = RsServerConfig(port: 0, exposeOnLan: false, dataDir: await _soloDataDir(), serverName: Strings.appName);
+      _lastConfig = config;
+      await _controller.start(config);
+      _soloServer = true;
+      return _controller.port ?? 0;
+    });
+  }
+
+  @override
+  Future<HostedRoom> hostSolo({required String hostName, required SoloConfig solo}) async {
+    final port = await startSoloServer();
+    return _guard(() async {
+      final created = await _controller.createRoom(hostName, _toBridge(soloRoomConfig(solo)));
       return HostedRoom(
         roomCode: created.roomCode,
         playerId: created.playerId,
@@ -104,7 +143,24 @@ final class NativeHostServer implements HostServer {
     blindLevelMinutes: c.blindLevelMinutes,
     turnTimeLimitSeconds: c.turnTimeLimitSeconds,
     cardMode: c.cardMode == CardMode.virtual ? RsCardMode.virtual : RsCardMode.physical,
+    solo: c.solo == null
+        ? null
+        : RsSoloConfig(
+            bots: c.solo!.bots,
+            skill: switch (c.solo!.skill) {
+              BotSkill.easy => RsBotSkill.easy,
+              BotSkill.normal => RsBotSkill.normal,
+              BotSkill.hard => RsBotSkill.hard,
+            },
+            ladderHands: c.solo!.ladderHands,
+          ),
   );
+
+  /// Solo games live apart from hosted rooms, so neither server ever loads the other's.
+  static Future<String> _soloDataDir() async {
+    final support = await getApplicationSupportDirectory();
+    return '${support.path}${Platform.pathSeparator}solo_rooms';
+  }
 
   static Future<String> _defaultDataDir() async {
     final support = await getApplicationSupportDirectory();

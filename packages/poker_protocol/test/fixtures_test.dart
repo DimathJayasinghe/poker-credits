@@ -192,6 +192,34 @@ void main() {
       expect(view.reveals.first.name, isNotEmpty);
     });
 
+    test('a solo room config carries its settings and an ordinary one has none', () {
+      final solo = decodeClient(File('${fixtureDir.path}/client_create_room_solo.json').readAsStringSync()).body as CreateRoom;
+      expect(solo.config.solo?.bots, 5);
+      expect(solo.config.solo?.skill, BotSkill.hard);
+      expect(solo.config.solo?.ladderHands, 8);
+      expect(solo.config.cardMode, CardMode.virtual);
+      final plain = decodeClient(File('${fixtureDir.path}/client_create_room.json').readAsStringSync()).body as CreateRoom;
+      expect(plain.config.solo, isNull);
+      expect(asMap(encodeClient(plain))['config'], isNot(contains('solo')));
+    });
+
+    test('an unknown bot skill is normal, the middle level', () {
+      final envelope = decodeClient(
+        '{"v":1,"type":"CREATE_ROOM","hostName":"H","config":{"startingChips":1000,"smallBlind":5,"bigBlind":10,"ante":0,'
+        '"isTournament":true,"blindLevelMinutes":10,"turnTimeLimitSeconds":0,"cardMode":"VIRTUAL",'
+        '"solo":{"bots":3,"skill":"GODLIKE","ladderHands":8}}}',
+      );
+      expect((envelope.body as CreateRoom).config.solo?.skill, BotSkill.normal);
+    });
+
+    test('finishOrder parses, and a view without it has none and is written without it', () {
+      final solo = decodeServer(File('${fixtureDir.path}/server_state_update_solo.json').readAsStringSync()).body as StateUpdate;
+      expect(solo.view.finishOrder.map((f) => (f.name, f.place)), [('Liam', 4), ('Zoe', 3)]);
+      final plain = decodeServer(File('${fixtureDir.path}/server_state_update.json').readAsStringSync()).body as StateUpdate;
+      expect(plain.view.finishOrder, isEmpty);
+      expect(asMap(encodeServer(plain))['view'], isNot(contains('finishOrder')));
+    });
+
     test('garbage is a ProtocolFormatException', () {
       for (final text in ['not json', '[]', '{"v":1}', '{"type":"PONG","t":1}', '{"v":1,"type":"PONG"}']) {
         expect(() => decodeServer(text), throwsA(isA<ProtocolFormatException>()), reason: text);

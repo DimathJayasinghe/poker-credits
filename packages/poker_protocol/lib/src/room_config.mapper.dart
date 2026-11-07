@@ -54,6 +54,191 @@ extension CardModeMapperExtension on CardMode {
   }
 }
 
+class BotSkillMapper extends EnumMapper<BotSkill> {
+  BotSkillMapper._();
+
+  static BotSkillMapper? _instance;
+  static BotSkillMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = BotSkillMapper._());
+    }
+    return _instance!;
+  }
+
+  static BotSkill fromValue(dynamic value) {
+    ensureInitialized();
+    return MapperContainer.globals.fromValue(value);
+  }
+
+  @override
+  BotSkill decode(dynamic value) {
+    switch (value) {
+      case r'EASY':
+        return BotSkill.easy;
+      case r'NORMAL':
+        return BotSkill.normal;
+      case r'HARD':
+        return BotSkill.hard;
+      default:
+        return BotSkill.values[1];
+    }
+  }
+
+  @override
+  dynamic encode(BotSkill self) {
+    switch (self) {
+      case BotSkill.easy:
+        return r'EASY';
+      case BotSkill.normal:
+        return r'NORMAL';
+      case BotSkill.hard:
+        return r'HARD';
+    }
+  }
+}
+
+extension BotSkillMapperExtension on BotSkill {
+  String toValue() {
+    BotSkillMapper.ensureInitialized();
+    return MapperContainer.globals.toValue<BotSkill>(this) as String;
+  }
+}
+
+class SoloConfigMapper extends ClassMapperBase<SoloConfig> {
+  SoloConfigMapper._();
+
+  static SoloConfigMapper? _instance;
+  static SoloConfigMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = SoloConfigMapper._());
+      BotSkillMapper.ensureInitialized();
+    }
+    return _instance!;
+  }
+
+  @override
+  final String id = 'SoloConfig';
+
+  static int _$bots(SoloConfig v) => v.bots;
+  static const Field<SoloConfig, int> _f$bots = Field('bots', _$bots);
+  static BotSkill _$skill(SoloConfig v) => v.skill;
+  static const Field<SoloConfig, BotSkill> _f$skill = Field('skill', _$skill);
+  static int _$ladderHands(SoloConfig v) => v.ladderHands;
+  static const Field<SoloConfig, int> _f$ladderHands = Field(
+    'ladderHands',
+    _$ladderHands,
+  );
+
+  @override
+  final MappableFields<SoloConfig> fields = const {
+    #bots: _f$bots,
+    #skill: _f$skill,
+    #ladderHands: _f$ladderHands,
+  };
+  @override
+  final bool ignoreNull = true;
+
+  static SoloConfig _instantiate(DecodingData data) {
+    return SoloConfig(
+      bots: data.dec(_f$bots),
+      skill: data.dec(_f$skill),
+      ladderHands: data.dec(_f$ladderHands),
+    );
+  }
+
+  @override
+  final Function instantiate = _instantiate;
+
+  static SoloConfig fromMap(Map<String, dynamic> map) {
+    return ensureInitialized().decodeMap<SoloConfig>(map);
+  }
+
+  static SoloConfig fromJson(String json) {
+    return ensureInitialized().decodeJson<SoloConfig>(json);
+  }
+}
+
+mixin SoloConfigMappable {
+  String toJson() {
+    return SoloConfigMapper.ensureInitialized().encodeJson<SoloConfig>(
+      this as SoloConfig,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return SoloConfigMapper.ensureInitialized().encodeMap<SoloConfig>(
+      this as SoloConfig,
+    );
+  }
+
+  SoloConfigCopyWith<SoloConfig, SoloConfig, SoloConfig> get copyWith =>
+      _SoloConfigCopyWithImpl<SoloConfig, SoloConfig>(
+        this as SoloConfig,
+        $identity,
+        $identity,
+      );
+  @override
+  String toString() {
+    return SoloConfigMapper.ensureInitialized().stringifyValue(
+      this as SoloConfig,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return SoloConfigMapper.ensureInitialized().equalsValue(
+      this as SoloConfig,
+      other,
+    );
+  }
+
+  @override
+  int get hashCode {
+    return SoloConfigMapper.ensureInitialized().hashValue(this as SoloConfig);
+  }
+}
+
+extension SoloConfigValueCopy<$R, $Out>
+    on ObjectCopyWith<$R, SoloConfig, $Out> {
+  SoloConfigCopyWith<$R, SoloConfig, $Out> get $asSoloConfig =>
+      $base.as((v, t, t2) => _SoloConfigCopyWithImpl<$R, $Out>(v, t, t2));
+}
+
+abstract class SoloConfigCopyWith<$R, $In extends SoloConfig, $Out>
+    implements ClassCopyWith<$R, $In, $Out> {
+  $R call({int? bots, BotSkill? skill, int? ladderHands});
+  SoloConfigCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
+}
+
+class _SoloConfigCopyWithImpl<$R, $Out>
+    extends ClassCopyWithBase<$R, SoloConfig, $Out>
+    implements SoloConfigCopyWith<$R, SoloConfig, $Out> {
+  _SoloConfigCopyWithImpl(super.value, super.then, super.then2);
+
+  @override
+  late final ClassMapperBase<SoloConfig> $mapper =
+      SoloConfigMapper.ensureInitialized();
+  @override
+  $R call({int? bots, BotSkill? skill, int? ladderHands}) => $apply(
+    FieldCopyWithData({
+      if (bots != null) #bots: bots,
+      if (skill != null) #skill: skill,
+      if (ladderHands != null) #ladderHands: ladderHands,
+    }),
+  );
+  @override
+  SoloConfig $make(CopyWithData data) => SoloConfig(
+    bots: data.get(#bots, or: $value.bots),
+    skill: data.get(#skill, or: $value.skill),
+    ladderHands: data.get(#ladderHands, or: $value.ladderHands),
+  );
+
+  @override
+  SoloConfigCopyWith<$R2, SoloConfig, $Out2> $chain<$R2, $Out2>(
+    Then<$Out2, $R2> t,
+  ) => _SoloConfigCopyWithImpl<$R2, $Out2>($value, $cast, t);
+}
+
 class RoomConfigMapper extends ClassMapperBase<RoomConfig> {
   RoomConfigMapper._();
 
@@ -62,6 +247,7 @@ class RoomConfigMapper extends ClassMapperBase<RoomConfig> {
     if (_instance == null) {
       MapperContainer.globals.use(_instance = RoomConfigMapper._());
       CardModeMapper.ensureInitialized();
+      SoloConfigMapper.ensureInitialized();
     }
     return _instance!;
   }
@@ -108,6 +294,12 @@ class RoomConfigMapper extends ClassMapperBase<RoomConfig> {
     opt: true,
     def: CardMode.physical,
   );
+  static SoloConfig? _$solo(RoomConfig v) => v.solo;
+  static const Field<RoomConfig, SoloConfig> _f$solo = Field(
+    'solo',
+    _$solo,
+    opt: true,
+  );
 
   @override
   final MappableFields<RoomConfig> fields = const {
@@ -119,6 +311,7 @@ class RoomConfigMapper extends ClassMapperBase<RoomConfig> {
     #blindLevelMinutes: _f$blindLevelMinutes,
     #turnTimeLimitSeconds: _f$turnTimeLimitSeconds,
     #cardMode: _f$cardMode,
+    #solo: _f$solo,
   };
   @override
   final bool ignoreNull = true;
@@ -135,6 +328,7 @@ class RoomConfigMapper extends ClassMapperBase<RoomConfig> {
       blindLevelMinutes: data.dec(_f$blindLevelMinutes),
       turnTimeLimitSeconds: data.dec(_f$turnTimeLimitSeconds),
       cardMode: data.dec(_f$cardMode),
+      solo: data.dec(_f$solo),
     );
   }
 
@@ -198,6 +392,7 @@ extension RoomConfigValueCopy<$R, $Out>
 
 abstract class RoomConfigCopyWith<$R, $In extends RoomConfig, $Out>
     implements ClassCopyWith<$R, $In, $Out> {
+  SoloConfigCopyWith<$R, SoloConfig, SoloConfig>? get solo;
   $R call({
     int? startingChips,
     int? smallBlind,
@@ -207,6 +402,7 @@ abstract class RoomConfigCopyWith<$R, $In extends RoomConfig, $Out>
     int? blindLevelMinutes,
     int? turnTimeLimitSeconds,
     CardMode? cardMode,
+    SoloConfig? solo,
   });
   RoomConfigCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -220,6 +416,9 @@ class _RoomConfigCopyWithImpl<$R, $Out>
   late final ClassMapperBase<RoomConfig> $mapper =
       RoomConfigMapper.ensureInitialized();
   @override
+  SoloConfigCopyWith<$R, SoloConfig, SoloConfig>? get solo =>
+      $value.solo?.copyWith.$chain((v) => call(solo: v));
+  @override
   $R call({
     int? startingChips,
     int? smallBlind,
@@ -229,6 +428,7 @@ class _RoomConfigCopyWithImpl<$R, $Out>
     int? blindLevelMinutes,
     int? turnTimeLimitSeconds,
     CardMode? cardMode,
+    Object? solo = $none,
   }) => $apply(
     FieldCopyWithData({
       if (startingChips != null) #startingChips: startingChips,
@@ -240,6 +440,7 @@ class _RoomConfigCopyWithImpl<$R, $Out>
       if (turnTimeLimitSeconds != null)
         #turnTimeLimitSeconds: turnTimeLimitSeconds,
       if (cardMode != null) #cardMode: cardMode,
+      if (solo != $none) #solo: solo,
     }),
   );
   @override
@@ -258,6 +459,7 @@ class _RoomConfigCopyWithImpl<$R, $Out>
       or: $value.turnTimeLimitSeconds,
     ),
     cardMode: data.get(#cardMode, or: $value.cardMode),
+    solo: data.get(#solo, or: $value.solo),
   );
 
   @override

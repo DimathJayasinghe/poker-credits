@@ -28,6 +28,18 @@ abstract interface class HostServer {
   /// Throws [HostException].
   Future<HostedRoom> hostGame({required String hostName, required RoomConfig config});
 
+  /// Starts the server that only this device can reach (a single-player game) and returns its
+  /// port. Stops a server that is open to the network first: the two never run together, and
+  /// the caller makes sure no hosted game is running.
+  ///
+  /// Throws [HostException].
+  Future<int> startSoloServer();
+
+  /// Starts the solo server and creates a single-player game on it.
+  ///
+  /// Throws [HostException].
+  Future<HostedRoom> hostSolo({required String hostName, required SoloConfig solo});
+
   /// Makes sure the server is up, restarting it if the OS or a panic stopped it. Rooms come
   /// back from disk. Call when the app returns to the foreground.
   ///

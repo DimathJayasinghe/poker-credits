@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `start_with_events`, `to_core`, `to_wire`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `try_from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `try_from`
 
 /// Starts the server and returns its handle. Call [`RsServerHandle::subscribe`] to watch it.
 ///
@@ -41,6 +41,21 @@ abstract class RsServerHandle implements RustOpaqueInterface {
   /// Streams [`RsServerEvent`]s into `events` until the server stops. Only the first call
   /// gets the stream; later calls end immediately.
   Stream<RsServerEvent> subscribe();
+}
+
+/// How well the computer players of a solo game play.
+enum RsBotSkill {
+  /// Plays by instinct and makes mistakes.
+  easy,
+
+  /// A sensible all-round player (default).
+  normal,
+
+  /// Reads the table fast and rarely errs.
+  hard;
+
+  static Future<RsBotSkill> default_() =>
+      RustLib.instance.api.crateApiServerRsBotSkillDefault();
 }
 
 /// Real cards or cards dealt by the app. Fixed when the room is created.
@@ -121,6 +136,9 @@ class RsRoomConfig {
   /// Real or virtual cards.
   final RsCardMode cardMode;
 
+  /// Set for a single-player game (needs virtual cards, and a server that is not on the LAN).
+  final RsSoloConfig? solo;
+
   const RsRoomConfig({
     required this.startingChips,
     required this.smallBlind,
@@ -130,6 +148,7 @@ class RsRoomConfig {
     required this.blindLevelMinutes,
     required this.turnTimeLimitSeconds,
     required this.cardMode,
+    this.solo,
   });
 
   @override
@@ -141,7 +160,8 @@ class RsRoomConfig {
       isTournament.hashCode ^
       blindLevelMinutes.hashCode ^
       turnTimeLimitSeconds.hashCode ^
-      cardMode.hashCode;
+      cardMode.hashCode ^
+      solo.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -155,7 +175,8 @@ class RsRoomConfig {
           isTournament == other.isTournament &&
           blindLevelMinutes == other.blindLevelMinutes &&
           turnTimeLimitSeconds == other.turnTimeLimitSeconds &&
-          cardMode == other.cardMode;
+          cardMode == other.cardMode &&
+          solo == other.solo;
 }
 
 /// The room was refused.
@@ -295,4 +316,34 @@ enum RsServerEventKind {
 
   /// The server has stopped; `value` is 0.
   stopped,
+}
+
+/// Extra settings of a single-player game against computer players.
+class RsSoloConfig {
+  /// Computer players at the table, 1 to 9.
+  final int bots;
+
+  /// How well they play.
+  final RsBotSkill skill;
+
+  /// Hands played at each blind level.
+  final int ladderHands;
+
+  const RsSoloConfig({
+    required this.bots,
+    required this.skill,
+    required this.ladderHands,
+  });
+
+  @override
+  int get hashCode => bots.hashCode ^ skill.hashCode ^ ladderHands.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RsSoloConfig &&
+          runtimeType == other.runtimeType &&
+          bots == other.bots &&
+          skill == other.skill &&
+          ladderHands == other.ladderHands;
 }

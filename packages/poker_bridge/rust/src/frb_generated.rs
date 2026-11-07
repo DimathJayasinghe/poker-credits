@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1615424658;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1685982909;
 
 // Section: executor
 
@@ -402,6 +402,38 @@ fn wire__crate__api__logging__init_logging_impl(
         },
     )
 }
+fn wire__crate__api__server__rs_bot_skill_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "rs_bot_skill_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::server::RsBotSkill::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__server__rs_card_mode_default_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -558,6 +590,30 @@ impl SseDecode for Vec<u8> {
     }
 }
 
+impl SseDecode for Option<crate::api::server::RsSoloConfig> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::server::RsSoloConfig>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for crate::api::server::RsBotSkill {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::server::RsBotSkill::Easy,
+            1 => crate::api::server::RsBotSkill::Normal,
+            2 => crate::api::server::RsBotSkill::Hard,
+            _ => unreachable!("Invalid variant for RsBotSkill: {}", inner),
+        };
+    }
+}
+
 impl SseDecode for crate::api::server::RsCardMode {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -597,6 +653,7 @@ impl SseDecode for crate::api::server::RsRoomConfig {
         let mut var_blindLevelMinutes = <u32>::sse_decode(deserializer);
         let mut var_turnTimeLimitSeconds = <u32>::sse_decode(deserializer);
         let mut var_cardMode = <crate::api::server::RsCardMode>::sse_decode(deserializer);
+        let mut var_solo = <Option<crate::api::server::RsSoloConfig>>::sse_decode(deserializer);
         return crate::api::server::RsRoomConfig {
             starting_chips: var_startingChips,
             small_blind: var_smallBlind,
@@ -606,6 +663,7 @@ impl SseDecode for crate::api::server::RsRoomConfig {
             blind_level_minutes: var_blindLevelMinutes,
             turn_time_limit_seconds: var_turnTimeLimitSeconds,
             card_mode: var_cardMode,
+            solo: var_solo,
         };
     }
 }
@@ -689,6 +747,20 @@ impl SseDecode for crate::api::server::RsServerEventKind {
     }
 }
 
+impl SseDecode for crate::api::server::RsSoloConfig {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_bots = <u8>::sse_decode(deserializer);
+        let mut var_skill = <crate::api::server::RsBotSkill>::sse_decode(deserializer);
+        let mut var_ladderHands = <u32>::sse_decode(deserializer);
+        return crate::api::server::RsSoloConfig {
+            bots: var_bots,
+            skill: var_skill,
+            ladder_hands: var_ladderHands,
+        };
+    }
+}
+
 impl SseDecode for u16 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -751,8 +823,9 @@ fn pde_ffi_dispatcher_primary_impl(
             data_len,
         ),
         6 => wire__crate__api__logging__init_app_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__server__rs_card_mode_default_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__server__start_server_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__server__rs_bot_skill_default_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__server__rs_card_mode_default_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__server__start_server_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -788,6 +861,28 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<RsServerHandle>> for RsServerH
     }
 }
 
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::server::RsBotSkill {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Easy => 0.into_dart(),
+            Self::Normal => 1.into_dart(),
+            Self::Hard => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::server::RsBotSkill
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::server::RsBotSkill>
+    for crate::api::server::RsBotSkill
+{
+    fn into_into_dart(self) -> crate::api::server::RsBotSkill {
+        self
+    }
+}
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::server::RsCardMode {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
@@ -844,6 +939,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::server::RsRoomConfig {
             self.blind_level_minutes.into_into_dart().into_dart(),
             self.turn_time_limit_seconds.into_into_dart().into_dart(),
             self.card_mode.into_into_dart().into_dart(),
+            self.solo.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -989,6 +1085,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::server::RsServerEventKind>
         self
     }
 }
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::server::RsSoloConfig {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.bots.into_into_dart().into_dart(),
+            self.skill.into_into_dart().into_dart(),
+            self.ladder_hands.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::server::RsSoloConfig
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::server::RsSoloConfig>
+    for crate::api::server::RsSoloConfig
+{
+    fn into_into_dart(self) -> crate::api::server::RsSoloConfig {
+        self
+    }
+}
 
 impl SseEncode for flutter_rust_bridge::for_generated::anyhow::Error {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1062,6 +1180,33 @@ impl SseEncode for Vec<u8> {
     }
 }
 
+impl SseEncode for Option<crate::api::server::RsSoloConfig> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::server::RsSoloConfig>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for crate::api::server::RsBotSkill {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::server::RsBotSkill::Easy => 0,
+                crate::api::server::RsBotSkill::Normal => 1,
+                crate::api::server::RsBotSkill::Hard => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
 impl SseEncode for crate::api::server::RsCardMode {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1099,6 +1244,7 @@ impl SseEncode for crate::api::server::RsRoomConfig {
         <u32>::sse_encode(self.blind_level_minutes, serializer);
         <u32>::sse_encode(self.turn_time_limit_seconds, serializer);
         <crate::api::server::RsCardMode>::sse_encode(self.card_mode, serializer);
+        <Option<crate::api::server::RsSoloConfig>>::sse_encode(self.solo, serializer);
     }
 }
 
@@ -1167,6 +1313,15 @@ impl SseEncode for crate::api::server::RsServerEventKind {
             },
             serializer,
         );
+    }
+}
+
+impl SseEncode for crate::api::server::RsSoloConfig {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u8>::sse_encode(self.bots, serializer);
+        <crate::api::server::RsBotSkill>::sse_encode(self.skill, serializer);
+        <u32>::sse_encode(self.ladder_hands, serializer);
     }
 }
 

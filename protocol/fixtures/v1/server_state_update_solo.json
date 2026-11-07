@@ -1,0 +1,47 @@
+{
+  "v": 1,
+  "type": "STATE_UPDATE",
+  "stateVersion": 310,
+  "view": {
+    "roomCode": "KQ7M",
+    "handNumber": 31,
+    "phase": "NEXT_HAND_PREP",
+    "dealerSeat": 4,
+    "bigBlindSeat": 0,
+    "currentHighBet": 0,
+    "minRaiseTo": 0,
+    "totalPot": 0,
+    "pots": [],
+    "seats": [
+      {
+        "seatIndex": 0,
+        "playerId": "p_1",
+        "name": "Dimath",
+        "chips": 4100,
+        "streetBet": 0,
+        "hasFolded": false,
+        "isAllIn": false,
+        "isSittingOut": false,
+        "isConnected": true
+      },
+      {
+        "seatIndex": 5,
+        "playerId": "p_3",
+        "name": "Maya",
+        "chips": 2900,
+        "streetBet": 0,
+        "hasFolded": false,
+        "isAllIn": false,
+        "isSittingOut": false,
+        "isConnected": true
+      }
+    ],
+    "paused": false,
+    "spectatorCount": 0,
+    "pendingRebuys": [],
+    "finishOrder": [
+      { "playerId": "p_2", "name": "Liam", "place": 4 },
+      { "playerId": "p_4", "name": "Zoe", "place": 3 }
+    ]
+  }
+}

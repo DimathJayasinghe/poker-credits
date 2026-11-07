@@ -12,6 +12,21 @@ const RoomConfig defaultRoomConfig = RoomConfig(
   turnTimeLimitSeconds: 30,
 );
 
+/// The table of a single-player game: a freeze-out with 75 big blinds each, virtual cards, no
+/// turn timer (nobody waits for the person playing) and blinds that rise every
+/// [SoloConfig.ladderHands] hands. Only a starting point: the server validates it.
+RoomConfig soloRoomConfig(SoloConfig solo) => RoomConfig(
+  startingChips: 1500,
+  smallBlind: 10,
+  bigBlind: 20,
+  ante: 0,
+  isTournament: true,
+  blindLevelMinutes: 10,
+  turnTimeLimitSeconds: 0,
+  cardMode: CardMode.virtual,
+  solo: solo,
+);
+
 /// A room created by the embedded server, with the host's credentials.
 class HostedRoom {
   const HostedRoom({

@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1615424658;
+  int get rustContentHash => -1685982909;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -100,6 +100,8 @@ abstract class RustLibApi extends BaseApi {
   Future<void> crateApiLoggingInitApp();
 
   void crateApiLoggingInitLogging({required String filter});
+
+  Future<RsBotSkill> crateApiServerRsBotSkillDefault();
 
   Future<RsCardMode> crateApiServerRsCardModeDefault();
 
@@ -352,7 +354,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "init_logging", argNames: ["filter"]);
 
   @override
-  Future<RsCardMode> crateApiServerRsCardModeDefault() {
+  Future<RsBotSkill> crateApiServerRsBotSkillDefault() {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -361,6 +363,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             generalizedFrbRustBinding,
             serializer,
             funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_rs_bot_skill,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiServerRsBotSkillDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiServerRsBotSkillDefaultConstMeta =>
+      const TaskConstMeta(debugName: "rs_bot_skill_default", argNames: []);
+
+  @override
+  Future<RsCardMode> crateApiServerRsCardModeDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 9,
             port: port_,
           );
         },
@@ -390,7 +419,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 10,
             port: port_,
           );
         },
@@ -483,6 +512,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RsSoloConfig dco_decode_box_autoadd_rs_solo_config(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_rs_solo_config(raw);
+  }
+
+  @protected
   int dco_decode_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -498,6 +533,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
+  }
+
+  @protected
+  RsSoloConfig? dco_decode_opt_box_autoadd_rs_solo_config(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_rs_solo_config(raw);
+  }
+
+  @protected
+  RsBotSkill dco_decode_rs_bot_skill(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return RsBotSkill.values[raw as int];
   }
 
   @protected
@@ -524,8 +571,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RsRoomConfig dco_decode_rs_room_config(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return RsRoomConfig(
       startingChips: dco_decode_i_64(arr[0]),
       smallBlind: dco_decode_i_64(arr[1]),
@@ -535,6 +582,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       blindLevelMinutes: dco_decode_u_32(arr[5]),
       turnTimeLimitSeconds: dco_decode_u_32(arr[6]),
       cardMode: dco_decode_rs_card_mode(arr[7]),
+      solo: dco_decode_opt_box_autoadd_rs_solo_config(arr[8]),
     );
   }
 
@@ -599,6 +647,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RsServerEventKind dco_decode_rs_server_event_kind(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return RsServerEventKind.values[raw as int];
+  }
+
+  @protected
+  RsSoloConfig dco_decode_rs_solo_config(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return RsSoloConfig(
+      bots: dco_decode_u_8(arr[0]),
+      skill: dco_decode_rs_bot_skill(arr[1]),
+      ladderHands: dco_decode_u_32(arr[2]),
+    );
   }
 
   @protected
@@ -712,6 +773,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RsSoloConfig sse_decode_box_autoadd_rs_solo_config(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_rs_solo_config(deserializer));
+  }
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getInt32();
@@ -728,6 +797,26 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
     return deserializer.buffer.getUint8List(len_);
+  }
+
+  @protected
+  RsSoloConfig? sse_decode_opt_box_autoadd_rs_solo_config(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_rs_solo_config(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  RsBotSkill sse_decode_rs_bot_skill(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return RsBotSkill.values[inner];
   }
 
   @protected
@@ -763,6 +852,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_blindLevelMinutes = sse_decode_u_32(deserializer);
     var var_turnTimeLimitSeconds = sse_decode_u_32(deserializer);
     var var_cardMode = sse_decode_rs_card_mode(deserializer);
+    var var_solo = sse_decode_opt_box_autoadd_rs_solo_config(deserializer);
     return RsRoomConfig(
       startingChips: var_startingChips,
       smallBlind: var_smallBlind,
@@ -772,6 +862,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       blindLevelMinutes: var_blindLevelMinutes,
       turnTimeLimitSeconds: var_turnTimeLimitSeconds,
       cardMode: var_cardMode,
+      solo: var_solo,
     );
   }
 
@@ -835,6 +926,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return RsServerEventKind.values[inner];
+  }
+
+  @protected
+  RsSoloConfig sse_decode_rs_solo_config(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_bots = sse_decode_u_8(deserializer);
+    var var_skill = sse_decode_rs_bot_skill(deserializer);
+    var var_ladderHands = sse_decode_u_32(deserializer);
+    return RsSoloConfig(
+      bots: var_bots,
+      skill: var_skill,
+      ladderHands: var_ladderHands,
+    );
   }
 
   @protected
@@ -962,6 +1066,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_rs_solo_config(
+    RsSoloConfig self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_rs_solo_config(self, serializer);
+  }
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
@@ -981,6 +1094,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     serializer.buffer.putUint8List(self);
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_rs_solo_config(
+    RsSoloConfig? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_rs_solo_config(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_rs_bot_skill(RsBotSkill self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
   }
 
   @protected
@@ -1012,6 +1144,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_32(self.blindLevelMinutes, serializer);
     sse_encode_u_32(self.turnTimeLimitSeconds, serializer);
     sse_encode_rs_card_mode(self.cardMode, serializer);
+    sse_encode_opt_box_autoadd_rs_solo_config(self.solo, serializer);
   }
 
   @protected
@@ -1070,6 +1203,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_rs_solo_config(RsSoloConfig self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_8(self.bots, serializer);
+    sse_encode_rs_bot_skill(self.skill, serializer);
+    sse_encode_u_32(self.ladderHands, serializer);
   }
 
   @protected
