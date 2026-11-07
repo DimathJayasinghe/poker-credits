@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/main.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
 
 import '../support/fakes.dart';
 
@@ -119,4 +120,48 @@ void main() {
       }
     }
   }
+
+  // Accessibility: anything that can be pressed is at least 44 x 44 (the platform minimum), on
+  // every screen outside a game, at the normal text size.
+  testWidgets('every pressable cell on the non-game screens is at least 44 px tall and wide', (tester) async {
+    const size = Size(390, 844);
+    final small = <String>[];
+    var audited = 0;
+    void audit(String screen) {
+      for (final element in tester.elementList(find.byType(BrutalPressable))) {
+        audited++;
+        final box = element.size!;
+        if (box.height < 44 || box.width < 44) small.add('$screen: ${box.width.round()}x${box.height.round()} ${element.widget.runtimeType}');
+      }
+    }
+
+    await _launch(tester, TestHarness(), size, 1);
+    audit('home');
+    await tester.tap(find.text('SETTINGS'));
+    await tester.pumpAndSettle();
+    audit('settings');
+    await tester.ensureVisible(find.text(Strings.supportRow.toUpperCase()));
+    await tester.tap(find.text(Strings.supportRow.toUpperCase()));
+    await tester.pumpAndSettle();
+    audit('support');
+    await tester.pumpWidget(const SizedBox());
+    await _launch(tester, TestHarness(), size, 1);
+    await tester.tap(find.text('GUIDE').first);
+    await tester.pumpAndSettle();
+    audit('guide');
+    await tester.pumpWidget(const SizedBox());
+    await _launch(tester, TestHarness(firstRun: true, splash: const Duration(seconds: 30)), size, 1);
+    await tester.tap(find.byType(Scaffold).first);
+    await tester.pumpAndSettle();
+    audit('terms');
+    await tester.ensureVisible(find.text(Strings.termsAgree));
+    await tester.tap(find.text(Strings.termsAgree));
+    await tester.pump();
+    await tester.ensureVisible(find.text(Strings.termsAccept.toUpperCase()));
+    await tester.tap(find.text(Strings.termsAccept.toUpperCase()));
+    await tester.pumpAndSettle();
+    audit('intro');
+    expect(audited, greaterThan(20), reason: 'the audit really looked at the screens');
+    expect(small, isEmpty);
+  });
 }
