@@ -103,6 +103,28 @@ Game screens (Table, Player, Spectator) are full screen routes without the bar, 
 
 **Back rule:** every pushed route has a visible back arrow (`BackCell`, a left arrow) in its top bar, and the system back does the same thing. On Player it asks "Leave the table?" (leaving gives the seat up); on the host Table it asks "End the game?" (it ends the game for everybody); a spectator, or a game that has already ended, leaves at once. Join cancels a connection attempt; Host is locked while the server starts.
 
+## 4b. No scrolling (1.3.1)
+**Rule:** outside Settings, the Guide and the terms text, no screen scrolls. Every control, every number and every player is on screen at once, on every standard phone (Android 360x640 up to a Pro Max, iPhone SE to 16 Pro Max, with their system bars), upright and on its side, on tablets and in a desktop window. A game screen needs this most (a scroll in the middle of a hand costs a turn); the screens around it follow the same rule so the app feels one piece.
+
+**What gives way, in this order:** (1) gaps and padding, (2) captions and hints (one line, then none), (3) the size of decoration (wordmark, QR code, plate and card sizes, never below the 44 px tap minimum), (4) layout (two columns or a right-hand pane on a phone on its side, a grid instead of an oval), (5) the size of the text, on game screens only. Things never drop out: a control, a number or a name is either on screen or in one tap (a sheet).
+
+**How (code):**
+- `FitPage` (`app/lib/widget/brutal/fit_page.dart`): a fixed top bar, a body and an optional footer. It picks a `FitTier` (comfortable, compact, tight) from the height it has divided by the text scale, tells the content with `FitInfo`, and puts the main action in a footer that is outside the scrolling area (a right-hand pane on a phone on its side). `FitSection` and `FitHeader` draw a labelled group and a headline in the size of the tier.
+- Game screens: `PlayerFit` (player) and `TableFit` (host table: tiers `roomy`, `snug`, `tight`, with plate, button, pot, card and QR sizes; `FeltLayout` falls back from the oval to a grid, and the grid takes as few columns as keep every plate at its least height).
+- Plates and rows adapt to the height they are given instead of the device: `SeatPlate` has a standard and a dense form, `BrutalRow` a dense and a snug one.
+- Sheets (seat order, winners, raise) hold their content without scrolling; on a phone on its side they get wider (`wideSheetWidth`) and lay their cells out in columns. A list that comes from data (the winners of a showdown) scrolls inside its own box while its confirm button stays pinned.
+
+**Text size.** Non-game screens never cap the text scale; they are drawn denser, and past 1.3x or with the keyboard open they may scroll as a last resort (the scroll view stays in the tree as a guard, the main button stays pinned outside it). Game screens cap the scale to what fits, by height: the player screen at height over 555, the host table at usable height over 560 upright and over 330 on its side (never over 2). The wordmark and big numerals do not scale with text.
+
+**Deliberate exceptions.**
+- Settings, the Guide and the terms document scroll (they are documents or lists of unknown length). On the terms screen the "I understand and agree" switch and the Accept and Decline buttons are a footer that does not scroll, so the decision is always reachable (the footer takes at most 60% of the height and scrolls inside that only at huge text).
+- The Nearby games list scrolls when many games are found.
+- The host table's seat list may scroll inside its own box, with the pot, cards and every button fixed, in one case only: a seated host who plays with cards in the app, on their turn, with ten seats, on the smallest phones (seat plates would otherwise fall under 60 px).
+- The error screen shown when the app fails to start scrolls its report; the copy button stays pinned.
+- The Host name field no longer takes focus on open (the keyboard would cover half of a short screen at once); with a keyboard open any page may scroll.
+
+**Checks.** `test/pages/no_scroll_test.dart` and `no_scroll_more_test.dart` (menus, setup pages, join, host, support, intro, terms buttons, tours, the poker lesson, Home with a game to resume, the spectator table, and keyboard-open cases) and `table_no_scroll_test.dart` (the host table in eight scenes and its sheets) measure the scroll extent of every screen on 18 device sizes (`test/support/devices.dart`) at text 1.0 and 1.3, and fail on any scroll above half a pixel or any exception. `solo_table_test.dart` does the same for the player screen.
+
 ## 5. Screens
 
 ### Play (home)
@@ -124,7 +146,7 @@ Game screens (Table, Player, Spectator) are full screen routes without the bar, 
 Phone: single column, the felt panel becomes a 160 px band under the title. The resume row, when present, is first and carries the accent.
 
 ### Table (landscape or tablet, host)
-Top bar cells: room code | hand and street | Pause | Undo. Centre: the `felt` panel with the pot block (`chip` fill, Anton 96) and seat plates on an oval path as hairline cells. The acting seat plate is the only accent fill, with its countdown as a 3 px bar. Ticker row of the last actions under the grid. Host controls: the next step (START HAND, BEGIN SHOWDOWN, RESOLVE) is one full-width heavy button on its own row; the rest (Seats, Pause, Undo, End game) sit under it in a grid of equal cells, two or three per row. When the host is on turn, YOUR TURN and the action row appear above the controls.
+Top bar cells: room code | hand and street | Pause | Undo. Centre: the `felt` panel with the pot block (`chip` fill, Anton 96) and seat plates on an oval path as hairline cells. The acting seat plate is the only accent fill, with its countdown as a 3 px bar. Ticker row of the last actions under the grid. Host controls: the next step (START HAND, BEGIN SHOWDOWN, RESOLVE) is one full-width heavy button on its own row; the rest (Seats, Pause, Undo, End game) sit under it in a grid of equal cells, two or three per row. When the host is on turn, YOUR TURN and the action row appear above the controls. On a phone on its side the seats stay on the left and everything the host presses is a pane on the right; the host's own cards sit in that pane. The whole table fits without scrolling (4b).
 
 ### Player (portrait, one thumb)
 Top bar: room, connection state. Hero cell: stack in Anton 64, bet beside it. Middle: whose turn (quiet `surface` cell) or, when acting, a full-width accent YOUR TURN cell with the countdown. Bottom third: FOLD (outlined), CHECK or CALL n (ink), RAISE (accent); raise opens the slider sheet. Haptics unchanged.
@@ -134,12 +156,12 @@ Top bar: room, connection state. Hero cell: stack in Anton 64, bet beside it. Mi
 - A tier (`roomy`, `snug`, `tight`) is picked from the height left after the system bars and banners: it sets the size of the chip count, my cards (`hero`, `hand`, `board`), the buttons (56, 52, 48), the gaps, and, on `tight`, merges the turn and the pot into one line.
 - The text scale is capped to what fits (`PlayerFit.maxTextScale`: the height over 555). The middle (turn, pot, board) is the part that shrinks, never below about 0.65 of its size; below the least height the whole controller is scaled down.
 - Opponents share the width (never a sideways scroll). Up to five get a cell with their two card backs; more take two rows of dense cells (name and chips only). A showdown lists the winners and my hand first, one line each, and a "+n more" line opens every hand in a sheet.
-- A phone on its side (shorter than 600, much wider than tall) gets two panes: the chips, the table and the middle on the left, my cards and the buttons on the right.
+- A phone on its side (shorter than 600, much wider than tall) gets two panes: the chips, the table and the middle on the left, my cards and the buttons on the right. At a showdown the panes swap weight: the showdown takes the larger right-hand side, the buttons stay under it, and my cards move to the left under my chips.
 `test/pages/solo_table_test.dart` (group "everything I need fits without scrolling") checks 24 real device sizes with their system bars, at text 1.0 and 1.3, and the biggest table (nine opponents, a six-way showdown).
 
 **Seat order.** Seats run clockwise and are numbered 1 to 10 (seat 1 at the bottom of the table screen). Between hands the Player screen shows "Seat N: change seat" and the host controls show "Seats"; both open the seat sheet: ten numbered cells, free ones tappable for a guest, and for the host a pick-then-place move (a taken seat swaps). Names are listed clockwise under the grid so the room can check the order out loud. During a hand the sheet only explains that seats are locked.
 
-**Table layout rule.** The oval is used only when ten plates fit around the pot without touching (`FeltLayout.ovalFits`, about five plate heights at the current text size); otherwise the plates go into a grid in seat order, and when the controls would squeeze even that, the middle of the page scrolls as a whole with the player's own buttons first. Nothing is ever drawn over anything else. `test/pages/table_layout_test.dart` fails on any overlap.
+**Table layout rule.** The oval is used only when ten plates fit around the pot without touching (`FeltLayout.ovalFits`, about five plate heights at the current text size); otherwise the plates go into a grid in seat order, in as few columns as keep every plate tall enough, and the plates get shorter (never below `TableFit.minPlate`) before anything scrolls. Nothing is ever drawn over anything else. `test/pages/table_layout_test.dart` fails on any overlap.
 
 **Landing table.** The felt panel draws one fixed-shape table (aspect 1.7) scaled to fit and centred, never stretched to the panel.
 
@@ -166,7 +188,7 @@ Settings persist in a small JSON file (`path_provider`, behind a platform seam; 
 ## 6. Accessibility
 - Contrast: body 7:1 or better; `muted` 4.5:1 or better; checked by `test/theme/contrast_test.dart` for both themes.
 - Semantics label on every actionable cell; a 3 px `accent`-contrast focus outline with offset for keyboard use.
-- Text scales to 3.0 without clipping or overflow on Home, Join, Host, Player, Settings, Guide, Support, the splash, terms, intro and the tours, and to 2.0 on the host Table (a shared display with fixed geometry; it clamps there on purpose). The Player screen never scrolls: it caps the text scale to what fits (see Player). Widget tests (`test/pages/text_scale_test.dart`, `home_page_test.dart`) fail on any overflow at 1.0, 2.0 and 3.0 on 320x640, 390x844 and 1280x800.
+- Text scales to 3.0 without clipping or overflow on Home, Join, Host, Settings, Guide, Support, the splash, terms, intro and the tours (past 1.3x these may scroll, see "No scrolling"). The Player and host Table screens never scroll: they cap the text scale to what fits (see 4b). Widget tests (`test/pages/text_scale_test.dart`, `home_page_test.dart`) fail on any overflow at 1.0, 2.0 and 3.0 on 320x640, 390x844 and 1280x800.
 - Colour never carries meaning alone (section 2). Reduced motion honoured. Texture can be switched off.
 
 ## 7. Implementation rules
@@ -207,7 +229,7 @@ Spec and mockups: `docs/superpowers/specs/2026-11-07-virtual-cards-design.md` se
 
 Spec: `docs/superpowers/specs/2026-11-07-single-player-bots-design.md` section 9. As built:
 - **Home:** "Play alone" row (caption "Against computer players, no network"), and a "Resume solo game" row above Host when a saved solo game exists. Hidden where hosting is unsupported (web).
-- **Setup (`SoloSetupPage`):** Opponents stepper (1 to 9, default 4); Skill as three equal cells (Easy, Normal, Hard) with a one-line caption for the chosen one; Game length cells (Quick 6 / Standard 8 / Long 12 hands per blind level); a caption with the personal record for that table kind; the primary Start cell. It scrolls a little on a small phone or at big text (no hard "fits without scrolling" rule); no tick marks on the stepper. Tokens only.
+- **Setup (`SoloSetupPage`):** Opponents stepper (1 to 9, default 4); Skill as three equal cells (Easy, Normal, Hard) with a one-line caption for the chosen one; Game length cells (Quick 6 / Standard 8 / Long 12 hands per blind level); a caption with the personal record for that table kind; the primary Start cell. It fits without scrolling on every phone (see 4b); no tick marks on the stepper. Tokens only.
 - **Table:** the Player screen (`PlayerPage(solo: true)`, a mode of the normal page, not a copy). Top bar adds BLINDS and RISE IN (`BlindStatusCells`, fed by `RoomView.blinds`). The opponent strip shows stacks and frames whose turn it is. Pause / Resume and END GAME replace top up, sit out and leave. Notes under the table ("> HEADS-UP", "> MAYA IS OUT (5TH)") show for two hands. When the human is out a SEE RESULT button appears. Back asks "Save and exit" (keeps the game, Home offers it again) or END GAME.
 - **Lifecycle:** `SoloTablePage` pauses the game when the app is backgrounded; coming back keeps it paused until the player presses Resume.
 - **Result (`SoloResultPage`):** place ("3RD" with "OF 6", or "YOU WON"), stats (hands played and won, biggest win, best hand), the hand that decided it as mini cards (`ShowdownPanel`), Play again (same table kind and length) and Home. The finished game is added to the local record and the saved game is cleared.
