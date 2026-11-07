@@ -18,6 +18,8 @@ pub(super) fn create_dir(dir: &Path) -> io::Result<()> {
 
 /// Open options for a store file: created readable and writable by the owner only.
 pub(super) fn options() -> OpenOptions {
+    // Only the unix branch below changes the options; elsewhere `mut` would be unused.
+    #[cfg_attr(not(unix), allow(unused_mut))]
     let mut options = OpenOptions::new();
     #[cfg(unix)]
     {
