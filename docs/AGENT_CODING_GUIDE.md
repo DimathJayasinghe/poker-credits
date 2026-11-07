@@ -211,3 +211,7 @@ Versions in use (app, as of Phase 4): `refena_flutter ^3.7.0`, `web_socket_chann
 4. Run section 5 checks.
 5. Update `docs/STATUS.md` (what is done, what is next, any deviations and why).
 6. Stop. Report to the user. Do not begin the next phase.
+
+## 8. Which model does the work
+Plan, audit and review with the strongest model; implement written briefs with a mid-tier model; do mechanical steps with a light one. Cheaper models get briefs that fix every file, signature, test and gate, plus the project pitfalls, and stop and report instead of guessing. Full policy, brief template and pitfalls: `docs/MODEL_STRATEGY.md`. No subagents unless the owner asks.
+
