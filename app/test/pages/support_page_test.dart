@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/config/project_links.dart';
 import 'package:poker_credits/pages/support_page.dart';
