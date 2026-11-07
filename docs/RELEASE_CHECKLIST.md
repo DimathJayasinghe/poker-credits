@@ -15,10 +15,13 @@ stores a signing key in the repository.
 - [ ] `fvm flutter test` in `app/`, `packages/poker_protocol`, `packages/poker_bridge`
 - [ ] Native TLS interop: `cd packages/poker_bridge && cargo build -p rust_lib_poker_bridge && POKER_BRIDGE_LIB=$PWD/../../target/debug/librust_lib_poker_bridge.so fvm flutter test test/native_tls_test.dart`
 - [ ] `bash tool/check_web_safe.sh` and `bash tool/check_no_state_logging.sh`
+- [ ] End-to-end suite on the real stack (22 scenarios, about 15 s): `cargo build -p rust_lib_poker_bridge && cd app && POKER_BRIDGE_LIB=$PWD/../target/debug/librust_lib_poker_bridge.so fvm flutter test test/e2e`. Every scenario must pass; the matrix of events it covers is `docs/SECURITY_AND_EDGE_CASES.md` section 8. It runs headless on one machine, so it does not replace section 2 below.
 - [ ] CI is green on the pushed branch, including the desktop build workflow (it is the first place the `ring` crate is compiled for Windows and macOS) and `cargo deny`
 - [ ] GitHub Actions in the workflows are still pinned to full SHAs (Dependabot PRs update them; read each one)
 
 ## 2. Run it on real devices (nothing here was ever run on a phone)
+
+The headless end-to-end suite already proved the join, play, reconnect, host restart, moved port, wrong certificate and old-host cases over real TLS sockets. What it cannot prove is the phone itself: camera, radio, OS background rules, release build. The lines below are only those.
 
 - [ ] Host on a physical Android phone, join with **two** other phones: once by QR code, once by room code, once by typed address. Play a few hands. Confirm each joins.
 - [ ] Wrong host: scan the QR of host A, then change host A's certificate (delete `tls-identity.bin` through a reinstall or clear data) and reconnect: the guest must stop with "not the host you meant", keep its seat data, and never connect.
@@ -61,7 +64,7 @@ stores a signing key in the repository.
 ## 5. Desktop packages (GitHub releases)
 
 - [ ] **owner:** Decide on code signing. Windows installers and the Linux tarball are unsigned; SmartScreen warns. Publish `SHA256SUMS` and verify it on download. A Windows signing certificate is the fix (audit F8).
-- [ ] The first desktop build with the TLS crates ran green in CI (see section 1).
+- [x] The first desktop build with the TLS crates ran green in CI for Linux and Windows (run 42419140147, 2026-11-08). Re-check on the release commit; macOS is not built by that workflow.
 
 ## 6. Terms and copy
 

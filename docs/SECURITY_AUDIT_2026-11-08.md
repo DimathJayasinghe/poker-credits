@@ -102,12 +102,20 @@ Status: tracked in `docs/RELEASE_CHECKLIST.md`.
 - **R2. The private key is a 0600 file** in the app's private directory, not in the platform
   keystore. The app sandbox protects it; a rooted or backed-up device could expose it. It identifies
   a LAN host only; it protects no account and no money.
-- **R3. No global cap on established connections** after the handshake (per-IP caps apply). A device
-  on the LAN can still occupy the host's connection slots with many addresses.
+- **R3. Partly mitigated.** Idle, half-open and slowloris sockets are now cut (first byte within 2 s,
+  handshake within 5 s, then 1.25 times the WebSocket idle timeout), the handshake pool is fair
+  (64 in all, 8 per address, IPv6 per /64, the oldest handshake of the heaviest address is dropped
+  for a newcomer), and an established connection holds a per-address slot (cap twice the WebSocket
+  cap plus four). Still open: a device that owns many addresses and speaks valid WebSocket can hold
+  slots for as long as it keeps pinging. A host that notices can end the game.
 - **R4. Old hosts and new guests cannot play together** (1.3.1 hosts speak plain `ws://`). The guest
-  shows "host runs an older version". The release notes must say so.
-- **R5. Nothing was run on a real device.** TLS interop was proven between `dart:io` and rustls on
-  loopback sockets, on Linux. Windows (`ring` build), Android, iOS and macOS need a run.
+  looks at `http://host/health` once; if it is our own health answer the join stops at once with
+  "host runs an older version" (before, the wss attempt broke the pipe and the guest looped on
+  "reconnecting"). The release notes must say so.
+- **R5. Nothing was run on a real device.** TLS interop and the whole join, play and recovery flow
+  were proven headless between the app's providers, `dart:io` and the real server, on Linux, over
+  loopback and over the machine's own LAN address (`app/test/e2e`, matrix in
+  `docs/SECURITY_AND_EDGE_CASES.md` section 8). The Windows and Linux desktop builds compile the TLS crates in CI (run 42419140147); Android release APK builds locally. Android, iOS and macOS still need a run on hardware.
 
 ## What was checked and is fine
 

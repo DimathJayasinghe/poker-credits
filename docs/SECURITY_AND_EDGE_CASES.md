@@ -274,3 +274,43 @@ In host (LAN) mode players find the host by code (ADR-012): the app probes `GET 
 - A solo game binds the embedded server to `127.0.0.1` only: no LAN listener, no discovery, no lobby entry. Solo rooms are rejected from network `CREATE_ROOM` and can only be made through the host path on a `ServerConfig::loopback_only` server; `is_bot` is never sent to a client.
 - Bot logs must not contain cards (`tool/check_no_state_logging.sh`).
 - Edge cases: every bot decision is checked against the engine's legal actions; failure falls back to check or fold so a hand cannot stall; bots are exempt from absence, presence and vote-kick; the app pausing in the background pauses the bots.
+
+## 8. Network, device and host events: what the app does (ADR-019, tested 2026-11-08)
+
+The end-to-end suite (`app/test/e2e/lan_e2e_test.dart`) runs the real stack headless: the real Rust server through the native library, the real TLS sockets (also through this machine's own LAN address, not only loopback), the real host finder, and the app's own providers, one container per phone. Only what needs a screen is replaced (wake lock, haptics, sound, secure storage). Run it with `cargo build -p rust_lib_poker_bridge` and then, in `app`, `POKER_BRIDGE_LIB=$PWD/../target/debug/librust_lib_poker_bridge.so fvm flutter test test/e2e`. Without the variable the tests skip.
+
+| Event | What the app does | Evidence |
+| :--- | :--- | :--- |
+| Guest's Wi-Fi drops and returns | Backoff retry, then `RESUME` with the same pin: same seat, no duplicate | e2e "a guest whose socket drops comes back to the same seat" |
+| Guest taps Join twice | One seat | e2e "tapping Join twice makes one seat" |
+| Guest cancels while the host is being looked at | Nothing is connected, no stored session | e2e "cancelling while the host is being looked at"; `join_probe_test` |
+| Slow Wi-Fi: first certificate look fails | Asked once more after 300 ms, then joins | e2e "a slow first look"; `join_probe_test` |
+| Room code nobody hosts | "Room not found", no hang | e2e "a room code nobody hosts" |
+| Host app killed and reopened | Same certificate (identity file), guests resume their seats | e2e "the host app is killed and reopened" |
+| Host app killed with a guest's app killed too | Guest's stored session resumes the same seat | e2e "a guest whose app was killed and reopened" |
+| Host switches apps and the OS stops the server | On return the server restarts on the same port with the same pin | e2e "the host switches apps and the server is gone" |
+| Host identity file lost | New pin: the guest stops with "not the host you meant", keeps its seat data, does not loop. Scanning the QR code again pins the new one | e2e "the host comes back with a new certificate" |
+| Identity file corrupt, empty or oversized | Replaced and logged; read is capped at 16 KiB | `tls.rs` unit tests (1 MiB damaged file) |
+| Port 7878 taken | Host uses 7879; a guest finds it by room code | e2e "port 7878 is taken" |
+| Both usual ports taken | The OS gives another port; the QR code carries it | e2e "both usual ports are taken" |
+| Host moves to another port (a stray listener took the old one) | After three failed tries the guest searches for the room code, accepts only the same certificate, and resumes on the new port. A failed handshake on a known host is a network error, never "outdated" | e2e "the host comes back on another port"; `socket_client_test` "a session that is being resumed keeps retrying" |
+| Another device with another certificate answers the room code | Ignored; the session token is never sent to it | `connection_provider` rediscovery check; e2e "wrong fingerprint" |
+| QR code with the wrong fingerprint | Refused before any message is sent; tokens kept; no retries | e2e "a QR code with the wrong fingerprint"; `secure_channel_test` |
+| Host of an older version (plain HTTP) | One look at `/health` over HTTP; "host runs an older version" at once, nothing connected, no endless retry | e2e "a plain-HTTP host"; `host_finder_test`; `join_probe_test` |
+| Plain `ws://` to another device, stored or typed | Refused for good | `socket_client_test`; `secure_channel_test` |
+| Host ends the game | Guests are told and stop trying; their stored session is cleared | e2e "the host ends the game" |
+| Host's data folder unwritable | Clear "storage" failure on the host screen, no crash | e2e "a folder the app cannot write to" |
+| Silent socket (no bytes) | Dropped after 2 s | `tls.rs` integration test |
+| Handshake started and never finished | Dropped after 5 s | `tls.rs` integration test |
+| Handshake finished, then nothing | Closed after 1.25 times the WebSocket idle timeout; a live WebSocket with pings is not cut | `tls.rs` integration tests |
+| Half an HTTP request that never ends (slowloris) | Closed by the same idle timer | `tls.rs` integration test |
+| Garbage after a good handshake | Closed, short answer at most; the next guest is served | `tls.rs` integration test |
+| Flood of handshakes from one address | At most 8 at once per address (IPv6 per /64) and 64 in all; the oldest of the heaviest address is dropped for a newcomer holding less, so one address cannot lock out a real guest | `tls.rs` unit and integration tests |
+| Many established connections from one address | Per-address cap, plus the listener cap of twice that plus four | `the_per_address_limits_still_see_the_guest_address` |
+| Plaintext client to the TLS port | No HTTP answer, no leak of a token (a sniffer sees tokens only without TLS) | `tls.rs` integration tests |
+| Browser page on the same Wi-Fi reaches a host through its own name | `Host` header must be an IP literal, `localhost` or `*.local`, else 400 | e2e on the LAN address; `tls.rs` |
+| QR code too dense to scan | Asserted: version 5 at most (37 squares), at least 2.5 logical pixels per square on every table size | `qr_scan_budget_test` |
+
+### Not testable here (stays on the release checklist)
+
+No emulator, adb or display exists on the build machine, so these are checked by hand on devices (`docs/RELEASE_CHECKLIST.md`): the camera scanning a real QR code, Android doze and background limits (the foreground service keeps the host alive), Wi-Fi roaming and captive networks, the Windows build of `ring`, iOS local-network permission, and rendering on small phones (the no-scroll golden tests cover layout but not a real GPU).
