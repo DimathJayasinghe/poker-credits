@@ -27,6 +27,25 @@ RoomConfig soloRoomConfig(SoloConfig solo) => RoomConfig(
   solo: solo,
 );
 
+/// How long a single-player game lasts, as the number of hands played at each blind level.
+enum SoloLength {
+  quick(6),
+  standard(8),
+  long(12)
+  ;
+
+  const SoloLength(this.ladderHands);
+
+  final int ladderHands;
+
+  /// The length that matches a saved number of hands per level; anything else is [standard].
+  static SoloLength fromHands(int hands) => values.firstWhere((l) => l.ladderHands == hands, orElse: () => standard);
+}
+
+/// Fewest and most computer players the setup offers (the server accepts the same range).
+const int minSoloBots = 1;
+const int maxSoloBots = 9;
+
 /// A room created by the embedded server, with the host's credentials.
 class HostedRoom {
   const HostedRoom({

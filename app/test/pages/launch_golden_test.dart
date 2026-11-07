@@ -59,6 +59,17 @@ void main() {
         });
       }
 
+      testWidgets('play alone setup, $name', (tester) async {
+        final harness = TestHarness();
+        harness.settings.value = harness.settings.value.copyWith(theme: dark ? ThemeChoice.dark : ThemeChoice.light);
+        await _launch(tester, harness, entry.value);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(Strings.playAlone.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/solo_setup_$name.png'));
+      });
+
       testWidgets('guide, hand ranking open, $name', (tester) async {
         final harness = TestHarness();
         harness.settings.value = harness.settings.value.copyWith(theme: dark ? ThemeChoice.dark : ThemeChoice.light);

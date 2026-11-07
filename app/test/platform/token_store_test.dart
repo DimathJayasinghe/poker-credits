@@ -1,6 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/model/hosting.dart';
+import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/platform/token_store_io.dart';
 
 const _session = StoredSession(
@@ -35,5 +36,30 @@ void main() {
     final store = const SecureTokenStore(FlutterSecureStorage());
     expect(await store.read(), isNull);
     expect(await const FlutterSecureStorage().read(key: 'poker_credits.session.v1'), isNull);
+  });
+
+  test('the solo slot is separate from the main one', () async {
+    FlutterSecureStorage.setMockInitialValues(<String, String>{});
+    final store = const SecureTokenStore(FlutterSecureStorage());
+    await store.write(_session);
+    await store.write(
+      const StoredSession(serverUri: 'ws://127.0.0.1:50000/v1/ws', roomCode: 'ABCD', sessionToken: 'solo-secret'),
+      slot: TokenSlot.solo,
+    );
+    expect((await store.read())?.roomCode, 'KQ7M');
+    expect((await store.read(slot: TokenSlot.solo))?.roomCode, 'ABCD');
+
+    await store.clear(slot: TokenSlot.solo);
+    expect(await store.read(slot: TokenSlot.solo), isNull);
+    expect((await store.read())?.roomCode, 'KQ7M');
+  });
+
+  test('the memory store keeps the slots apart too', () async {
+    final store = MemoryTokenStore();
+    await store.write(_session, slot: TokenSlot.solo);
+    expect(await store.read(), isNull);
+    expect((await store.read(slot: TokenSlot.solo))?.roomCode, 'KQ7M');
+    await store.clear();
+    expect((await store.read(slot: TokenSlot.solo))?.roomCode, 'KQ7M');
   });
 }

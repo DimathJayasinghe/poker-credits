@@ -7,6 +7,7 @@ import 'package:poker_credits/model/room_state.dart';
 import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/net/features.dart';
 import 'package:poker_credits/net/socket_client.dart';
+import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -74,6 +75,10 @@ final sessionProvider = NotifierProvider<SessionNotifier, SessionState>((ref) =>
 class SessionNotifier extends Notifier<SessionState> {
   RoomClient? _client;
 
+  /// Where this session's tokens are saved. A single-player game keeps its own, so it never
+  /// replaces or erases the hosted or joined game saved in [TokenSlot.main].
+  TokenSlot _slot = TokenSlot.main;
+
   /// The server knows this session: a `RESUME` was accepted or a join went through. Until then a
   /// failure belongs to the join attempt and must not touch the stored session of another room.
   bool _established = false;
@@ -89,9 +94,18 @@ class SessionNotifier extends Notifier<SessionState> {
   /// Connects to [uri] and sends [first] (`RESUME` to re-attach, `JOIN_ROOM` to join).
   /// [playerId] is known when re-attaching from a stored session. [keepRoom] keeps showing the
   /// last room view while the new connection comes up (the host moved to another address): the
-  /// next `SNAPSHOT` replaces it, so nothing stale survives.
-  void attach({required Uri uri, required ClientMessage first, required bool host, String? playerId, bool keepRoom = false}) {
+  /// next `SNAPSHOT` replaces it, so nothing stale survives. [slot] is where the tokens of this
+  /// session are saved.
+  void attach({
+    required Uri uri,
+    required ClientMessage first,
+    required bool host,
+    String? playerId,
+    bool keepRoom = false,
+    TokenSlot slot = TokenSlot.main,
+  }) {
     unawaited(_detach());
+    _slot = slot;
     final client = ref.read(roomClientFactoryProvider)(uri, first);
     _client = client;
     _established = first is Resume;
@@ -127,7 +141,7 @@ class SessionNotifier extends Notifier<SessionState> {
     // can take a while when the peer is gone, so nothing that matters waits for it.
     final detaching = _detach();
     state = const SessionState();
-    if (forget) await ref.read(tokenStoreProvider).clear();
+    if (forget) await ref.read(tokenStoreProvider).clear(slot: _slot);
     unawaited(detaching.catchError((Object error) => _log.info('closing the socket failed: $error')));
   }
 
@@ -169,7 +183,7 @@ class SessionNotifier extends Notifier<SessionState> {
         failure != LinkFailure.updateRequired &&
         failure != LinkFailure.rateLimited) {
       // The room or the session is gone; the stored tokens are useless now.
-      unawaited(ref.read(tokenStoreProvider).clear());
+      unawaited(ref.read(tokenStoreProvider).clear(slot: _slot));
     }
   }
 
@@ -177,7 +191,7 @@ class SessionNotifier extends Notifier<SessionState> {
   /// there. The server still checks the session token, so a wrong answer cannot get anybody in.
   Future<void> rediscover() async {
     final finder = ref.read(hostFinderProvider);
-    final stored = await ref.read(tokenStoreProvider).read();
+    final stored = await ref.read(tokenStoreProvider).read(slot: _slot);
     if (stored == null || stored.isHost || !finder.isSupported) return;
     final uri = Uri.tryParse(stored.serverUri);
     if (uri == null || !JoinLink.isLanAddress(uri.host)) return;
@@ -195,6 +209,7 @@ class SessionNotifier extends Notifier<SessionState> {
             sessionToken: stored.sessionToken,
             playerId: stored.playerId,
           ),
+          slot: _slot,
         );
     if (_client == null || state.link.isLive) return;
     attach(
@@ -203,6 +218,7 @@ class SessionNotifier extends Notifier<SessionState> {
       host: false,
       playerId: stored.playerId,
       keepRoom: true,
+      slot: _slot,
     );
   }
 
@@ -235,6 +251,7 @@ class SessionNotifier extends Notifier<SessionState> {
               hostToken: credentials.hostToken,
               playerId: credentials.playerId,
             ),
+            slot: _slot,
           ),
     );
   }

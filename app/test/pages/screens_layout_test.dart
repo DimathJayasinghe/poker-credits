@@ -64,6 +64,18 @@ void main() {
           _clean(tester, 'home');
           await _reachable(tester, find.text('HOST A GAME'), size, 'HOST A GAME');
           await _reachable(tester, find.text('JOIN A GAME'), size, 'JOIN A GAME');
+          await _reachable(tester, find.text('PLAY ALONE'), size, 'PLAY ALONE');
+        });
+
+        testWidgets('play alone setup holds ($where)', (tester) async {
+          await _launch(tester, TestHarness(), size, scale, dark: dark);
+          await tester.ensureVisible(find.text('PLAY ALONE'));
+          await tester.tap(find.text('PLAY ALONE'));
+          await tester.pumpAndSettle();
+          _clean(tester, 'play alone setup');
+          await _reachable(tester, find.text(Strings.startSolo.toUpperCase()), size, 'START GAME');
+          await _reachable(tester, find.text(Strings.skillHard.toUpperCase()), size, 'HARD');
+          await _reachable(tester, find.text(Strings.lengthLong.toUpperCase()), size, 'LONG');
         });
 
         testWidgets('settings holds ($where)', (tester) async {

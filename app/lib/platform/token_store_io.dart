@@ -24,37 +24,43 @@ TokenStore createTokenStore() => const SecureTokenStore(
 final class SecureTokenStore implements TokenStore {
   const SecureTokenStore(this._storage);
 
-  static const String _key = 'poker_credits.session.v1';
+  static const String _mainKey = 'poker_credits.session.v1';
+  static const String _soloKey = 'poker_credits.solo.v1';
+
+  static String _key(TokenSlot slot) => switch (slot) {
+    TokenSlot.main => _mainKey,
+    TokenSlot.solo => _soloKey,
+  };
 
   final FlutterSecureStorage _storage;
 
   @override
-  Future<StoredSession?> read() async {
+  Future<StoredSession?> read({TokenSlot slot = TokenSlot.main}) async {
     try {
-      final raw = await _storage.read(key: _key);
+      final raw = await _storage.read(key: _key(slot));
       if (raw == null) return null;
       return StoredSession.fromJson(jsonDecode(raw));
     } on Object catch (error) {
       // Never log the value itself.
       _log.warning('cannot read the stored session: ${error.runtimeType}');
-      await clear();
+      await clear(slot: slot);
       return null;
     }
   }
 
   @override
-  Future<void> write(StoredSession session) async {
+  Future<void> write(StoredSession session, {TokenSlot slot = TokenSlot.main}) async {
     try {
-      await _storage.write(key: _key, value: jsonEncode(session.toJson()));
+      await _storage.write(key: _key(slot), value: jsonEncode(session.toJson()));
     } on Object catch (error) {
       _log.warning('cannot store the session: ${error.runtimeType}');
     }
   }
 
   @override
-  Future<void> clear() async {
+  Future<void> clear({TokenSlot slot = TokenSlot.main}) async {
     try {
-      await _storage.delete(key: _key);
+      await _storage.delete(key: _key(slot));
     } on Object catch (error) {
       _log.warning('cannot clear the stored session: ${error.runtimeType}');
     }

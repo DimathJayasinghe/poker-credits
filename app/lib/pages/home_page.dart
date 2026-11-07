@@ -5,6 +5,8 @@ import 'package:poker_credits/pages/guide_page.dart';
 import 'package:poker_credits/pages/host_page.dart';
 import 'package:poker_credits/pages/join_page.dart';
 import 'package:poker_credits/pages/settings_page.dart';
+import 'package:poker_credits/pages/solo_setup_page.dart';
+import 'package:poker_credits/pages/solo_table_page.dart';
 import 'package:poker_credits/pages/player_page.dart';
 import 'package:poker_credits/pages/spectator_page.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
@@ -13,6 +15,7 @@ import 'package:poker_credits/pages/table_page.dart';
 import 'package:poker_credits/provider/host_provider.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_credits/provider/settings_provider.dart';
+import 'package:poker_credits/provider/solo_provider.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
@@ -36,6 +39,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with Refena {
   StoredSession? _hosted;
   StoredSession? _playing;
+  StoredSession? _solo;
   bool _resuming = false;
   int _tab = 0;
   String? _resumeError;
@@ -45,8 +49,11 @@ class _HomePageState extends State<HomePage> with Refena {
     super.initState();
     ensureRef((ref) async {
       final stored = await ref.read(tokenStoreProvider).read();
-      if (!mounted || stored == null) return;
+      final solo = await ref.notifier(soloProvider).saved();
+      if (!mounted) return;
       setState(() {
+        _solo = solo;
+        if (stored == null) return;
         if (stored.isHost) {
           _hosted = stored;
         } else {
@@ -54,6 +61,31 @@ class _HomePageState extends State<HomePage> with Refena {
         }
       });
     });
+  }
+
+  /// Opens a single-player page, then looks again for a saved game: it may have been started,
+  /// finished or left meanwhile.
+  Future<void> _pushSolo(Widget page) async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+    if (!mounted) return;
+    final solo = await ref.notifier(soloProvider).saved();
+    if (mounted) setState(() => _solo = solo);
+  }
+
+  Future<void> _resumeSolo() async {
+    setState(() => _resumeError = null);
+    final ok = await ref.notifier(soloProvider).restore();
+    if (!mounted) return;
+    if (!ok) {
+      setState(() {
+        _solo = null;
+        _resumeError = Strings.soloResumeFailed;
+      });
+      // A game the server no longer knows is of no use: forget it.
+      await ref.notifier(soloProvider).leave();
+      return;
+    }
+    await _pushSolo(const SoloTablePage());
   }
 
   Future<void> _resume() async {
@@ -139,12 +171,14 @@ class _HomePageState extends State<HomePage> with Refena {
             onTap: _resuming ? null : _resume,
           ),
         if (_playing != null) BrutalRow(label: '${Strings.resumeGame} ${_playing!.roomCode}', emphasis: resume == null, onTap: _resumePlaying),
+        if (_solo != null && supported) BrutalRow(label: Strings.resumeSolo, emphasis: resume == null && _playing == null, onTap: _resumeSolo),
         BrutalRow(
           label: Strings.hostGame,
           caption: supported ? Strings.hostRowCaption : Strings.hostUnsupported,
-          emphasis: resume == null && _playing == null && supported,
+          emphasis: resume == null && _playing == null && _solo == null && supported,
           onTap: supported ? () => _push(const HostPage()) : null,
         ),
+        if (supported) BrutalRow(label: Strings.playAlone, caption: Strings.playAloneCaption, onTap: () => _pushSolo(const SoloSetupPage())),
         BrutalRow(label: Strings.joinGame, caption: Strings.joinRowCaption, onTap: () => _push(const JoinPage())),
       ],
     );
@@ -205,6 +239,7 @@ class _HomePageState extends State<HomePage> with Refena {
               onGameForgotten: () => setState(() {
                 _hosted = null;
                 _playing = null;
+                _solo = null;
               }),
             ),
           ],

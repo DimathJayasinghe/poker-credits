@@ -3,6 +3,7 @@ import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/pages/support_page.dart';
 import 'package:poker_credits/pages/tours.dart';
 import 'package:poker_credits/pages/terms_page.dart';
+import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_credits/provider/settings_provider.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
@@ -43,7 +44,8 @@ class _SettingsViewState extends State<SettingsView> with Refena {
     super.initState();
     // Two independent reads: a slow version lookup must not hide the saved-game row.
     ensureRef((ref) async {
-      final stored = await ref.read(tokenStoreProvider).read();
+      final store = ref.read(tokenStoreProvider);
+      final stored = await store.read() ?? await store.read(slot: TokenSlot.solo);
       if (mounted) setState(() => _hasSavedGame = stored != null);
     });
     ensureRef((ref) async {
@@ -79,6 +81,7 @@ class _SettingsViewState extends State<SettingsView> with Refena {
     );
     if (confirmed != true || !mounted) return;
     await ref.read(tokenStoreProvider).clear();
+    await ref.read(tokenStoreProvider).clear(slot: TokenSlot.solo);
     if (!mounted) return;
     setState(() {
       _hasSavedGame = false;

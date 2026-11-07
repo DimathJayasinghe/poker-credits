@@ -34,6 +34,48 @@ abstract final class Strings {
   // Play (home)
   static const String hostRowCaption = 'Start a table on this device. Others join over Wi-Fi.';
   static const String joinRowCaption = 'Type the room code the host shows you.';
+  static const String playAlone = 'Play alone';
+  static const String playAloneCaption = 'Against computer players. No network needed.';
+  static const String resumeSolo = 'Resume solo game';
+
+  // Play alone (setup)
+  static const String soloTitle = 'Play alone';
+  static const String soloOpponents = 'Opponents';
+  static const String soloSkill = 'Skill';
+  static const String skillEasy = 'Easy';
+  static const String skillNormal = 'Normal';
+  static const String skillHard = 'Hard';
+  static const String skillEasyCaption = 'Plays by instinct.';
+  static const String skillNormalCaption = 'Reads the table.';
+  static const String skillHardCaption = 'Reads you and adapts.';
+  static const String soloLength = 'Game length';
+  static const String lengthQuick = 'Quick';
+  static const String lengthStandard = 'Standard';
+  static const String lengthLong = 'Long';
+  static const String lengthQuickCaption = 'Blinds rise every 6 hands.';
+  static const String lengthStandardCaption = 'Blinds rise every 8 hands.';
+  static const String lengthLongCaption = 'Blinds rise every 12 hands.';
+  static const String soloRules = 'Everyone starts with the same chips. Nobody can buy back in. The last player with chips wins.';
+  static const String startSolo = 'Start game';
+  static const String soloStarting = 'Starting...';
+  static const String soloResumeFailed = 'This game cannot be opened any more.';
+  static const String soloRecordNone = 'No finished game at this table yet.';
+  static String ordinal(int n) {
+    final tens = n % 100;
+    if (tens >= 11 && tens <= 13) return '${n}th';
+    return switch (n % 10) {
+      1 => '${n}st',
+      2 => '${n}nd',
+      3 => '${n}rd',
+      _ => '${n}th',
+    };
+  }
+
+  /// "Best finish 2nd. Won 1 of 3." for the table kind chosen on the setup screen.
+  static String soloRecordLine(int bestPlace, int wins, int played) => 'Best finish ${ordinal(bestPlace)}. Won $wins of $played.';
+  static const String soloFailedUnavailable = 'Playing alone is not available on this device.';
+  static const String soloFailedStorage = 'The game files cannot be saved on this device.';
+  static const String soloFailedUnknown = 'The game could not start. Try again.';
 
   // Settings
   static const String settingsTitle = 'Settings';

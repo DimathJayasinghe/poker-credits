@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:poker_credits/model/hosting.dart';
+import 'package:poker_protocol/poker_protocol.dart';
 
 /// The version of the terms and safety notice the player has to accept. Raise it when the notice
 /// changes in a way people must see again.
@@ -6,6 +8,46 @@ const int currentTermsVersion = 1;
 
 /// Which theme the app uses. [system] follows the operating system.
 enum ThemeChoice { system, light, dark }
+
+/// How a player has done against one kind of table: a number of opponents at one skill level.
+@immutable
+class SoloRecord {
+  const SoloRecord({this.played = 0, this.wins = 0, this.bestPlace = 0});
+
+  /// Games finished (won or lost). Leaving a game early does not count.
+  final int played;
+  final int wins;
+
+  /// Best finishing place (1 = won); 0 = none yet.
+  final int bestPlace;
+
+  /// This record after one more finished game in which the player took [place].
+  SoloRecord after(int place) => SoloRecord(
+    played: played + 1,
+    wins: wins + (place == 1 ? 1 : 0),
+    bestPlace: bestPlace == 0 || place < bestPlace ? place : bestPlace,
+  );
+
+  Map<String, Object?> toJson() => <String, Object?>{'played': played, 'wins': wins, 'bestPlace': bestPlace};
+
+  static SoloRecord? fromJson(Object? json) {
+    if (json is! Map<Object?, Object?>) return null;
+    int count(String key) => json[key] is int && (json[key]! as int) > 0 ? json[key]! as int : 0;
+    final record = SoloRecord(played: count('played'), wins: count('wins'), bestPlace: count('bestPlace'));
+    // A record that contradicts itself is dropped rather than shown.
+    if (record.wins > record.played || record.played == 0) return null;
+    return record;
+  }
+
+  @override
+  bool operator ==(Object other) => other is SoloRecord && other.played == played && other.wins == wins && other.bestPlace == bestPlace;
+
+  @override
+  int get hashCode => Object.hash(played, wins, bestPlace);
+}
+
+/// Key of a [SoloRecord] in [AppSettings.soloRecords].
+String soloRecordKey(int bots, BotSkill skill) => '$bots-${skill.name}';
 
 /// The player's preferences, kept on this device (docs/UI_DESIGN.md section 5, Settings).
 ///
@@ -24,6 +66,10 @@ class AppSettings {
     this.defaultName = '',
     this.acceptedTerms = 0,
     this.introDone = false,
+    this.soloBots = 4,
+    this.soloSkill = BotSkill.normal,
+    this.soloLength = SoloLength.standard,
+    this.soloRecords = const <String, SoloRecord>{},
   });
 
   static const AppSettings defaults = AppSettings();
@@ -60,6 +106,17 @@ class AppSettings {
   /// The first-run intro (the offer of a tour) has been answered, taken or skipped.
   final bool introDone;
 
+  /// What the single-player setup shows the next time: opponents, skill and game length.
+  final int soloBots;
+  final BotSkill soloSkill;
+  final SoloLength soloLength;
+
+  /// Finished single-player games by table kind ([soloRecordKey]). Kept on this device only.
+  final Map<String, SoloRecord> soloRecords;
+
+  /// The record for [bots] opponents at [skill], if any game was finished there.
+  SoloRecord? recordFor(int bots, BotSkill skill) => soloRecords[soloRecordKey(bots, skill)];
+
   /// Whether the notice the app is showing now has been accepted.
   bool get termsAccepted => acceptedTerms >= currentTermsVersion;
 
@@ -74,6 +131,10 @@ class AppSettings {
     String? defaultName,
     int? acceptedTerms,
     bool? introDone,
+    int? soloBots,
+    BotSkill? soloSkill,
+    SoloLength? soloLength,
+    Map<String, SoloRecord>? soloRecords,
   }) => AppSettings(
     theme: theme ?? this.theme,
     texture: texture ?? this.texture,
@@ -85,6 +146,10 @@ class AppSettings {
     defaultName: defaultName ?? this.defaultName,
     acceptedTerms: acceptedTerms ?? this.acceptedTerms,
     introDone: introDone ?? this.introDone,
+    soloBots: soloBots ?? this.soloBots,
+    soloSkill: soloSkill ?? this.soloSkill,
+    soloLength: soloLength ?? this.soloLength,
+    soloRecords: soloRecords ?? this.soloRecords,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -99,6 +164,10 @@ class AppSettings {
     'defaultName': defaultName,
     'acceptedTerms': acceptedTerms,
     'introDone': introDone,
+    'soloBots': soloBots,
+    'soloSkill': soloSkill.name,
+    'soloLength': soloLength.ladderHands,
+    'soloRecords': <String, Object?>{for (final e in soloRecords.entries) e.key: e.value.toJson()},
   };
 
   /// Anything that is not a JSON object, and any field of the wrong type, falls back to the
@@ -110,6 +179,16 @@ class AppSettings {
     final rawName = json['defaultName'];
     final name = rawName is String && _nameRule.hasMatch(rawName.trim()) ? rawName.trim() : '';
     final rawTerms = json['acceptedTerms'];
+    final rawBots = json['soloBots'];
+    final rawLength = json['soloLength'];
+    final rawRecords = json['soloRecords'];
+    final records = <String, SoloRecord>{};
+    if (rawRecords is Map<Object?, Object?>) {
+      for (final entry in rawRecords.entries) {
+        final record = SoloRecord.fromJson(entry.value);
+        if (entry.key is String && record != null) records[entry.key! as String] = record;
+      }
+    }
     return AppSettings(
       theme: theme,
       texture: flag('texture', defaults.texture),
@@ -122,6 +201,10 @@ class AppSettings {
       // Only a whole, positive number counts. Anything else means "not accepted".
       acceptedTerms: rawTerms is int && rawTerms > 0 ? rawTerms : 0,
       introDone: flag('introDone', defaults.introDone),
+      soloBots: rawBots is int && rawBots >= minSoloBots && rawBots <= maxSoloBots ? rawBots : defaults.soloBots,
+      soloSkill: BotSkill.values.asNameMap()[json['soloSkill']] ?? defaults.soloSkill,
+      soloLength: rawLength is int ? SoloLength.fromHands(rawLength) : defaults.soloLength,
+      soloRecords: records,
     );
   }
 
@@ -137,8 +220,19 @@ class AppSettings {
       other.cardsFaceUp == cardsFaceUp &&
       other.defaultName == defaultName &&
       other.acceptedTerms == acceptedTerms &&
-      other.introDone == introDone;
+      other.introDone == introDone &&
+      other.soloBots == soloBots &&
+      other.soloSkill == soloSkill &&
+      other.soloLength == soloLength &&
+      mapEquals(other.soloRecords, soloRecords);
 
   @override
-  int get hashCode => Object.hash(theme, texture, sound, vibration, keepAwake, fourColourDeck, cardsFaceUp, defaultName, acceptedTerms, introDone);
+  int get hashCode => Object.hash(
+    Object.hash(theme, texture, sound, vibration, keepAwake, fourColourDeck, cardsFaceUp, defaultName, acceptedTerms, introDone),
+    soloBots,
+    soloSkill,
+    soloLength,
+    // Order of the entries must not matter, as it does not for equality.
+    soloRecords.entries.fold<int>(0, (sum, e) => sum ^ Object.hash(e.key, e.value)),
+  );
 }

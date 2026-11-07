@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/model/app_settings.dart';
+import 'package:poker_credits/model/hosting.dart';
+import 'package:poker_protocol/poker_protocol.dart';
 import 'package:poker_credits/platform/settings_store_io.dart';
 
 void main() {
@@ -72,6 +74,61 @@ void main() {
         expect(AppSettings.fromJson(<String, Object?>{'defaultName': bad}).defaultName, '', reason: bad);
       }
       expect(AppSettings.fromJson(<String, Object?>{'defaultName': '  Ana_Maria-2 '}).defaultName, 'Ana_Maria-2');
+    });
+  });
+
+  group('single-player settings', () {
+    test('defaults, and a round trip of choices and records', () {
+      expect(AppSettings.defaults.soloBots, 4);
+      expect(AppSettings.defaults.soloSkill, BotSkill.normal);
+      expect(AppSettings.defaults.soloLength, SoloLength.standard);
+      expect(AppSettings.defaults.soloRecords, isEmpty);
+      final settings = AppSettings(
+        soloBots: 7,
+        soloSkill: BotSkill.hard,
+        soloLength: SoloLength.long,
+        soloRecords: <String, SoloRecord>{soloRecordKey(7, BotSkill.hard): const SoloRecord(played: 3, wins: 1, bestPlace: 1)},
+      );
+      expect(AppSettings.fromJson(jsonDecode(jsonEncode(settings.toJson()))), settings);
+      expect(settings.recordFor(7, BotSkill.hard)?.wins, 1);
+      expect(settings.recordFor(7, BotSkill.easy), isNull);
+    });
+
+    test('nonsense falls back field by field', () {
+      final read = AppSettings.fromJson(<String, Object?>{
+        'soloBots': 40,
+        'soloSkill': 'godlike',
+        'soloLength': 77,
+        'soloRecords': <String, Object?>{
+          'ok': <String, Object?>{'played': 2, 'wins': 1, 'bestPlace': 1},
+          'wins-exceed-played': <String, Object?>{'played': 1, 'wins': 5, 'bestPlace': 1},
+          'empty': <String, Object?>{'played': 0},
+          'junk': 'x',
+        },
+      });
+      expect(read.soloBots, 4);
+      expect(read.soloSkill, BotSkill.normal);
+      expect(read.soloLength, SoloLength.standard);
+      expect(read.soloRecords.keys, <String>['ok']);
+    });
+
+    test('a record keeps the best place and counts only finished games', () {
+      var record = const SoloRecord();
+      record = record.after(4);
+      record = record.after(2);
+      record = record.after(3);
+      expect((record.played, record.wins, record.bestPlace), (3, 0, 2));
+      record = record.after(1);
+      expect((record.played, record.wins, record.bestPlace), (4, 1, 1));
+    });
+
+    test('equal settings hash alike whatever the order of the records', () {
+      const a = SoloRecord(played: 1, wins: 0, bestPlace: 3);
+      const b = SoloRecord(played: 2, wins: 1, bestPlace: 1);
+      const one = AppSettings(soloRecords: <String, SoloRecord>{'x': a, 'y': b});
+      const two = AppSettings(soloRecords: <String, SoloRecord>{'y': b, 'x': a});
+      expect(one, two);
+      expect(one.hashCode, two.hashCode);
     });
   });
 
