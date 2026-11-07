@@ -19,9 +19,9 @@ stores a signing key in the repository.
 - [ ] CI is green on the pushed branch, including the desktop build workflow (it is the first place the `ring` crate is compiled for Windows and macOS) and `cargo deny`
 - [ ] GitHub Actions in the workflows are still pinned to full SHAs (Dependabot PRs update them; read each one)
 
-## 2. Run it on real devices (nothing here was ever run on a phone)
+## 2. Run it on real devices (an emulator pass was done 2026-11-08; no physical phone yet)
 
-The headless end-to-end suite already proved the join, play, reconnect, host restart, moved port, wrong certificate and old-host cases over real TLS sockets. What it cannot prove is the phone itself: camera, radio, OS background rules, release build. The lines below are only those.
+An Android emulator pass (2026-11-08, `docs/SECURITY_AND_EDGE_CASES.md` section 8) covered install, first run, hosting with the foreground service, joining over TLS both ways, a full hand, a vanished host, a changed certificate and a solo game in the background. It also found three defects that the unit tests had missed (the keyboard closing at once on tall screens, a host table that never showed a guest as connected, validation messages that stayed after the fix); they are fixed in 1.4.0. The headless end-to-end suite already proved the join, play, reconnect, host restart, moved port, wrong certificate and old-host cases over real TLS sockets. What it cannot prove is the phone itself: camera, radio, OS background rules, release build. The lines below are only those.
 
 - [ ] Host on a physical Android phone, join with **two** other phones: once by QR code, once by room code, once by typed address. Play a few hands. Confirm each joins.
 - [ ] Wrong host: scan the QR of host A, then change host A's certificate (delete `tls-identity.bin` through a reinstall or clear data) and reconnect: the guest must stop with "not the host you meant", keep its seat data, and never connect.
