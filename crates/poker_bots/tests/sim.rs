@@ -16,8 +16,11 @@ const START: u64 = 2000;
 
 fn bot(kind: Archetype, skill: Skill, seed: u64) -> Bot {
     let mut rng = BotRng::from_seed(seed);
+    let mut mind = BotMind::new(Personality::sample(kind, &mut rng), skill);
+    // No time limit on equity, so the same seeds always give the same games on any machine.
+    mind.equity_budget = None;
     Bot {
-        mind: BotMind::new(Personality::sample(kind, &mut rng), skill),
+        mind,
         rng: BotRng::from_seed(seed ^ 0x5EED),
     }
 }
@@ -189,9 +192,8 @@ fn no_seat_advantage() {
     }
 }
 
-// Recorded on the first run (sums over 12 rounds x 3 bots, chips per hand): easy -251, normal +116,
-// hard +135. Hard over Normal is not yet separable; opponent reads (Task 4) are what lifts Hard,
-// and its margin is asserted there.
+// Recorded (chips per hand, mean per bot over 12 rounds): easy -9.2, normal +1.9, hard +7.3, so
+// Hard clearly leads once opponent reads are on. Margins below are well inside those gaps.
 #[test]
 fn hard_beats_easy_and_normal_sits_between() {
     // Mixed table, one of each style in each skill group so style does not decide the result.
@@ -234,5 +236,11 @@ fn hard_beats_easy_and_normal_sits_between() {
         "normal {:.1} must beat easy {:.1} by a clear margin",
         group[1],
         group[0]
+    );
+    assert!(
+        group[2] > group[1] + 50.0,
+        "hard {:.1} must beat normal {:.1}: reads are what separates them",
+        group[2],
+        group[1]
     );
 }

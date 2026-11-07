@@ -1,6 +1,7 @@
 //! What one seat may know. This is the only input a bot's strategy receives.
 
 use poker_engine::card::Card;
+use poker_engine::hand_rank::HandCategory;
 use poker_engine::validator::LegalActions;
 use poker_engine::{ActionKind, HandStatus, Phase, PlayerId, SeatIndex};
 use poker_engine::{blinds::Blinds, types::Chips};
@@ -44,6 +45,8 @@ pub struct Reveal {
     pub seat: SeatIndex,
     /// The cards.
     pub hole: [Card; 2],
+    /// What the hand made (shown on every showdown screen).
+    pub category: HandCategory,
 }
 
 /// Everything the seat `me` knows at this moment. There is deliberately no field for the deck,

@@ -70,6 +70,18 @@ pub fn play_hand(
     )
     .map_err(|e| format!("start: {e:?}"))?
     .state;
+    let dealt: Vec<poker_engine::SeatIndex> = state
+        .table
+        .deal
+        .as_ref()
+        .unwrap()
+        .holes
+        .iter()
+        .filter_map(|(id, _)| state.table.seat_of(id).map(|s| s.index))
+        .collect();
+    for bot in bots.iter_mut() {
+        bot.mind.begin_hand(&dealt);
+    }
     let mut history: Vec<PublicAction> = Vec::new();
     let mut saw_flop = vec![false; n];
     let mut raised_preflop = vec![false; n];
@@ -152,7 +164,23 @@ pub fn play_hand(
             .map_err(|e| format!("resolve: {e:?}"))?
             .state;
     }
-    let net = (0..n).map(|i| total(state, i) - before[i]).collect();
+    let revealed: Vec<poker_bots::Reveal> = showdown::reveals(&state.table)
+        .into_iter()
+        .filter_map(|r| {
+            let seat = state.table.seat_of(&r.player_id)?.index;
+            Some(poker_bots::Reveal {
+                seat,
+                hole: r.cards,
+                category: r.category,
+            })
+        })
+        .collect();
+    let net: Vec<i64> = (0..n).map(|i| total(state, i) - before[i]).collect();
+    let big_blind = state.table.hand_blinds.big_blind;
+    for (i, bot) in bots.iter_mut().enumerate() {
+        bot.mind.observe_showdown(&revealed, &history);
+        bot.mind.observe_hand_end(net[i], big_blind, 0);
+    }
     Ok(Some(HandLog {
         net,
         actions: history,

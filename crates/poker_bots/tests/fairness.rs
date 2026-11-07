@@ -143,3 +143,39 @@ fn the_scramble_really_changes_the_hidden_cards() {
     assert!(changed >= 1, "other hands should differ");
     assert_ne!(a.board, b.board);
 }
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(24))]
+
+    /// Same property with warm notes: what a bot has noticed comes only from public actions, so
+    /// changing hidden cards still changes nothing, even after it has played many hands.
+    #[test]
+    fn bot_view_invariance_with_warm_notes(seed in any::<u64>(), salt in any::<u64>()) {
+        let mut state = dealt(5, 2000, seed);
+        walk_to(&mut state, poker_engine::Phase::Flop);
+        prop_assume!(state.table.phase == poker_engine::Phase::Flop);
+        let active = state.table.active.unwrap();
+        let me = state.table.seat(active).unwrap().player_id.clone();
+        let other = scramble_hidden(&state, &me, salt);
+        let p = Personality::sample(Archetype::Lag, &mut BotRng::from_seed(seed));
+        let warm = |m: &mut BotMind| {
+            m.equity_budget = None;
+            let seats: Vec<poker_engine::SeatIndex> = (0..5).map(support::seat).collect();
+            for hand in 0..40_u8 {
+                m.begin_hand(&seats);
+                for s in 0..5_u8 {
+                    let kind = if (s + hand) % 3 == 0 { poker_engine::ActionKind::Fold } else { poker_engine::ActionKind::Raise };
+                    m.observe_action(&poker_bots::PublicAction { seat: support::seat(s), street: poker_engine::Phase::Flop, kind, amount: poker_engine::Chips::ZERO });
+                }
+            }
+        };
+        let (mut a, mut b) = (BotMind::new(p, Skill::Hard), BotMind::new(p, Skill::Hard));
+        warm(&mut a);
+        warm(&mut b);
+        let view_a = view_for_seat(&state.table, active, &[]).unwrap();
+        let view_b = view_for_seat(&other.table, active, &[]).unwrap();
+        let da = decide(&view_a, &mut a, &mut BotRng::from_seed(seed ^ 7));
+        let db = decide(&view_b, &mut b, &mut BotRng::from_seed(seed ^ 7));
+        prop_assert_eq!(da, db);
+    }
+}

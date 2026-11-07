@@ -17,6 +17,7 @@ use crate::rng::BotRng;
 use crate::skill::Skill;
 use crate::strength::{preflop_adjust, preflop_strength};
 use crate::view::BotView;
+use crate::view::{PublicAction, Reveal};
 
 /// Longest a single equity estimate may run by default (spec section 8).
 pub const EQUITY_BUDGET: Duration = Duration::from_millis(8);
@@ -48,6 +49,42 @@ impl BotMind {
             notes: Notes::default(),
             equity_budget: Some(EQUITY_BUDGET),
         }
+    }
+}
+
+impl BotMind {
+    /// A new hand was dealt to `dealt` (every seat that got cards).
+    pub fn begin_hand(&mut self, dealt: &[poker_engine::SeatIndex]) {
+        self.notes.begin_hand(dealt);
+    }
+
+    /// Everybody at the table saw this action.
+    pub fn observe_action(&mut self, action: &PublicAction) {
+        self.notes.observe_action(action);
+    }
+
+    /// Hands shown at showdown, with the public betting of the hand.
+    pub fn observe_showdown(&mut self, reveals: &[Reveal], history: &[PublicAction]) {
+        self.notes.observe_showdown(reveals, history);
+    }
+
+    /// The hand is over: update the mood from my result in big blinds and how many players I
+    /// knocked out. Tilt builds after big losses, fades every hand, and a knockout calms it.
+    pub fn observe_hand_end(
+        &mut self,
+        my_net: i64,
+        big_blind: poker_engine::Chips,
+        knockouts: u32,
+    ) {
+        #[allow(clippy::cast_precision_loss, reason = "a ratio of small chip counts")]
+        let in_blinds = my_net as f32 / big_blind.get().max(1) as f32;
+        let mut mood = self.mood * 0.85;
+        if in_blinds <= -10.0 {
+            mood += (-in_blinds / 60.0).min(0.6);
+        }
+        #[allow(clippy::cast_precision_loss, reason = "at most nine knockouts")]
+        let calm = 0.3 * knockouts as f32;
+        self.mood = (mood - calm).clamp(0.0, 1.0);
     }
 }
 

@@ -97,6 +97,8 @@ Each `BotMind` keeps, **for every other player, including the human and the othe
 
 Stats are smoothed (a prior from a typical player, weight grows with observations) so one hand never swings a read. The bot uses them like this: widen bluffs against opponents who fold too much, value-bet thinner against calling stations, respect raises from tight-aggressive opponents, tighten against a wild player who is already in the pot, and trap players who bet on any weak signal. The strength of every shift is set by the skill level (section 4.4). Notes are **not** shared between bots: each bot's reads come only from its own seat's view, and no bot learns anything another bot saw privately (there is nothing private to share, section 5).
 
+**As built:** nine `u16` counters per seat (hands, VPIP, PFR, postflop bets and calls, times faced a bet, folds to a bet, showdowns, weak showdowns). Continuation-bet and average-bet-size counters from the first draft were left out; reads work without them and they can be added later.
+
 Cost: a few `u16` counters per opponent, updated once per action; no history list is kept (O(1) memory per opponent).
 
 **After a restore (my call):** notes are reset and the bots rebuild reads from new hands. Rebuilding by replaying the public journal would work but costs restore time and code for a small gain; a restored game is rare and the reset is invisible (reads need a few hands anyway). Personality and skill are restored (they are in the journal).
