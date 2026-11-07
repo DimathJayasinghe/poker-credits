@@ -714,6 +714,13 @@ impl RoomState {
             } => self.move_seat(&player_id, seat_index, at_ms, out)?,
             HostCommand::Configure { config } => {
                 self.refuse_in_solo()?;
+                // A single-player game exists only from creation; no setting change makes one.
+                if config.solo.is_some() {
+                    return Err(RoomError::new(
+                        ErrorCode::BadRequest,
+                        "a room cannot become a single-player game",
+                    ));
+                }
                 let blinds = blinds_mode(&config)?;
                 self.engine_step(Command::Configure { blinds }, at_ms, out)?;
                 // Real or virtual cards is decided when the room is created, never later.

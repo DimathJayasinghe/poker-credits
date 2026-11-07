@@ -220,3 +220,36 @@ fn an_ordinary_room_has_no_solo_behaviour() {
     let json = serde_json::to_string(&room).unwrap();
     assert!(!json.contains("bots") && !json.contains("finishOrder") && !json.contains("solo"));
 }
+
+#[test]
+fn configure_can_neither_change_a_solo_room_nor_make_one() {
+    use poker_server_core::room::state::HostCommand;
+    let host = |config: RoomConfig| Op::Host {
+        by: "p_1".into(),
+        command: HostCommand::Configure { config },
+        at_ms: 1,
+    };
+    // A solo room refuses every Configure.
+    let mut solo = solo_room(2, 5);
+    assert_eq!(
+        solo.apply(host(config(2)), &Timings::default())
+            .unwrap_err()
+            .code,
+        ErrorCode::BadRequest
+    );
+    // An ordinary room refuses a Configure that carries `solo`.
+    let mut c = config(2);
+    c.solo = None;
+    c.card_mode = CardMode::Physical;
+    let mut plain = RoomState::new("ABCD".into(), c, "Dimath", "h".into(), "s".into(), 0).unwrap();
+    let mut sneaky = config(2);
+    sneaky.card_mode = CardMode::Physical;
+    assert_eq!(
+        plain
+            .apply(host(sneaky), &Timings::default())
+            .unwrap_err()
+            .code,
+        ErrorCode::BadRequest
+    );
+    assert!(!plain.is_solo());
+}
