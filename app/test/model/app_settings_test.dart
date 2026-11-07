@@ -69,6 +69,22 @@ void main() {
       expect(AppSettings.fromJson(<String, Object?>{'theme': 'neon'}).theme, ThemeChoice.system);
     });
 
+    test('the first-run name question: asked until answered, and never asked of someone who got past the intro before it existed', () {
+      expect(AppSettings.defaults.nameAsked, isFalse);
+      expect(AppSettings.fromJson(<String, Object?>{'acceptedTerms': 1}).nameAsked, isFalse, reason: 'a fresh install is asked');
+      expect(AppSettings.fromJson(<String, Object?>{'acceptedTerms': 1, 'introDone': false}).nameAsked, isFalse, reason: 'intro still to come');
+      expect(
+        AppSettings.fromJson(<String, Object?>{'acceptedTerms': 1, 'introDone': true}).nameAsked,
+        isTrue,
+        reason: 'an update must not ask long-time players',
+      );
+      expect(AppSettings.fromJson(<String, Object?>{'defaultName': 'Ana'}).nameAsked, isTrue, reason: 'a name is already set');
+      expect(AppSettings.fromJson(<String, Object?>{'introDone': true, 'nameAsked': false}).nameAsked, isFalse, reason: 'an explicit answer wins');
+      const asked = AppSettings(acceptedTerms: currentTermsVersion, introDone: true, nameAsked: true);
+      expect(AppSettings.fromJson(jsonDecode(jsonEncode(asked.toJson()))), asked);
+      expect(asked == asked.copyWith(nameAsked: false), isFalse);
+    });
+
     test('a saved name that the join form would refuse is dropped', () {
       for (final bad in <String>['', '   ', 'a' * 21, 'Dimath!', 'ünï', '<script>']) {
         expect(AppSettings.fromJson(<String, Object?>{'defaultName': bad}).defaultName, '', reason: bad);

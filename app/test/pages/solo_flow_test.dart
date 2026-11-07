@@ -153,6 +153,7 @@ void main() {
     harness.settings.value = AppSettings(
       acceptedTerms: currentTermsVersion,
       introDone: true,
+      nameAsked: true,
       soloRecords: <String, SoloRecord>{soloRecordKey(4, BotSkill.normal): const SoloRecord(played: 3, wins: 1, bestPlace: 1)},
     );
     await _openSetup(tester, harness);

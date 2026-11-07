@@ -66,6 +66,7 @@ class AppSettings {
     this.defaultName = '',
     this.acceptedTerms = 0,
     this.introDone = false,
+    this.nameAsked = false,
     this.soloBots = 4,
     this.soloSkill = BotSkill.normal,
     this.soloLength = SoloLength.standard,
@@ -76,6 +77,9 @@ class AppSettings {
 
   /// Same rule as the join form, so a saved name always passes it.
   static final RegExp _nameRule = RegExp(r'^[A-Za-z0-9 _-]{1,20}$');
+
+  /// Whether [name] (trimmed) is a name the server accepts.
+  static bool isValidName(String name) => _nameRule.hasMatch(name.trim());
 
   final ThemeChoice theme;
 
@@ -106,6 +110,10 @@ class AppSettings {
   /// The first-run intro (the offer of a tour) has been answered, taken or skipped.
   final bool introDone;
 
+  /// The first-run question for a default name has been answered or skipped, so it is not asked
+  /// again. Someone who already finished the intro before this question existed counts as asked.
+  final bool nameAsked;
+
   /// What the single-player setup shows the next time: opponents, skill and game length.
   final int soloBots;
   final BotSkill soloSkill;
@@ -131,6 +139,7 @@ class AppSettings {
     String? defaultName,
     int? acceptedTerms,
     bool? introDone,
+    bool? nameAsked,
     int? soloBots,
     BotSkill? soloSkill,
     SoloLength? soloLength,
@@ -146,6 +155,7 @@ class AppSettings {
     defaultName: defaultName ?? this.defaultName,
     acceptedTerms: acceptedTerms ?? this.acceptedTerms,
     introDone: introDone ?? this.introDone,
+    nameAsked: nameAsked ?? this.nameAsked,
     soloBots: soloBots ?? this.soloBots,
     soloSkill: soloSkill ?? this.soloSkill,
     soloLength: soloLength ?? this.soloLength,
@@ -164,6 +174,7 @@ class AppSettings {
     'defaultName': defaultName,
     'acceptedTerms': acceptedTerms,
     'introDone': introDone,
+    'nameAsked': nameAsked,
     'soloBots': soloBots,
     'soloSkill': soloSkill.name,
     'soloLength': soloLength.ladderHands,
@@ -178,6 +189,7 @@ class AppSettings {
     final theme = ThemeChoice.values.asNameMap()[json['theme']] ?? defaults.theme;
     final rawName = json['defaultName'];
     final name = rawName is String && _nameRule.hasMatch(rawName.trim()) ? rawName.trim() : '';
+    final introDone = flag('introDone', defaults.introDone);
     final rawTerms = json['acceptedTerms'];
     final rawBots = json['soloBots'];
     final rawLength = json['soloLength'];
@@ -200,7 +212,8 @@ class AppSettings {
       defaultName: name,
       // Only a whole, positive number counts. Anything else means "not accepted".
       acceptedTerms: rawTerms is int && rawTerms > 0 ? rawTerms : 0,
-      introDone: flag('introDone', defaults.introDone),
+      introDone: introDone,
+      nameAsked: flag('nameAsked', introDone || name.isNotEmpty),
       soloBots: rawBots is int && rawBots >= minSoloBots && rawBots <= maxSoloBots ? rawBots : defaults.soloBots,
       soloSkill: BotSkill.values.asNameMap()[json['soloSkill']] ?? defaults.soloSkill,
       soloLength: rawLength is int ? SoloLength.fromHands(rawLength) : defaults.soloLength,
@@ -221,6 +234,7 @@ class AppSettings {
       other.defaultName == defaultName &&
       other.acceptedTerms == acceptedTerms &&
       other.introDone == introDone &&
+      other.nameAsked == nameAsked &&
       other.soloBots == soloBots &&
       other.soloSkill == soloSkill &&
       other.soloLength == soloLength &&
@@ -228,7 +242,7 @@ class AppSettings {
 
   @override
   int get hashCode => Object.hash(
-    Object.hash(theme, texture, sound, vibration, keepAwake, fourColourDeck, cardsFaceUp, defaultName, acceptedTerms, introDone),
+    Object.hash(theme, texture, sound, vibration, keepAwake, fourColourDeck, cardsFaceUp, defaultName, acceptedTerms, introDone, nameAsked),
     soloBots,
     soloSkill,
     soloLength,

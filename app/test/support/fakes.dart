@@ -186,16 +186,20 @@ class FakeHostServer implements HostServer {
 /// Everything a page test needs: fakes wired through provider overrides.
 class TestHarness {
   /// [firstRun] starts with nothing accepted, like a fresh install. By default the player is past
-  /// the terms and the intro, and the splash screen does not wait.
+  /// the terms and the intro, and the splash screen does not wait. [askName] leaves the first-run
+  /// question for a default name unanswered.
   TestHarness({
     FakeHostServer? host,
     TokenStore? tokens,
     this.addresses = const <String>['192.168.1.5'],
     bool firstRun = false,
+    bool askName = false,
     this.splash = Duration.zero,
   }) : host = host ?? FakeHostServer(),
        tokens = tokens ?? MemoryTokenStore(),
-       settings = MemorySettingsStore(firstRun ? AppSettings.defaults : const AppSettings(acceptedTerms: currentTermsVersion, introDone: true));
+       settings = MemorySettingsStore(
+         firstRun ? AppSettings.defaults : AppSettings(acceptedTerms: currentTermsVersion, introDone: true, nameAsked: !askName),
+       );
 
   final FakeHostServer host;
   final TokenStore tokens;

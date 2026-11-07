@@ -126,7 +126,7 @@ abstract final class Strings {
   static const String cardsFaceUpLabel = 'Show my cards at once';
   static const String cardsFaceUpCaption = 'Off: your cards stay face down until you tap them, so nobody beside you sees them.';
   static const String defaultNameLabel = 'Default name';
-  static const String defaultNameHint = 'Filled in when you join a game';
+  static const String defaultNameHint = 'Filled in when you host, join or play alone';
   static const String sectionData = 'Data';
   static const String forgetGame = 'Forget saved game';
   static const String forgetGameCaption = 'Stop offering to go back to the last game on this device.';
@@ -481,6 +481,13 @@ abstract final class Strings {
   static const String introLearn = 'Learn poker';
   static const String introLearnCaption = 'New to Texas Hold\'em? The basics in 10 short steps.';
   static const String introSkip = 'Skip, I know my way';
+  static const String nameStepTitle = 'Your name';
+  static const String nameStepHeadline = 'What should we call you?';
+  static const String nameStepBody =
+      'Other players see this name at the table. We fill it in each time you host, join or play alone, so you never have to type it again. You can change it any time in Settings.';
+  static const String nameStepBodyShort = 'Players see this at the table. We fill it in each time. Change it in Settings.';
+  static const String nameStepSave = 'Save and continue';
+  static const String nameStepSkip = 'Skip for now';
   static const String introSkipCaption = 'Go straight to the app.';
   static const String guideTours = 'Tours';
   static const String helpTourRow = 'App tour';

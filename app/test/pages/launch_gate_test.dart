@@ -148,8 +148,10 @@ void main() {
   });
 
   group('intro', () {
+    // The name question that follows the intro has its own tests (`name_step_test.dart`); here it
+    // is already answered so these tests stay about the intro.
     Future<void> pastTerms(WidgetTester tester, TestHarness harness) async {
-      harness.settings.value = harness.settings.value.copyWith(acceptedTerms: currentTermsVersion);
+      harness.settings.value = harness.settings.value.copyWith(acceptedTerms: currentTermsVersion, nameAsked: true);
       await _launch(tester, harness);
       await tester.pumpAndSettle();
       expect(find.byType(IntroPage), findsOneWidget);

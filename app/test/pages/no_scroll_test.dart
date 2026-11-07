@@ -87,6 +87,12 @@ void main() {
           }
         }
         await tester.pumpWidget(const SizedBox());
+
+        // The first-run question for a default name.
+        await launchOn(tester, TestHarness(askName: true), d, scale: scale);
+        misfits.check(tester, 'name step', find.text(Strings.nameStepSkip.toUpperCase()), d, scale);
+        misfits.check(tester, 'name step field', find.byType(TextField), d, scale);
+        await tester.pumpWidget(const SizedBox());
         misfits.done(d, scale);
       });
     }
