@@ -106,6 +106,10 @@ pub struct Timings {
     pub disconnect_grace_ms: u64,
     /// A seat without any connection for this long is sat out.
     pub absent_sit_out_ms: u64,
+    /// Solo games: multiplies every computer player's thinking time (1.0 normal, 0 in tests).
+    pub bot_think_scale: f32,
+    /// Solo games: pause between the end of a hand and the next deal.
+    pub bot_next_hand_ms: u64,
 }
 
 impl Default for Timings {
@@ -117,6 +121,8 @@ impl Default for Timings {
             rebuy_window_ms: 2 * 60 * 1000,
             disconnect_grace_ms: 30 * 1000,
             absent_sit_out_ms: 10 * 60 * 1000,
+            bot_think_scale: 1.0,
+            bot_next_hand_ms: 3_000,
         }
     }
 }

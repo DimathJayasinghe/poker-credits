@@ -82,7 +82,26 @@ pub struct RoomConfig {
     /// Real or virtual cards (absent means real).
     #[serde(default, skip_serializing_if = "CardMode::is_physical")]
     pub card_mode: CardMode,
+    /// A single-player game against computer players (absent means an ordinary room). Only the
+    /// app's own loopback server accepts it; the network `CREATE_ROOM` refuses it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub solo: Option<SoloConfig>,
 }
+
+/// The extra settings of a single-player game (ADR-018).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SoloConfig {
+    /// Computer players at the table, 1 to 9.
+    pub bots: u8,
+    /// How well they play.
+    pub skill: poker_bots::Skill,
+    /// Hands played at each blind level.
+    pub ladder_hands: u32,
+}
+
+/// Most computer players a solo table holds (the engine seats ten).
+pub const MAX_BOTS: u8 = 9;
 
 /// Winners of one pot as sent by the host.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -399,6 +418,21 @@ pub struct RoomView {
     /// Virtual cards: how the last hand was paid.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result: Option<HandResultView>,
+    /// Solo games: who has been knocked out, in the order it happened, and the winner last.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub finish_order: Vec<FinishView>,
+}
+
+/// One finishing place in a solo game.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinishView {
+    /// Who finished.
+    pub player_id: String,
+    /// Their name (the seat may be gone by now).
+    pub name: String,
+    /// 1 = winner, 2 = runner-up, and so on.
+    pub place: u8,
 }
 
 /// A top-up request, public so the host can approve it.

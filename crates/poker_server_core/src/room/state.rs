@@ -6,6 +6,7 @@
 
 use std::collections::BTreeMap;
 
+use poker_bots::{Archetype, BotRng, Personality, Skill};
 use poker_engine::blinds::{Blinds, BlindsMode, CashGame, Tournament};
 use poker_engine::deck::Deck;
 use poker_engine::{
@@ -304,6 +305,13 @@ pub enum Op {
         /// Server time.
         at_ms: u64,
     },
+    /// Solo games: after a hand, knocked-out players get their finishing place, computer players
+    /// without chips leave the table and the last player standing wins. Only the room actor
+    /// creates it.
+    SoloSweep {
+        /// Server time.
+        at_ms: u64,
+    },
 }
 
 /// A message for one person or for everybody in the room.
@@ -326,6 +334,42 @@ pub struct Outcome {
     pub engine_events: Vec<Event>,
     /// State changed (bump `stateVersion`, send `STATE_UPDATE`, journal the op).
     pub changed: bool,
+}
+
+/// Who a computer player is. The personality itself is drawn again from `seed`, so a restored
+/// room brings back the same people. Never sent to clients.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BotProfile {
+    /// Playing style.
+    pub archetype: Archetype,
+    /// Skill level of the whole table.
+    pub skill: Skill,
+    /// Reads the human more closely than the others do (spec 10.3).
+    pub rival: bool,
+    /// Seeds the personality's small variations and the bot's own dice.
+    pub seed: u64,
+}
+
+impl BotProfile {
+    /// The personality this profile stands for. The same profile always gives the same one.
+    #[must_use]
+    pub fn personality(&self) -> Personality {
+        let base = Personality::sample(self.archetype, &mut BotRng::from_seed(self.seed));
+        if self.rival { base.rival() } else { base }
+    }
+}
+
+/// One finishing place in a solo game.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinishEntry {
+    /// Who finished.
+    pub player_id: String,
+    /// Their name at the time (the seat is gone afterwards).
+    pub name: String,
+    /// 1 = winner.
+    pub place: u8,
 }
 
 /// All persisted room state.
@@ -370,6 +414,16 @@ pub struct RoomState {
     /// still reads right after somebody left.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub hand_names: BTreeMap<String, String>,
+    /// Solo games: the computer players, by id. Absent in every other room.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub bots: BTreeMap<String, BotProfile>,
+    /// Solo games: knocked-out players in order, the winner last.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub finish_order: Vec<FinishEntry>,
+    /// Solo games: each funded player's chips when the current hand was dealt, to rank players
+    /// who go out in the same hand.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub hand_start_chips: BTreeMap<String, u64>,
 }
 
 /// First-level blinds scaled up for tournaments: numerator over 2 (1x, 1.5x, 2x, 3x, ...).
@@ -392,7 +446,18 @@ pub fn blinds_mode(config: &RoomConfig) -> Result<BlindsMode, RoomError> {
             ante: Chips::new(scale(config.ante)).map_err(|_| invalid())?,
         })
     };
-    let mode = if config.is_tournament {
+    let mode = if let Some(solo) = config.solo {
+        // A solo game is a freeze-out whose blinds rise after a fixed number of hands.
+        let levels = LADDER_HALVES
+            .iter()
+            .map(|h| level(*h))
+            .collect::<Result<Vec<_>, _>>()?;
+        BlindsMode::Tournament(Tournament {
+            levels,
+            level_ms: 0,
+            hands_per_level: Some(solo.ladder_hands),
+        })
+    } else if config.is_tournament {
         let levels = LADDER_HALVES
             .iter()
             .map(|h| level(*h))
@@ -408,6 +473,28 @@ pub fn blinds_mode(config: &RoomConfig) -> Result<BlindsMode, RoomError> {
     };
     poker_engine::blinds::BlindsStrategy::validate(&mode)?;
     Ok(mode)
+}
+
+/// Checks the settings only a solo game has.
+///
+/// # Errors
+/// `BAD_REQUEST` unless the cards are virtual, there are 1 to 9 computer players and the blinds
+/// rise after at least one hand.
+pub fn validate_solo(config: &RoomConfig) -> Result<(), RoomError> {
+    let Some(solo) = config.solo else {
+        return Ok(());
+    };
+    let bad = |text: &str| RoomError::new(ErrorCode::BadRequest, text);
+    if config.card_mode != crate::protocol::CardMode::Virtual {
+        return Err(bad("a solo game needs virtual cards"));
+    }
+    if solo.bots == 0 || solo.bots > crate::protocol::MAX_BOTS {
+        return Err(bad("a solo game has 1 to 9 opponents"));
+    }
+    if solo.ladder_hands == 0 || solo.ladder_hands > 100 {
+        return Err(bad("blinds must rise every 1 to 100 hands"));
+    }
+    Ok(())
 }
 
 /// Trims and checks a display name: 1 to 20 characters of `[A-Za-z0-9 _-]`.
@@ -449,6 +536,11 @@ impl RoomState {
         at_ms: u64,
     ) -> Result<Self, RoomError> {
         let name = validate_name(host_name)?;
+        validate_solo(&config)?;
+        let mut config = config;
+        if config.solo.is_some() {
+            config.is_tournament = true;
+        }
         let mode = blinds_mode(&config)?;
         let game = GameState::new(mode)?;
         let host_id = "p_1".to_owned();
@@ -471,6 +563,9 @@ impl RoomState {
             last_activity_ms: at_ms,
             ended: false,
             hand_names: BTreeMap::new(),
+            bots: BTreeMap::new(),
+            finish_order: Vec::new(),
+            hand_start_chips: BTreeMap::new(),
         };
         state.seat_player(&host_id, &name, Role::Host, Some(0), host_session_hash)?;
         Ok(state)
@@ -578,7 +673,8 @@ impl Op {
             | Op::PresenceAck { at_ms, .. }
             | Op::Recover { at_ms }
             | Op::Tick { at_ms }
-            | Op::AutoShowdown { at_ms, .. } => *at_ms,
+            | Op::AutoShowdown { at_ms, .. }
+            | Op::SoloSweep { at_ms } => *at_ms,
         }
     }
 }

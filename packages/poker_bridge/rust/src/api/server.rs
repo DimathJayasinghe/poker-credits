@@ -315,6 +315,7 @@ impl TryFrom<RsRoomConfig> for RoomConfig {
             is_tournament: config.is_tournament,
             blind_level_minutes: config.blind_level_minutes,
             turn_time_limit_seconds: config.turn_time_limit_seconds,
+            solo: None,
         })
     }
 }

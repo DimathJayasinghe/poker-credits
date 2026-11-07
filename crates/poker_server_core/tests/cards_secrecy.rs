@@ -32,6 +32,7 @@ fn config(mode: CardMode) -> RoomConfig {
         is_tournament: false,
         blind_level_minutes: 10,
         turn_time_limit_seconds: 30,
+        solo: None,
     }
 }
 

@@ -14,6 +14,7 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
 use super::absence::Absence;
+use super::bots::BotDriver;
 use super::handle::{ConnId, ConnSender, JoinOk, Outbound, RoomHandle, RoomInfo, RoomMsg};
 use super::state::{Broadcast, HostCommand, Op, Outcome, RoomError, RoomState};
 use crate::cards::{Entropy, OsEntropy, shuffled_deck};
@@ -60,6 +61,9 @@ impl Clock {
         self.start + Duration::from_millis(at_ms.saturating_sub(self.base_ms))
     }
 }
+
+/// How long a solo game waits to be resumed.
+const SOLO_TTL: Duration = Duration::from_hours(24 * 7);
 
 /// What a room needs from the outside world: time and randomness. Both can be replaced in tests.
 pub struct Deps {
@@ -151,6 +155,8 @@ pub struct RoomActor {
     internal_floor_ms: u64,
     absence: Absence,
     entropy: Box<dyn Entropy>,
+    /// The computer players of a solo game (empty otherwise).
+    bots: BotDriver,
 }
 
 fn internal(text: &str) -> RoomError {
@@ -180,10 +186,10 @@ pub fn create_with(
     timings: &Timings,
     deps: Deps,
 ) -> Result<Created, RoomError> {
-    let clock = deps.clock;
+    let Deps { clock, mut entropy } = deps;
     let host_token = token::generate().map_err(|_| internal("no randomness"))?;
     let session_token = token::generate().map_err(|_| internal("no randomness"))?;
-    let state = RoomState::new(
+    let mut state = RoomState::new(
         new.code.clone(),
         new.config,
         &new.host_name,
@@ -191,6 +197,14 @@ pub fn create_with(
         token::hash(&session_token),
         clock.now_ms(),
     )?;
+    if state.is_solo() {
+        // Everything about the opponents follows from one seed, which the snapshot keeps.
+        let mut seed = [0_u8; 8];
+        entropy
+            .fill(&mut seed)
+            .map_err(|_| internal("no randomness"))?;
+        state.seat_bots(u64::from_le_bytes(seed))?;
+    }
     let store = match new.data_dir {
         Some(root) => {
             let dir = store::room_dir(&root, &new.code);
@@ -201,7 +215,7 @@ pub fn create_with(
         None => None,
     };
     let player_id = state.host_id.clone();
-    let (handle, task) = spawn(state, store, limits, timings, deps);
+    let (handle, task) = spawn(state, store, limits, timings, Deps { clock, entropy });
     Ok(Created {
         handle,
         task,
@@ -273,6 +287,7 @@ fn spawn(
     let (tx, inbox) = mpsc::channel(limits.room_inbox);
     let handle = RoomHandle::new(state.code.clone(), tx);
     let absence = Absence::new(&state, clock.now_ms());
+    let bots = BotDriver::new(&state);
     let mut actor = RoomActor {
         state,
         limits: limits.clone(),
@@ -284,9 +299,11 @@ fn spawn(
         internal_floor_ms: 0,
         absence,
         entropy,
+        bots,
     };
     // A room that went down between the last bet and the payout finishes that hand now.
     actor.settle_showdown();
+    actor.settle_solo();
     (handle, tokio::spawn(actor.run()))
 }
 
@@ -296,6 +313,8 @@ impl RoomActor {
             if let Some(reason) = self.run_due() {
                 return reason;
             }
+            // What this loop just did may have handed a turn to a bot; plan it before sleeping.
+            self.plan_bots(self.clock.now_ms());
             let wake = self.clock.instant_at(self.next_wake_ms());
             tokio::select! {
                 msg = self.inbox.recv() => match msg {
@@ -313,7 +332,12 @@ impl RoomActor {
     }
 
     fn expiry_ms(&self) -> u64 {
-        let ttl = u64::try_from(self.limits.room_ttl.as_millis()).unwrap_or(u64::MAX);
+        let mut ttl = self.limits.room_ttl;
+        if self.state.is_solo() {
+            // Somebody who puts a solo game down expects to pick it up later.
+            ttl = ttl.max(SOLO_TTL);
+        }
+        let ttl = u64::try_from(ttl.as_millis()).unwrap_or(u64::MAX);
         self.state.last_activity_ms.saturating_add(ttl)
     }
 
@@ -322,6 +346,7 @@ impl RoomActor {
             self.state.next_wakeup_ms(&self.timings),
             self.absence.next_due_ms(&self.state, &self.timings),
             self.state.needs_auto_showdown().then_some(0),
+            self.bots.next_due_ms(),
         ]
         .into_iter()
         .flatten()
@@ -346,6 +371,7 @@ impl RoomActor {
             self.settle_showdown();
             return None;
         }
+        self.plan_bots(now);
         let turn_due = !self.state.game.table.paused
             && self
                 .state
@@ -369,11 +395,57 @@ impl RoomActor {
             if let Err(error) = self.submit(&op) {
                 tracing::warn!(code = ?error.code, "absence action was refused");
             }
+        } else if let Some(op) = self.bots.due_act(&self.state, now) {
+            self.run_bot_act(&op, now);
+        } else if self.bots.hand_due(now) {
+            self.deal_next_solo_hand(now);
         } else if tick_due {
             self.internal_floor_ms = now.saturating_add(250);
             let _ = self.submit(&Op::Tick { at_ms: now });
         }
         None
+    }
+
+    fn plan_bots(&mut self, now: u64) {
+        let human_here = self
+            .conns
+            .values()
+            .any(|conn| conn.player_id == self.state.host_id);
+        self.bots.plan(&self.state, now, human_here, &self.timings);
+    }
+
+    /// Journals a computer player's action. If the room refuses it (it should not), the bot
+    /// checks or folds instead, so a hand can never stall on a bot.
+    fn run_bot_act(&mut self, op: &Op, now: u64) {
+        let Err(error) = self.submit(op) else {
+            return;
+        };
+        tracing::warn!(code = ?error.code, "a computer player's action was refused");
+        if let Some(fallback) = BotDriver::fallback_act(&self.state, now)
+            && let Err(error) = self.submit(&fallback)
+        {
+            tracing::error!(code = ?error.code, "a computer player's fallback was refused");
+            self.internal_floor_ms = now.saturating_add(250);
+        }
+    }
+
+    /// Deals the next hand of a solo game: nobody there taps a button.
+    fn deal_next_solo_hand(&mut self, now: u64) {
+        self.bots.hand_attempted();
+        let Ok(deck) = shuffled_deck(&mut *self.entropy) else {
+            tracing::error!("could not shuffle for the next solo hand");
+            self.internal_floor_ms = now.saturating_add(250);
+            return;
+        };
+        let op = Op::Host {
+            by: self.state.host_id.clone(),
+            command: HostCommand::StartHand { deck: Some(deck) },
+            at_ms: now,
+        };
+        if let Err(error) = self.submit(&op) {
+            tracing::warn!(code = ?error.code, "the next solo hand could not be dealt");
+            self.internal_floor_ms = now.saturating_add(250);
+        }
     }
 
     fn finish_ended(&mut self) {
@@ -390,7 +462,18 @@ impl RoomActor {
     fn submit(&mut self, op: &Op) -> Result<Outcome, RoomError> {
         let outcome = self.submit_one(op)?;
         self.settle_showdown();
+        self.settle_solo();
         Ok(outcome)
+    }
+
+    /// Ranks players who just went out of a solo game and names the winner, as its own journaled
+    /// op, once the hand is paid.
+    fn settle_solo(&mut self) {
+        if let Some(op) = self.state.solo_sweep_op(self.clock.now_ms())
+            && let Err(error) = self.submit_one(&op)
+        {
+            tracing::error!(code = ?error.code, "solo sweep was refused");
+        }
     }
 
     /// Pays a virtual hand whose betting is over, as its own journaled op. Refused or failed, it
@@ -408,6 +491,7 @@ impl RoomActor {
     }
 
     fn submit_one(&mut self, op: &Op) -> Result<Outcome, RoomError> {
+        let before = self.state.game.table.phase;
         let mut next = self.state.clone();
         let outcome = next.apply(op.clone(), &self.timings)?;
         if !outcome.changed {
@@ -420,6 +504,8 @@ impl RoomActor {
             return Err(internal("could not persist the change"));
         }
         self.state = next;
+        self.bots
+            .observe(before, &outcome.engine_events, &self.state);
         self.absence
             .note_events(&outcome.engine_events, self.clock.now_ms());
         self.absence.prune(&self.state);
@@ -484,8 +570,9 @@ impl RoomActor {
     }
 
     fn view(&self) -> crate::protocol::RoomView {
+        // A computer player is always at the table, like anybody with a live connection.
         self.state
-            .view(&|id| self.conns.values().any(|c| c.player_id == id))
+            .view(&|id| self.state.is_bot(id) || self.conns.values().any(|c| c.player_id == id))
     }
 
     // -----------------------------------------------------------------------------------------
@@ -799,6 +886,11 @@ impl RoomActor {
             self.reply_error(conn, req_id, &error);
             return;
         };
+        if self.state.is_solo() && solo_refuses(&message) {
+            let error = RoomError::new(ErrorCode::BadRequest, "not available in a solo game");
+            self.reply_error(conn, req_id, &error);
+            return;
+        }
         let at_ms = self.clock.now_ms();
         let host = |command| Op::Host {
             by: player_id.clone(),
@@ -878,12 +970,17 @@ impl RoomActor {
                 return;
             }
         };
-        match self.submit(&op) {
+        self.submit_for(conn, req_id, &player_id, &op);
+    }
+
+    /// Runs a client's op and answers that connection with an `ACK` or the refusal.
+    fn submit_for(&mut self, conn: ConnId, req_id: Option<String>, player_id: &str, op: &Op) {
+        match self.submit(op) {
             Ok(outcome) => {
                 let next_action_seq = self
                     .state
                     .players
-                    .get(&player_id)
+                    .get(player_id)
                     .map_or(0, |p| p.next_action_seq);
                 let ack = ServerMessage::Ack {
                     next_action_seq,
@@ -894,6 +991,28 @@ impl RoomActor {
             Err(error) => self.reply_error(conn, req_id, &error),
         }
     }
+}
+
+/// Messages a single-player game has no use for. The one person playing may act, pause, resume
+/// and quit; there is no table to manage, nobody to wait for and no buying back in.
+fn solo_refuses(message: &ClientMessage) -> bool {
+    matches!(
+        message,
+        ClientMessage::ChooseSeat { .. }
+            | ClientMessage::RequestRebuy { .. }
+            | ClientMessage::SetSittingOut { .. }
+            | ClientMessage::LeaveTable
+            | ClientMessage::PresenceVote { .. }
+            | ClientMessage::PresenceAck
+            | ClientMessage::StartHand
+            | ClientMessage::BeginShowdown
+            | ClientMessage::ResolveShowdown { .. }
+            | ClientMessage::Undo
+            | ClientMessage::ApproveRebuy { .. }
+            | ClientMessage::Kick { .. }
+            | ClientMessage::MoveSeat { .. }
+            | ClientMessage::RoomConfigure { .. }
+    )
 }
 
 /// The host command a host-only message stands for; `None` for any other message.

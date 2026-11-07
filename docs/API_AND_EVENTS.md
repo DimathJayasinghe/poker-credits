@@ -364,6 +364,18 @@ All additive, `v` stays 1: a client or server that does not know them ignores th
 * **`START_HAND` has no deck field.** The server shuffles from its own entropy; a client cannot choose the deck.
 * **HTTP:** `cardMode` is added to `GET /v1/room/{code}` and to each entry of `GET /v1/lobbies` so the Join page can tag virtual games. A host that does not say it means real cards.
 
-## 10. Single player additions (ADR-018, proposed, not built)
+## 10. Single player additions (ADR-018, server side built, app side in progress)
 
-`RoomConfig` gains optional fields with serde defaults, so old clients and fixtures are unaffected: `solo` (bool, default false), `bots` (u8, default 0), `botSkill` (`EASY` | `NORMAL` | `HARD`, default `NORMAL`). A solo room requires `cardMode: VIRTUAL`, `bots` 1 to 9, and is created only through the host path (`create_room_detached` / the bridge), never from a network `CREATE_ROOM`. `blindLadderHands` (u32, default 8) sets hands per blind level for a solo game. No `isBot` is ever sent: bots look exactly like real players (owner decision). No new message types. Spec: `docs/superpowers/specs/2026-11-07-single-player-bots-design.md`.
+`RoomConfig` gains one optional object, absent for every ordinary room, so old clients and fixtures are unaffected:
+
+```json
+"solo": { "bots": 4, "skill": "NORMAL", "ladderHands": 8 }
+```
+
+`bots` is 1 to 9, `skill` is `EASY` | `NORMAL` | `HARD`, `ladderHands` (1 to 100) is the number of hands per blind level. A solo room requires `cardMode: VIRTUAL`; it is a freeze-out tournament (`isTournament` is forced on, the blinds rise by hand count, no timer for computer players). It is created only through the host path (`create_room_detached` / the bridge) on a loopback-only server (`ServerConfig::loopback_only`); a network `CREATE_ROOM` with `solo` returns `BAD_REQUEST`.
+
+The computer players are seated when the room is created, with ordinary `p_N` ids and names, spread over the ten seats with the human at seat 0. **No `isBot` is ever sent**: they look exactly like real players (owner decision), and `isConnected` is always true for them.
+
+`RoomView` gains `finishOrder`: `[{ "playerId", "name", "place" }]`, empty (and omitted) outside solo games. Knocked-out players are appended in the order they went out, with their finishing place (`1` = winner); several players going out in one hand are ranked by their stack at the start of that hand (smaller stack finishes lower). A computer player who goes out leaves the table; the human keeps the seat and appears in `finishOrder` too, which ends the game: no further hand is dealt once the human is in `finishOrder`. The next hand is dealt by the server a few seconds after the previous one ends, only while the human is connected.
+
+Refused in a solo room with `BAD_REQUEST` ("not available in a solo game"): `START_HAND`, `BEGIN_SHOWDOWN`, `RESOLVE_SHOWDOWN`, `UNDO`, `APPROVE_REBUY`, `REQUEST_REBUY`, `KICK`, `MOVE_SEAT`, `CHOOSE_SEAT`, `ROOM_CONFIGURE`, `SET_SITTING_OUT`, `LEAVE_TABLE`, `PRESENCE_VOTE`, `PRESENCE_ACK`. `JOIN_ROOM` returns `ROOM_FULL`. Allowed: `GAME_ACTION`, `PAUSE`, `RESUME_GAME`, `END_GAME`, `PING`, `RESUME`. A solo room has no absence rules (nobody is timed out or sat out) and lives seven days without activity, so a put-down game can be resumed. No new message types. Spec: `docs/superpowers/specs/2026-11-07-single-player-bots-design.md`.

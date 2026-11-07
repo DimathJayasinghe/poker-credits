@@ -217,6 +217,13 @@ impl Registry {
         host_name: String,
         config: RoomConfig,
     ) -> Result<Session, RoomError> {
+        if config.solo.is_some() {
+            // A single-player game exists only on the app's own loopback server.
+            return Err(RoomError::new(
+                ErrorCode::BadRequest,
+                "single-player games cannot be created over the network",
+            ));
+        }
         let (created, status) = self.create_inner(host_name, config)?;
         let code = created.handle.code().to_owned();
         let _queued = tx.try_send(Outbound {

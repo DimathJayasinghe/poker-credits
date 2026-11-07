@@ -101,6 +101,7 @@ impl RoomState {
             Op::AutoShowdown { allocations, at_ms } => {
                 self.op_auto_showdown(allocations, at_ms, out)
             }
+            Op::SoloSweep { at_ms } => self.op_solo_sweep(at_ms, out),
         }
     }
 
@@ -185,6 +186,7 @@ impl RoomState {
                     let credit = self.ledger.entry(player_id.to_string()).or_insert(0);
                     *credit = credit.saturating_add(chips.get());
                     self.players.remove(player_id.as_str());
+                    self.bots.remove(player_id.as_str());
                     self.pending_removals.retain(|id| id != player_id.as_str());
                     self.pending_rebuys
                         .retain(|r| r.player_id != player_id.as_str());
@@ -270,8 +272,13 @@ impl RoomState {
         if !turn_started {
             return;
         }
+        // A computer player has no clock: it acts when it has thought about it.
+        let bot_turn = table
+            .active
+            .and_then(|seat| self.player_at_seat(seat))
+            .is_some_and(|player| self.is_bot(&player.id));
         let limit_ms = u64::from(self.config.turn_time_limit_seconds) * 1000;
-        self.turn_deadline_ms = (limit_ms > 0).then(|| at_ms.saturating_add(limit_ms));
+        self.turn_deadline_ms = (limit_ms > 0 && !bot_turn).then(|| at_ms.saturating_add(limit_ms));
         if let Some((seat, legal)) = self.game.legal_actions()
             && let Some(player) = self.player_at_seat(seat)
         {
@@ -453,6 +460,12 @@ impl RoomState {
                 "the room has been closed",
             ));
         }
+        if self.is_solo() {
+            return Err(RoomError::new(
+                ErrorCode::RoomFull,
+                "this is a private single-player game",
+            ));
+        }
         let name = validate_name(name)?;
         if self.players.contains_key(id)
             || self
@@ -621,7 +634,18 @@ impl RoomState {
         Ok(())
     }
 
+    fn refuse_in_solo(&self) -> Done {
+        if self.is_solo() {
+            return Err(RoomError::new(
+                ErrorCode::BadRequest,
+                "nobody buys back in during a single-player game",
+            ));
+        }
+        Ok(())
+    }
+
     fn op_request_rebuy(&mut self, id: &str, amount: u64, out: &mut Outcome) -> Done {
+        self.refuse_in_solo()?;
         self.require_seated(id)?;
         if amount == 0 || amount > MAX_CHIPS {
             return Err(RoomError::new(
@@ -648,6 +672,7 @@ impl RoomState {
         match command {
             HostCommand::StartHand { deck } => {
                 let deck = self.deck_for_hand(deck)?;
+                self.note_hand_start();
                 let elapsed_ms = if self.config.is_tournament {
                     at_ms.saturating_sub(*self.tournament_started_ms.get_or_insert(at_ms))
                 } else {
@@ -679,12 +704,16 @@ impl RoomState {
             HostCommand::ApproveRebuy { player_id, amount } => {
                 self.op_approve_rebuy(&player_id, amount, out)?;
             }
-            HostCommand::Kick { player_id } => self.op_kick(&player_id, at_ms, out)?,
+            HostCommand::Kick { player_id } => {
+                self.refuse_in_solo()?;
+                self.op_kick(&player_id, at_ms, out)?;
+            }
             HostCommand::MoveSeat {
                 player_id,
                 seat_index,
             } => self.move_seat(&player_id, seat_index, at_ms, out)?,
             HostCommand::Configure { config } => {
+                self.refuse_in_solo()?;
                 let blinds = blinds_mode(&config)?;
                 self.engine_step(Command::Configure { blinds }, at_ms, out)?;
                 // Real or virtual cards is decided when the room is created, never later.
@@ -823,6 +852,7 @@ impl RoomState {
     }
 
     fn op_approve_rebuy(&mut self, id: &str, amount: u64, out: &mut Outcome) -> Done {
+        self.refuse_in_solo()?;
         self.require_seated(id)?;
         if amount == 0 || amount > MAX_CHIPS {
             return Err(RoomError::new(

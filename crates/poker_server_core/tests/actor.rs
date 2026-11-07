@@ -27,6 +27,7 @@ fn config() -> RoomConfig {
         is_tournament: false,
         blind_level_minutes: 10,
         turn_time_limit_seconds: 30,
+        solo: None,
     }
 }
 
@@ -492,6 +493,7 @@ fn untimed_config() -> RoomConfig {
     RoomConfig {
         card_mode: CardMode::Physical,
         turn_time_limit_seconds: 0,
+        solo: None,
         ..config()
     }
 }

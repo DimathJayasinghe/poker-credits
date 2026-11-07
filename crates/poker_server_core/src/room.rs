@@ -3,9 +3,11 @@
 
 mod absence;
 pub mod actor;
+mod bots;
 mod cards;
 pub mod handle;
 mod ops;
 pub mod session;
+mod solo;
 pub mod state;
 pub mod view;

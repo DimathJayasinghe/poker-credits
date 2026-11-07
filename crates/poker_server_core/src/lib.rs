@@ -64,6 +64,23 @@ pub struct ServerConfig {
     pub events: Option<mpsc::Sender<ServerEvent>>,
 }
 
+impl ServerConfig {
+    /// A server only this device can reach, for a single-player game: it listens on
+    /// `127.0.0.1` with a free port, so no one on the network can connect to it.
+    #[must_use]
+    pub fn loopback_only(data_dir: Option<PathBuf>) -> Self {
+        ServerConfig {
+            bind: SocketAddr::from(([127, 0, 0, 1], 0)),
+            data_dir,
+            limits: Limits::default(),
+            timings: Timings::default(),
+            mode: ServerMode::Host,
+            server_name: "Poker Credits".to_owned(),
+            events: None,
+        }
+    }
+}
+
 /// Why [`start`] failed.
 #[derive(Debug, thiserror::Error)]
 pub enum StartError {

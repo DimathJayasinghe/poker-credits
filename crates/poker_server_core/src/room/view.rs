@@ -5,8 +5,8 @@ use poker_engine::{HandStatus, Phase};
 
 use super::state::RoomState;
 use crate::protocol::{
-    HandResultView, PendingRebuyView, PotResultView, PotView, RevealView, RoomView, SeatView,
-    ShareView, WirePhase,
+    FinishView, HandResultView, PendingRebuyView, PotResultView, PotView, RevealView, RoomView,
+    SeatView, ShareView, WirePhase,
 };
 
 fn wire_phase(phase: Phase, paused: bool) -> WirePhase {
@@ -103,6 +103,15 @@ impl RoomState {
                 .map_or_else(Vec::new, |deal| deal.visible_board().to_vec()),
             reveals: self.reveal_views(),
             result: self.result_view(),
+            finish_order: self
+                .finish_order
+                .iter()
+                .map(|entry| FinishView {
+                    player_id: entry.player_id.clone(),
+                    name: entry.name.clone(),
+                    place: entry.place,
+                })
+                .collect(),
         }
     }
 

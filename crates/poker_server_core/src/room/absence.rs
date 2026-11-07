@@ -20,11 +20,20 @@ use crate::config::Timings;
 pub(super) struct Absence {
     since_ms: BTreeMap<String, u64>,
     turn_since_ms: u64,
+    solo: bool,
 }
 
 impl Absence {
-    /// Everybody seated starts out absent: after a restart nobody is connected yet.
+    /// Everybody seated starts out absent: after a restart nobody is connected yet. A solo game
+    /// has no absence rules at all: the computer players never leave and the one person playing
+    /// is not timed out or sat out, they simply pause (the app does that when it goes away).
     pub(super) fn new(state: &RoomState, now: u64) -> Self {
+        if state.is_solo() {
+            return Absence {
+                solo: true,
+                ..Absence::default()
+            };
+        }
         let since_ms = state
             .players
             .values()
@@ -34,11 +43,15 @@ impl Absence {
         Absence {
             since_ms,
             turn_since_ms: now,
+            solo: false,
         }
     }
 
     /// The player lost their last connection.
     pub(super) fn gone(&mut self, id: &str, now: u64) {
+        if self.solo {
+            return;
+        }
         self.since_ms.entry(id.to_owned()).or_insert(now);
     }
 
