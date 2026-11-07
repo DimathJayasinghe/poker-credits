@@ -41,8 +41,8 @@ class FeltLayout extends StatelessWidget {
   /// Below this width the oval gives way to the grid.
   static const double narrowWidth = 600;
 
-  /// A plate's height at text scale 1.
-  static const double plateHeight = 100;
+  /// A plate's height at text scale 1. Every plate is exactly this tall.
+  static const double plateHeight = 108;
 
   /// Neighbouring plates on the oval are at least half a plate height apart vertically at their
   /// closest (slots 2 and 3 of 10), so the oval needs about five plate heights, plus room for the
