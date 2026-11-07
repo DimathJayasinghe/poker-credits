@@ -70,7 +70,7 @@ Server restart keeps the room alive: it restores from journal (section 3.4), so 
 The Rust server emits a single typed `ServerEvent` enum over a channel exposed to Dart by FRB as one stream (LocalSend: `ServerEventV2` → `RsServerEvent`). New server-to-app interactions extend the enum. No side channels. Error variants include `ListenerFailed { error }` and `RoomRecovered { room, reason }`. Dart routes events to providers; the providers are event handlers, not route handlers.
 
 ### 2.5 Android, iOS, desktop specifics
-- **Android** host mode: foreground service with a persistent notification while a room is hosted (LocalSend has `foreground_service.dart` in `packages/localsend_isolates/lib/util/`). Take a multicast lock only when discovery is on. No cleartext exception is expected to be needed for `dart:io` and Rust sockets (verify on a device in Phase 5).
+- **Android** host mode: foreground service with a persistent notification while a room is hosted (LocalSend has `foreground_service.dart` in `packages/localsend_isolates/lib/util/`). Take a multicast lock only when discovery is on. The LAN socket is TLS (ADR-019) and `usesCleartextTraffic` is `false`; that flag governs only Android's own HTTP stack and WebViews, so our `dart:io` and Rust sockets do not depend on it.
 - **iOS**: sockets silently die while suspended; this is why probe-on-resume exists. Add `NSLocalNetworkUsageDescription`. Keep hosting on iOS best-effort: documented as "keep the app in the foreground" because iOS does not allow a general background server.
 - **Windows**: first bind triggers the firewall prompt; the host screen explains it. Single instance via the handover pattern.
 - **Linux/macOS**: same as Windows without the prompt.

@@ -4,7 +4,9 @@
 
 All clients (Table, Player, Spectator) talk to the authoritative Rust server over **one WebSocket** carrying JSON messages, plus a few plain HTTP endpoints. The same server code runs embedded in the host app (LAN) and as the standalone cloud binary. The host app's own UI connects over loopback with the same protocol.
 
-- Transport: `GET /v1/ws` upgraded to WebSocket. `ws://` on LAN, `wss://` in the cloud.
+- Transport: `GET /v1/ws` upgraded to WebSocket, always encrypted off the device: `wss://` in the cloud (TLS at a proxy) and `wss://` on the LAN (TLS 1.3 served by the host itself with a self-signed certificate that the guest pins, ADR-019). Plain `ws://` exists only on `127.0.0.1` (solo games). A host-mode server refuses to listen on a non-loopback address without TLS.
+- Join link / QR code: `pokercredits://join?h=<ip>:<port>&c=<ROOM>&f=<fingerprint>`. `f` is the SHA-256 of the host's certificate DER as 43 base64url characters without padding. A guest connects only to a server that presents exactly that certificate. Without `f` (typed address, room code, lobby list) the app pins to the certificate the device presents at the first join. A malformed `f` makes the whole link invalid. Inside the Dart app the pin travels in the URI fragment, `wss://host:port/v1/ws#pin=<fingerprint>`, which is removed before connecting.
+- HTTP routes (`/v1/room/{code}`, `/v1/lobbies`, `/v1/info`, `/health`) are served on the same TLS port in host mode. In host mode a `Host` header that is not an IP literal, `localhost` or a `*.local` name gets 400.
 - Encoding: UTF-8 JSON, max 16 KiB per message.
 - Schema source of truth: Rust enums in `crates/poker_server_core/src/protocol.rs` (serde). Dart mirror in `packages/poker_protocol`. Golden examples in `protocol/fixtures/` are tested from both sides.
 - Replaces: Socket.io events, Zod schemas, Express/Fastify REST routes of the old design.

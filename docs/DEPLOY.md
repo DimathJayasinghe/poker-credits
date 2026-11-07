@@ -24,7 +24,7 @@ Health check for an orchestrator: `GET /health` (the slim image has no `curl`, s
 
 ### Before exposing it to the internet (open items)
 These are known gaps, tracked in `docs/STATUS.md`; none blocks a LAN game.
-1. **TLS.** The server speaks plain `ws://`. Cloud mode needs `wss://`: terminate TLS in a reverse proxy (Caddy, nginx, a platform load balancer) and forward `/v1/ws` with WebSocket upgrade headers.
+1. **TLS.** The cloud binary speaks plain `ws://` (the LAN host mode inside the app serves its own TLS, ADR-019, and is a different code path). Cloud mode needs `wss://`: terminate TLS in a reverse proxy (Caddy, nginx, a platform load balancer) and forward `/v1/ws` with WebSocket upgrade headers.
 2. **Per-IP limits behind a proxy.** Connection, create and join-failure limits are keyed by the peer address. Behind a proxy that is the proxy's address, so **all players share one budget** (default 40 connections). Reading `X-Forwarded-For` from a trusted proxy is not implemented; decide how to trust it before putting the binary behind one (`SECURITY_AND_EDGE_CASES.md` 6.6).
 3. **Origin policy.** A named host must list its own web origin in `POKER_ALLOWED_ORIGINS`; "Origin equals Host" is deliberately not trusted for names (DNS rebinding), only for IP literals and `localhost`.
 4. **Room codes are 4 characters.** Fine on a LAN; on the open internet a scanner can guess them slowly despite the limiters (see the open owner question on longer codes).

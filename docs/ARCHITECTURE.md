@@ -86,7 +86,7 @@ Layout mirrors LocalSend's `packages/localsend_isolates`: `rust/` is the plugin 
 - Layers: `config/` (init, error app, error hooks), `theme/` (tokens, `BrutalTheme`), `model/`, `provider/` (Refena), `net/` (socket client, reconnect), `pages/` (table, player, spectator, join, settings), `widget/brutal/` (design-system widgets) and `widget/table|player/`, `platform/` (the only place with platform-specific code, see section 9), `util/`.
 - Visual language: neo-brutalism, `docs/UI_DESIGN.md`.
 - **The client never computes game outcomes.** It renders `RoomView` and sends intents. A local legal-action preview for button enabling is allowed only from the server-provided `TURN_PROMPT.legal`.
-- Host-mode flow: start server through the bridge, create the room, connect to `ws://127.0.0.1:<port>/v1/ws` as `HOST`, show the QR code.
+- Host-mode flow: start server through the bridge, create the room, connect to `wss://127.0.0.1:<port>/v1/ws` as `HOST` (pinned to the phone's own certificate; solo games use plain `ws://127.0.0.1`), show the QR code.
 
 ### 3.5 Concurrency model
 - UI isolate: rendering and light JSON handling only.
@@ -206,7 +206,7 @@ graph TB
     subgraph Lan ["2. Host mode (offline LAN / hotspot)"]
         HostApp["Host app\nembedded poker_server_core\nbinds 0.0.0.0:<port>"]
         Wifi["Wi-Fi router or phone hotspot\nno internet needed"]
-        P1["Player app 1\nws://192.168.x.x:<port>"]
+        P1["Player app 1\nwss://192.168.x.x:<port>\n(TLS 1.3, pinned certificate)"]
         P2["Player app 2"]
         HostApp --- Wifi
         Wifi --- P1
@@ -217,8 +217,8 @@ graph TB
 ### 6.1 Host mode workflow
 1. Host taps "Host a game". The app starts the embedded server on the configured port (default 7878, fallback to a random free port, then show the chosen one).
 2. The app reads its own non-loopback IPv4 addresses (`NetworkInterface.list()`), picks the first private-range address, offers a picker if several.
-3. The Table screen shows a QR code `pokercredits://join?h=192.168.43.1:7878&r=KQ7M&v=1` plus the typed fallback "IP + room code".
-4. Players scan (in-app scanner) or type the details. The join screen calls `GET /v1/info` to validate the address before opening the socket.
+3. The Table screen shows a QR code `pokercredits://join?h=192.168.43.1:7878&c=KQ7M&f=<43-character certificate fingerprint>` plus the typed fallback "IP + room code". The fingerprint is the pin: the scanning guest accepts only that phone's certificate (ADR-019).
+4. Players scan (in-app scanner) or type the details. For a typed address or a room code the join first asks the device for its certificate fingerprint (trust on first use), then opens the pinned socket.
 5. Later (Phase 6, optional): UDP multicast announce so players see nearby hosts without scanning (ADR-012).
 
 ### 6.2 Cloud mode workflow
@@ -246,7 +246,7 @@ Players enter the server URL once (default baked in at build time) and a 4-lette
 
 | Platform | Needs | Notes |
 | :--- | :--- | :--- |
-| Android | `INTERNET`, `ACCESS_NETWORK_STATE`, `CAMERA`, `FOREGROUND_SERVICE` (+ type), `POST_NOTIFICATIONS`, `WAKE_LOCK`; no cleartext exception expected for `dart:io`/Rust sockets (ADR-012), verify on device in Phase 5 | Rust built by cargokit for `arm64-v8a`, `armeabi-v7a`, `x86_64` |
+| Android | `INTERNET`, `ACCESS_NETWORK_STATE`, `CAMERA`, `FOREGROUND_SERVICE` (+ type), `POST_NOTIFICATIONS`, `WAKE_LOCK`; `usesCleartextTraffic="false"` (our sockets are TLS and bypass it, ADR-019); release signed with the upload key from `key.properties` | Rust built by cargokit for `arm64-v8a`, `armeabi-v7a`, `x86_64` |
 | iOS | `NSCameraUsageDescription`, `NSLocalNetworkUsageDescription` (both added in Phase 0); multicast entitlement only for Phase 6 and needs Apple approval (verify) | Sockets die on suspend: probe on resume |
 | Windows | Firewall prompt on first listen (explain on host screen) | Inno Setup or MSIX packaging later |
 | macOS | App Sandbox entitlements `network.server` and `network.client`, camera | |

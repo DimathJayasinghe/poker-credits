@@ -89,7 +89,7 @@ Machine setup and helper scripts: [`docs/DEV_SETUP.md`](docs/DEV_SETUP.md). To r
 
 ## Security note
 
-Host mode uses plain `ws://` on the local network, so play on a network you trust (home Wi-Fi or your own hotspot), not on public Wi-Fi. Cloud mode must sit behind TLS. Details are in the security document above.
+Host mode serves TLS 1.3 on the local network with a per-phone certificate that guests pin (the QR code carries its fingerprint), so the game is encrypted and a guest can tell it reached the right phone. Still play on a network you trust (home Wi-Fi or your own hotspot), not on public Wi-Fi: a shared network can see that a game exists and try the room code. Cloud mode must sit behind TLS. Details are in the security document above and in ADR-019.
 
 ## License
 
