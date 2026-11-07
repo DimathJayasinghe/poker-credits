@@ -62,19 +62,32 @@ impl BlindsStrategy for CashGame {
     }
 }
 
-/// Escalating blind levels driven by tournament time.
+/// Escalating blind levels driven by tournament time, or by the number of hands dealt.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Tournament {
     /// Levels in order; the last one repeats once time runs past it.
     pub levels: Vec<Blinds>,
-    /// Length of each level in milliseconds.
+    /// Length of each level in milliseconds (ignored when `hands_per_level` is set).
     pub level_ms: u64,
+    /// When set and above zero, the level rises every this many hands and the clock is ignored:
+    /// the structure is then deterministic and unaffected by pauses (solo games).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hands_per_level: Option<u32>,
+}
+
+impl Tournament {
+    fn hands_per_level(&self) -> Option<u32> {
+        self.hands_per_level.filter(|hands| *hands > 0)
+    }
 }
 
 impl BlindsStrategy for Tournament {
-    fn blinds(&self, _hand_number: u32, elapsed_ms: u64) -> Blinds {
-        let level = elapsed_ms.checked_div(self.level_ms).unwrap_or(0);
+    fn blinds(&self, hand_number: u32, elapsed_ms: u64) -> Blinds {
+        let level = match self.hands_per_level() {
+            Some(hands) => u64::from(hand_number.saturating_sub(1) / hands),
+            None => elapsed_ms.checked_div(self.level_ms).unwrap_or(0),
+        };
         let index = usize::try_from(level).unwrap_or(usize::MAX);
         self.levels
             .get(index)
@@ -84,7 +97,7 @@ impl BlindsStrategy for Tournament {
     }
 
     fn validate(&self) -> Result<(), PokerError> {
-        if self.levels.is_empty() || self.level_ms == 0 {
+        if self.levels.is_empty() || (self.level_ms == 0 && self.hands_per_level().is_none()) {
             return Err(PokerError::InvalidAmount);
         }
         self.levels.iter().try_for_each(Blinds::validate)

@@ -398,7 +398,11 @@ pub fn blinds_mode(config: &RoomConfig) -> Result<BlindsMode, RoomError> {
             .map(|h| level(*h))
             .collect::<Result<Vec<_>, _>>()?;
         let level_ms = u64::from(config.blind_level_minutes.max(1)) * 60_000;
-        BlindsMode::Tournament(Tournament { levels, level_ms })
+        BlindsMode::Tournament(Tournament {
+            levels,
+            level_ms,
+            hands_per_level: None,
+        })
     } else {
         BlindsMode::Cash(CashGame { blinds: level(2)? })
     };
