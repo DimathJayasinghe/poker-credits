@@ -105,6 +105,12 @@ const List<GuideTerm> guideTerms = <GuideTerm>[
   GuideTerm('Blinds', 'The forced bets before the cards are dealt: the small blind, then the big blind (usually double).'),
   GuideTerm('Dealer button', 'The D marker. It shows who deals and moves one seat clockwise every hand. The blinds sit to its left.'),
   GuideTerm('Stack', 'The chips one player has.'),
+  GuideTerm('Hole cards', 'The two private cards each player is dealt. Only you see yours until the showdown.'),
+  GuideTerm('Community cards', 'The five shared cards turned face up in the middle: three on the flop, one on the turn, one on the river.'),
+  GuideTerm(
+    'Run-out',
+    'When everyone left is all-in, there is no more betting and the rest of the shared cards are simply turned over, one street at a time.',
+  ),
   GuideTerm('Kicker', 'The extra card that breaks a tie between two equal hands.'),
   GuideTerm('Showdown', 'Turning your cards over at the end of the hand.'),
 ];
@@ -121,7 +127,8 @@ const List<String> guideRules = <String>[
   'With two players, the dealer posts the small blind and acts first before the flop and last after it.',
   'If the host set a turn timer, the server keeps it. When it ends, you check if it costs nothing, otherwise you fold. Two timeouts in a row sit you out.',
   'Sit out, leave or top up between hands. A new player or a returning one is dealt in from the next hand.',
-  'The host can pause the game and undo up to the last five steps.',
+  'The host can pause the game and undo up to the last five steps. With cards in the app, undo only works inside one betting round: once a new card is turned it cannot be taken back.',
+  'With cards in the app the app decides the winners and pays every pot itself. Nobody has to pick a winner or total up a hand.',
 ];
 
 /// What to do when the connection drops.
@@ -141,4 +148,33 @@ const List<String> guideManners = <String>[
   'Act in turn. The app tells you whose turn it is, so there is no guessing.',
   'Do not talk about your hand while the hand is still being played.',
   'The app is the bank. Use it for every chip, and keep the real cards on the table.',
+];
+
+/// How cards in the app work, once a game uses them.
+const List<GuideStep> guideCards = <GuideStep>[
+  GuideStep(
+    'Your two cards',
+    'They wait face down on your phone. Tap them to look and tap again to hide them. On a screen everyone can see, hold your finger on them to peek and let go to hide. If you fold, the dock says No cards.',
+  ),
+  GuideStep(
+    'The shared cards',
+    'The flop, turn and river appear on the table screen and on every phone. When everyone left is all-in the app turns the rest over one street at a time, so nobody misses a card.',
+  ),
+  GuideStep(
+    'The showdown',
+    'Everyone still in shows both cards to everybody. Each winning hand is named, and every pot lists who won it and how much. The app pays the pots; the host has nothing to pick.',
+  ),
+  GuideStep(
+    'Card settings',
+    'In Settings you can turn your cards face up as soon as they are dealt, and switch to a four-colour deck where clubs are green and diamonds are blue.',
+  ),
+];
+
+/// Staying safe on a shared network.
+const List<String> guideSafety = <String>[
+  'Use your own Wi-Fi, or a phone hotspot with a password. Avoid public or shared Wi-Fi such as a cafe, hotel or school.',
+  'The game connection is not encrypted. Give the room code only to the people at your table.',
+  'With cards in the app, the host phone holds the deck and knows every card. Play that way only with people you would trust to host.',
+  'Chips are counters. The app never moves real money.',
+  'You can read the full notice again in Settings under Terms and safety.',
 ];

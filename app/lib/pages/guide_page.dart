@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:poker_credits/model/walkthrough.dart';
+import 'package:poker_credits/pages/support_page.dart';
 import 'package:poker_credits/pages/walkthrough_page.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
@@ -38,9 +39,11 @@ class GuideView extends StatefulWidget {
 class _GuideViewState extends State<GuideView> {
   final GlobalKey _hands = GlobalKey();
   final GlobalKey _flow = GlobalKey();
+  final GlobalKey _cards = GlobalKey();
   final GlobalKey _words = GlobalKey();
   final GlobalKey _rules = GlobalKey();
   final GlobalKey _drops = GlobalKey();
+  final GlobalKey _safety = GlobalKey();
 
   void _walk(String title, List<WalkthroughStep> steps) {
     Navigator.of(context).push(
@@ -106,9 +109,11 @@ class _GuideViewState extends State<GuideView> {
                             children: <Widget>[
                               _Jump(Strings.guideTabHands, () => _jump(_hands)),
                               _Jump(Strings.guideTabHand, () => _jump(_flow)),
+                              _Jump(Strings.guideTabCards, () => _jump(_cards)),
                               _Jump(Strings.guideTabWords, () => _jump(_words)),
                               _Jump(Strings.guideTabRules, () => _jump(_rules)),
                               _Jump(Strings.guideTabDrops, () => _jump(_drops)),
+                              _Jump(Strings.guideTabSafety, () => _jump(_safety)),
                             ],
                           ),
                         ],
@@ -131,14 +136,23 @@ class _GuideViewState extends State<GuideView> {
                     const GuideHands(),
                     GuideHeading(Strings.guideSectionFlow, key: _flow),
                     const GuideSteps(guideHandFlow),
+                    GuideHeading(Strings.guideSectionCards, key: _cards),
+                    const GuideSteps(guideCards),
                     GuideHeading(Strings.guideSectionWords, key: _words),
                     const GuideTerms(),
                     GuideHeading(Strings.guideSectionRules, key: _rules),
                     const GuideBullets(guideRules),
                     GuideHeading(Strings.guideSectionDrops, key: _drops),
                     const GuideSteps(guideDrops),
+                    GuideHeading(Strings.guideSectionSafety, key: _safety),
+                    const GuideBullets(guideSafety),
                     const GuideHeading(Strings.guideSectionManners),
                     const GuideBullets(guideManners),
+                    BrutalRow(
+                      label: Strings.guideSupportRow,
+                      caption: Strings.guideSupportCaption,
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SupportPage())),
+                    ),
                     const SizedBox(height: BrutalMetrics.gapXxl),
                   ],
                 ),

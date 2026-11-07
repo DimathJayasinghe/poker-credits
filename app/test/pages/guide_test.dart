@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/main.dart';
 import 'package:poker_credits/pages/guide_page.dart';
+import 'package:poker_credits/pages/support_page.dart';
 import 'package:poker_credits/pages/walkthrough_page.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/util/guide_content.dart';
@@ -59,7 +60,7 @@ void main() {
     });
 
     test('no list is empty and no text is blank', () {
-      for (final steps in <List<GuideStep>>[guideNight, guideHandFlow, guideDrops]) {
+      for (final steps in <List<GuideStep>>[guideNight, guideHandFlow, guideDrops, guideCards]) {
         expect(steps, isNotEmpty);
         for (final s in steps) {
           expect(s.title.trim(), isNotEmpty);
@@ -72,6 +73,7 @@ void main() {
       }
       expect(guideRules.every((r) => r.trim().isNotEmpty), isTrue);
       expect(guideManners.every((r) => r.trim().isNotEmpty), isTrue);
+      expect(guideSafety.every((r) => r.trim().isNotEmpty), isTrue);
     });
 
     test('the street names match the streets the engine plays, in order', () {
@@ -103,9 +105,11 @@ void main() {
         'HOW A NIGHT WORKS',
         'HAND RANKINGS',
         'HOW A HAND PLAYS',
+        'CARDS IN THE APP',
         'WORDS ON THE BUTTONS',
         'RULES THE APP KEEPS',
         'IF THE CONNECTION DROPS',
+        'PLAY SAFE',
         'TABLE MANNERS',
       ]) {
         expect(find.text(heading), findsOneWidget, reason: heading);
@@ -119,6 +123,21 @@ void main() {
       await tester.tap(find.text('DROPS'));
       await tester.pumpAndSettle();
       expect(find.text('IF THE CONNECTION DROPS').hitTestable(), findsOneWidget);
+    });
+
+    testWidgets('the safety section tells people to use a trusted Wi-Fi', (tester) async {
+      await _openGuideTab(tester, size: const Size(1280, 4000));
+      expect(guideSafety.first, contains('your own Wi-Fi'));
+      expect(find.textContaining('your own Wi-Fi'), findsWidgets);
+      expect(find.textContaining('host phone holds the deck'), findsOneWidget);
+    });
+
+    testWidgets('the Support the developer row opens the Support screen', (tester) async {
+      await _openGuideTab(tester);
+      await tester.scrollUntilVisible(find.text(Strings.guideSupportRow.toUpperCase()), 400, scrollable: find.byType(Scrollable).first);
+      await tester.tap(find.text(Strings.guideSupportRow.toUpperCase()));
+      await tester.pumpAndSettle();
+      expect(find.byType(SupportPage), findsOneWidget);
     });
 
     testWidgets('works with no network and no game: it is static text', (tester) async {
