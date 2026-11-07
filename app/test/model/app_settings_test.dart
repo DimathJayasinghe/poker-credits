@@ -20,6 +20,31 @@ void main() {
       expect(AppSettings.fromJson(<String, Object?>{'fourColourDeck': 'yes', 'cardsFaceUp': 1}), AppSettings.defaults);
     });
 
+    test('first-run state: terms are not accepted and the intro not seen until the player says so', () {
+      expect(AppSettings.defaults.acceptedTerms, 0);
+      expect(AppSettings.defaults.termsAccepted, isFalse);
+      expect(AppSettings.defaults.introDone, isFalse);
+      const accepted = AppSettings(acceptedTerms: currentTermsVersion, introDone: true);
+      expect(accepted.termsAccepted, isTrue);
+      expect(AppSettings.fromJson(jsonDecode(jsonEncode(accepted.toJson()))), accepted);
+    });
+
+    test('terms accepted for an older version have to be accepted again', () {
+      expect(const AppSettings(acceptedTerms: currentTermsVersion - 1).termsAccepted, isFalse);
+      expect(const AppSettings(acceptedTerms: currentTermsVersion + 1).termsAccepted, isTrue);
+    });
+
+    test('a damaged terms or intro value never counts as accepted', () {
+      for (final junk in <Object?>['1', -3, 1.5, null, true, <Object?>[]]) {
+        final settings = AppSettings.fromJson(<String, Object?>{'acceptedTerms': junk});
+        expect(settings.termsAccepted, isFalse, reason: '$junk');
+      }
+      for (final junk in <Object?>['yes', 1, null, <Object?>[]]) {
+        final settings = AppSettings.fromJson(<String, Object?>{'introDone': junk});
+        expect(settings.introDone, isFalse, reason: '$junk');
+      }
+    });
+
     test('anything that is not an object gives the defaults', () {
       for (final junk in <Object?>[null, 'text', 42, <Object?>[], true]) {
         expect(AppSettings.fromJson(junk), AppSettings.defaults, reason: '$junk');

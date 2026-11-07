@@ -1,5 +1,9 @@
 import 'package:flutter/foundation.dart';
 
+/// The version of the terms and safety notice the player has to accept. Raise it when the notice
+/// changes in a way people must see again.
+const int currentTermsVersion = 1;
+
 /// Which theme the app uses. [system] follows the operating system.
 enum ThemeChoice { system, light, dark }
 
@@ -18,6 +22,8 @@ class AppSettings {
     this.fourColourDeck = false,
     this.cardsFaceUp = false,
     this.defaultName = '',
+    this.acceptedTerms = 0,
+    this.introDone = false,
   });
 
   static const AppSettings defaults = AppSettings();
@@ -48,6 +54,15 @@ class AppSettings {
   /// Prefills the name field when joining. Empty = none.
   final String defaultName;
 
+  /// The version of the terms notice accepted on this device; 0 = never.
+  final int acceptedTerms;
+
+  /// The first-run intro (the offer of a tour) has been answered, taken or skipped.
+  final bool introDone;
+
+  /// Whether the notice the app is showing now has been accepted.
+  bool get termsAccepted => acceptedTerms >= currentTermsVersion;
+
   AppSettings copyWith({
     ThemeChoice? theme,
     bool? texture,
@@ -57,6 +72,8 @@ class AppSettings {
     bool? fourColourDeck,
     bool? cardsFaceUp,
     String? defaultName,
+    int? acceptedTerms,
+    bool? introDone,
   }) => AppSettings(
     theme: theme ?? this.theme,
     texture: texture ?? this.texture,
@@ -66,6 +83,8 @@ class AppSettings {
     fourColourDeck: fourColourDeck ?? this.fourColourDeck,
     cardsFaceUp: cardsFaceUp ?? this.cardsFaceUp,
     defaultName: defaultName ?? this.defaultName,
+    acceptedTerms: acceptedTerms ?? this.acceptedTerms,
+    introDone: introDone ?? this.introDone,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -78,6 +97,8 @@ class AppSettings {
     'fourColourDeck': fourColourDeck,
     'cardsFaceUp': cardsFaceUp,
     'defaultName': defaultName,
+    'acceptedTerms': acceptedTerms,
+    'introDone': introDone,
   };
 
   /// Anything that is not a JSON object, and any field of the wrong type, falls back to the
@@ -88,6 +109,7 @@ class AppSettings {
     final theme = ThemeChoice.values.asNameMap()[json['theme']] ?? defaults.theme;
     final rawName = json['defaultName'];
     final name = rawName is String && _nameRule.hasMatch(rawName.trim()) ? rawName.trim() : '';
+    final rawTerms = json['acceptedTerms'];
     return AppSettings(
       theme: theme,
       texture: flag('texture', defaults.texture),
@@ -97,6 +119,9 @@ class AppSettings {
       fourColourDeck: flag('fourColourDeck', defaults.fourColourDeck),
       cardsFaceUp: flag('cardsFaceUp', defaults.cardsFaceUp),
       defaultName: name,
+      // Only a whole, positive number counts. Anything else means "not accepted".
+      acceptedTerms: rawTerms is int && rawTerms > 0 ? rawTerms : 0,
+      introDone: flag('introDone', defaults.introDone),
     );
   }
 
@@ -110,8 +135,10 @@ class AppSettings {
       other.keepAwake == keepAwake &&
       other.fourColourDeck == fourColourDeck &&
       other.cardsFaceUp == cardsFaceUp &&
-      other.defaultName == defaultName;
+      other.defaultName == defaultName &&
+      other.acceptedTerms == acceptedTerms &&
+      other.introDone == introDone;
 
   @override
-  int get hashCode => Object.hash(theme, texture, sound, vibration, keepAwake, fourColourDeck, cardsFaceUp, defaultName);
+  int get hashCode => Object.hash(theme, texture, sound, vibration, keepAwake, fourColourDeck, cardsFaceUp, defaultName, acceptedTerms, introDone);
 }
