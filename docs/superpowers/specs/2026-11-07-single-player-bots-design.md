@@ -1,6 +1,6 @@
 # Single Player Mode with Bots: Design
 
-Status: **Proposed, owner answers received. Nothing is built.** Date: 2026-11-07. Author: assistant, from the owner's conversation. Owner decisions (2026-11-07): **no rebuy, losing ends the game with an end screen** (rebuys would make the game boring because the player never gets defeated); **bots look exactly like real players, no bot tag**; **1 to 9 bots**. The owner asked for suggestions to keep play interesting: section 10. Calls marked **(my call)** were made by the assistant; the owner can change any of them. Building starts only when the owner approves this document, then comes the plan (`superpowers:writing-plans`). Target release: **1.3.0** (the unreleased 1.2.1 rolls into it; the owner has said no release until the bigger feature is done).
+Status: **APPROVED by the owner 2026-11-07 (suggestions in section 10 accepted; bounties, daily challenges, chat and achievements are out for this stage). Nothing is built yet; next is the plan.** Date: 2026-11-07. Author: assistant, from the owner's conversation. Owner decisions (2026-11-07): **no rebuy, losing ends the game with an end screen** (rebuys would make the game boring because the player never gets defeated); **bots look exactly like real players, no bot tag**; **1 to 9 bots**. The owner asked for suggestions to keep play interesting: section 10. Calls marked **(my call)** were made by the assistant; the owner can change any of them. Building starts only when the owner approves this document, then comes the plan (`superpowers:writing-plans`). Target release: **1.3.0** (the unreleased 1.2.1 rolls into it; the owner has said no release until the bigger feature is done).
 
 ## 1. Intent
 
@@ -241,7 +241,7 @@ Bots live in the room actor, not as socket clients; bots exempt from absence and
 1. Busting: **no rebuy, show an end screen**; the owner asked for suggestions to keep it interesting (section 10).
 2. Bots: **look exactly like real players, no tag.**
 3. Count: **1 to 9 bots.**
-Still open for the owner: approve the spec, and say whether the suggestions in section 10 are right (especially the hand-driven blind ladder and the Quick / Standard / Long lengths).
+Approved. The owner accepted the section 10 suggestions and ruled out bounties, daily challenges, chat and achievements for now.
 
 ## 16. Builder check
 Subagents are disallowed in this project, so the document was reread as the builder: the gaps found were the hand-driven blind ladder (10.2; the engine's tournament mode is clock-driven), the absence exemption (3.2), restore of notes (4.5), PRNG without a new dependency (4.6), the single storage slot (7), loopback binding (7), and the missing sim harness (11); each is now decided above. What is still left to the builder: exact constants (sample counts, thresholds, think times, archetype parameter ranges), which are tuned by the simulation tests and recorded in `docs/GAME_LOGIC_AND_RULES.md` section 11 once built; and the choice between reusing `TablePage` or `PlayerPage` for the solo table (section 9).
