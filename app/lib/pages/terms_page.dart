@@ -4,10 +4,9 @@ import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/util/terms_content.dart';
-import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_credits/widget/brutal/brutal_switch_row.dart';
-import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
+import 'package:poker_credits/widget/brutal/fit_page.dart';
 import 'package:poker_credits/widget/guide/guide_widgets.dart';
 
 /// The safety notice. On first launch it has to be accepted ([onAccept] is set). Opened from
@@ -36,60 +35,55 @@ class _TermsPageState extends State<TermsPage> {
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    return PaperScaffold(
-      body: Column(
+    // The notice is a document and scrolls. What the player has to do with it does not: the
+    // agree switch and the two buttons stay at the bottom edge, in view the whole time.
+    return FitPage(
+      title: Strings.termsTitle,
+      onBack: widget.readOnly ? () => Navigator.of(context).maybePop() : null,
+      maxWidth: 680,
+      footerShare: 0.42,
+      padding: EdgeInsets.zero,
+      footer: widget.readOnly
+          ? null
+          : (context, info) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                BrutalSwitchRow(
+                  label: Strings.termsAgree,
+                  caption: Strings.termsAgreeCaption,
+                  value: _agreed,
+                  onChanged: (v) => setState(() => _agreed = v),
+                ),
+                SizedBox(height: info.gap),
+                BrutalButton(
+                  label: Strings.termsAccept,
+                  kind: BrutalButtonKind.primary,
+                  heavy: true,
+                  minHeight: info.roomy ? BrutalMetrics.tapPlayer : 52,
+                  onPressed: _agreed ? widget.onAccept : null,
+                ),
+                SizedBox(height: info.gap),
+                BrutalButton(label: Strings.termsDecline, onPressed: _decline),
+              ],
+            ),
+      builder: (context, info) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          AppTopBar(title: Strings.termsTitle, onBack: widget.readOnly ? () => Navigator.of(context).maybePop() : null),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 680),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapL, BrutalMetrics.gapXl, BrutalMetrics.gapL, BrutalMetrics.gapL),
-                        child: Text(
-                          Strings.termsIntro,
-                          style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: BrutalType.body, height: BrutalType.bodyHeight, color: c.muted),
-                        ),
-                      ),
-                      for (final section in termsSections) GuideBlock(title: section.title, body: section.body),
-                      if (!widget.readOnly) ...<Widget>[
-                        Container(height: BrutalMetrics.borderHeavy, color: c.line),
-                        BrutalSwitchRow(
-                          label: Strings.termsAgree,
-                          caption: Strings.termsAgreeCaption,
-                          value: _agreed,
-                          onChanged: (v) => setState(() => _agreed = v),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(BrutalMetrics.gapL),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: <Widget>[
-                              BrutalButton(
-                                label: Strings.termsAccept,
-                                kind: BrutalButtonKind.primary,
-                                heavy: true,
-                                minHeight: BrutalMetrics.tapPlayer,
-                                onPressed: _agreed ? widget.onAccept : null,
-                              ),
-                              const SizedBox(height: BrutalMetrics.gapM),
-                              BrutalButton(label: Strings.termsDecline, onPressed: _decline),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: BrutalMetrics.gapXxl),
-                    ],
-                  ),
-                ),
-              ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              BrutalMetrics.gapL,
+              info.roomy ? BrutalMetrics.gapXl : BrutalMetrics.gapM,
+              BrutalMetrics.gapL,
+              BrutalMetrics.gapM,
+            ),
+            child: Text(
+              Strings.termsIntro,
+              style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: BrutalType.body, height: BrutalType.bodyHeight, color: c.muted),
             ),
           ),
+          for (final section in termsSections) GuideBlock(title: section.title, body: section.body),
+          const SizedBox(height: BrutalMetrics.gapXl),
         ],
       ),
     );

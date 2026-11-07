@@ -48,7 +48,8 @@ class BrutalDialog extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                content,
+                // At a huge text size the message may not push the buttons off the screen.
+                Flexible(child: SingleChildScrollView(child: content)),
                 const SizedBox(height: BrutalMetrics.gapM),
                 Wrap(spacing: BrutalMetrics.gapM, runSpacing: BrutalMetrics.gapS, alignment: WrapAlignment.end, children: actions),
               ],

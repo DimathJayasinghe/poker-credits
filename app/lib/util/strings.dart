@@ -56,6 +56,7 @@ abstract final class Strings {
   static const String lengthStandardCaption = 'Blinds rise every 8 hands.';
   static const String lengthLongCaption = 'Blinds rise every 12 hands.';
   static const String soloRules = 'Everyone starts with the same chips. Nobody can buy back in. The last player with chips wins.';
+  static const String soloRulesShort = 'Same chips for all, no rebuys. Last player with chips wins.';
   static const String startSolo = 'Start game';
   static const String soloStarting = 'Starting...';
   static const String soloResumeFailed = 'This game cannot be opened any more.';
@@ -146,7 +147,8 @@ abstract final class Strings {
   static const String startingChips = 'Starting chips';
   static const String smallBlind = 'Small blind';
   static const String bigBlind = 'Big blind';
-  static const String turnSeconds = 'Seconds per turn (0 = no timer)';
+  static const String turnSeconds = 'Turn seconds';
+  static const String turnSecondsHint = '0 = no timer.';
   static const String startHosting = 'Start hosting';
   static const String starting = 'Starting the server...';
   static const String hostFailedPort = 'The port is busy. Close the other app or game and try again.';
@@ -253,6 +255,7 @@ abstract final class Strings {
   static const String nearbyLooking = 'Looking for open games';
   static const String nearbyNone = 'No open games found. Ask the host for the room code, or search again.';
   static const String nearbyAgain = 'Search again';
+  static const String nearbyNoneShort = 'No open games found.';
   static const String nearbyPick = 'Tap a game, then your name, then join.';
   static String nearbySeats(String code, int count, int max, {bool virtual = false}) =>
       'Room $code, $count of $max seats taken${virtual ? '. Cards in the app' : ''}';
@@ -319,6 +322,7 @@ abstract final class Strings {
   static const String opponents = 'Other players';
   static const String hasCards = 'has cards';
   static const String undoVirtualNote = 'Undo works within one betting round. A card that is turned cannot be taken back.';
+  static const String undoVirtualShort = 'Undo: this betting round only.';
   static const String winsTag = 'Wins';
   static String potWonBy(String pot, int amount, String who) => '$pot $amount: $who';
   static const String winnerTag = 'Wins';
@@ -430,6 +434,10 @@ abstract final class Strings {
   static const String supportHeadline = 'Free, open source, made by one person';
   static const String supportBody =
       'Poker Credits is built and maintained by Dimath Jayasinghe. It has no ads, no accounts and no tracking, and it never sends anything outside your own Wi-Fi. If it made your game night better, these three taps help more than you think.';
+  static const String supportBodyShort = 'No ads, no accounts, no tracking. If it made your game night better, these taps help.';
+  static const String supportBodyTiny = 'No ads, no accounts, no tracking.';
+  static const String supportShowCode = 'Show QR code';
+  static const String supportShowCodeCaption = 'To open the project on another phone';
   static const String supportStar = 'Star on GitHub';
   static const String supportStarCaption = 'Helps other people find the app';
   static const String supportFollow = 'Follow on GitHub';
@@ -464,6 +472,7 @@ abstract final class Strings {
   static const String introTitle = 'Welcome';
   static const String introBody =
       'Want a quick look around before the first hand? Both are optional. You can open them again later from Settings or the Guide.';
+  static const String introBodyShort = 'A quick look around before the first hand? Both are optional.';
   static const String introTour = 'Take the app tour';
   static const String introTourCaption = 'How hosting, joining and playing work. About 2 minutes.';
   static const String introLearn = 'Learn poker';

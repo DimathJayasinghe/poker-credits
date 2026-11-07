@@ -33,36 +33,42 @@ SeatView _seat(int index, String name, int chips, {bool cards = true}) => SeatVi
 /// The scene is drawn at one natural size and scaled down to fit, so no width or text size can
 /// make it overflow.
 class StepArtView extends StatelessWidget {
-  const StepArtView({super.key, required this.art, required this.label});
+  const StepArtView({super.key, required this.art, required this.label, this.bare = false});
 
   final StepArt art;
   final String label;
 
+  /// Without the felt panel behind it, for a page that draws the panel itself.
+  final bool bare;
+
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
+    final scene = IgnorePointer(
+      child: MediaQuery.withNoTextScaling(
+        child: Padding(
+          padding: EdgeInsets.all(bare ? BrutalMetrics.gapM : BrutalMetrics.gapL),
+          child: Center(
+            child: FittedBox(fit: BoxFit.scaleDown, child: _scene(context)),
+          ),
+        ),
+      ),
+    );
     return Semantics(
       image: true,
       label: label,
       excludeSemantics: true,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: c.felt,
-          border: Border(
-            bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
-          ),
-        ),
-        child: IgnorePointer(
-          child: MediaQuery.withNoTextScaling(
-            child: Padding(
-              padding: const EdgeInsets.all(BrutalMetrics.gapL),
-              child: Center(
-                child: FittedBox(fit: BoxFit.scaleDown, child: _scene(context)),
+      child: bare
+          ? scene
+          : DecoratedBox(
+              decoration: BoxDecoration(
+                color: c.felt,
+                border: Border(
+                  bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
+                ),
               ),
+              child: scene,
             ),
-          ),
-        ),
-      ),
     );
   }
 

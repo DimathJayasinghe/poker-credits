@@ -8,10 +8,13 @@ enum BrutalTagKind { neutral, signal, danger, info }
 /// Small boxed label: `D`, `SB`, `BB`, `ALL-IN`, `FOLDED`, `AUTO`. State is carried by the text,
 /// never by colour alone (docs/UI_DESIGN.md section 2).
 class BrutalTag extends StatelessWidget {
-  const BrutalTag(this.label, {super.key, this.kind = BrutalTagKind.neutral});
+  const BrutalTag(this.label, {super.key, this.kind = BrutalTagKind.neutral, this.compact = false});
 
   final String label;
   final BrutalTagKind kind;
+
+  /// Smaller type and padding, for a seat plate that has little room.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -31,10 +34,18 @@ class BrutalTag extends StatelessWidget {
           border: Border.all(color: c.line, width: BrutalMetrics.border),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS, vertical: BrutalMetrics.gapXs / 2),
+          padding: compact
+              ? const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapXs, vertical: 1)
+              : const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS, vertical: BrutalMetrics.gapXs / 2),
           child: Text(
             label.toUpperCase(),
-            style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1, color: text),
+            style: TextStyle(
+              fontFamily: BrutalFonts.mono,
+              fontWeight: FontWeight.bold,
+              fontSize: compact ? 11 : 12,
+              letterSpacing: compact ? 0.5 : 1,
+              color: text,
+            ),
           ),
         ),
       ),

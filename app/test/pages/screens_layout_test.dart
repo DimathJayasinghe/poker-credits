@@ -122,6 +122,9 @@ void main() {
           await _reachable(tester, find.text(Strings.termsAgree), size, 'agree switch');
           await tester.tap(find.text(Strings.termsAgree));
           await tester.pump();
+          // At a huge text size the footer scrolls inside its own box: bring ACCEPT back into it.
+          await tester.ensureVisible(find.text(Strings.termsAccept.toUpperCase()));
+          await tester.pump();
           await tester.tap(find.text(Strings.termsAccept.toUpperCase()));
           await tester.pumpAndSettle();
           _clean(tester, 'intro');

@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/config/project_links.dart';
 import 'package:poker_credits/pages/support_page.dart';
@@ -36,6 +37,10 @@ void main() {
   });
 
   testWidgets('shows the developer, the three actions and a QR code of the repository', (tester) async {
+    tester.view
+      ..physicalSize = const Size(800, 1000)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await _open(tester);
     expect(find.text(Strings.supportTitle.toUpperCase()), findsWidgets);
     expect(find.textContaining('Dimath Jayasinghe'), findsWidgets);
@@ -45,6 +50,22 @@ void main() {
     final qr = tester.widget<PrettyQrView>(find.byType(PrettyQrView));
     expect(qr, isNotNull);
     expect(find.text(ProjectLinks.repository.toString()), findsWidgets, reason: 'the address is also shown as text');
+  });
+
+  testWidgets('a short screen keeps the three actions and puts the QR code behind a button', (tester) async {
+    tester.view
+      ..physicalSize = const Size(360, 640)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await _open(tester);
+    expect(find.text(Strings.supportStar.toUpperCase()), findsOneWidget);
+    expect(find.text(Strings.supportFollow.toUpperCase()), findsOneWidget);
+    expect(find.text(Strings.supportIssues.toUpperCase()), findsOneWidget);
+    expect(find.byType(PrettyQrView), findsNothing, reason: 'no room for the code on the page itself');
+    await tester.tap(find.text(Strings.supportShowCode.toUpperCase()));
+    await tester.pumpAndSettle();
+    expect(find.byType(PrettyQrView), findsOneWidget);
+    expect(find.text(ProjectLinks.repository.toString()), findsWidgets);
   });
 
   testWidgets('each action opens its own link', (tester) async {

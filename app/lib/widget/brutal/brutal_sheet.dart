@@ -4,16 +4,31 @@ import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
 
+/// The widest a sheet gets on this screen: a phone on its side has width and no height, so its
+/// sheets are wider and can lay their contents out in columns.
+double wideSheetWidth(BuildContext context) {
+  final size = MediaQuery.sizeOf(context);
+  return size.width >= 600 && size.height < 460 ? 760 : 560;
+}
+
 /// Shows a bordered panel that slides up from the bottom with the `base` motion.
+///
+/// [maxWidth] is the widest the panel gets. With [scrolls] false the panel does not scroll its
+/// body: the body is given the height that is left and decides itself what scrolls (a list), so
+/// its main button can stay in place under the list.
 Future<T?> showBrutalSheet<T>({
   required BuildContext context,
   required String title,
   required WidgetBuilder builder,
+  double maxWidth = 560,
+  bool scrolls = true,
 }) {
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    // The platform default caps a sheet at 640; a sheet that asks for more gets it.
+    constraints: BoxConstraints(maxWidth: maxWidth),
     backgroundColor: Colors.transparent,
     elevation: 0,
     barrierColor: BrutalColors.dark.paper.withValues(alpha: 0.7),
@@ -22,7 +37,7 @@ Future<T?> showBrutalSheet<T>({
       reverseDuration: BrutalTheme.duration(context, BrutalMetrics.fast),
       curve: Curves.easeOut,
     ),
-    builder: (context) => BrutalSheet(title: title, child: builder(context)),
+    builder: (context) => BrutalSheet(title: title, maxWidth: maxWidth, scrolls: scrolls, child: builder(context)),
   );
 }
 
@@ -31,10 +46,12 @@ Future<T?> showBrutalSheet<T>({
 /// The header never scrolls and always carries a CLOSE cell: on a short screen the sheet can fill
 /// the whole display, and then there is no backdrop left to tap and no hint of how to get back.
 class BrutalSheet extends StatelessWidget {
-  const BrutalSheet({super.key, required this.title, required this.child});
+  const BrutalSheet({super.key, required this.title, required this.child, this.maxWidth = 560, this.scrolls = true});
 
   final String title;
   final Widget child;
+  final double maxWidth;
+  final bool scrolls;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +67,7 @@ class BrutalSheet extends StatelessWidget {
       child: Align(
         alignment: Alignment.bottomCenter,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 560, maxHeight: maxHeight),
+          constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: c.surface,
@@ -99,10 +116,20 @@ class BrutalSheet extends StatelessWidget {
                   ),
                 ),
                 Flexible(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-                    child: Padding(padding: const EdgeInsets.all(BrutalMetrics.gapM), child: child),
-                  ),
+                  child: scrolls
+                      ? SingleChildScrollView(
+                          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+                          child: Padding(padding: const EdgeInsets.all(BrutalMetrics.gapM), child: child),
+                        )
+                      : Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            BrutalMetrics.gapM,
+                            BrutalMetrics.gapM,
+                            BrutalMetrics.gapM,
+                            BrutalMetrics.gapM + media.viewInsets.bottom,
+                          ),
+                          child: child,
+                        ),
                 ),
               ],
             ),

@@ -22,6 +22,7 @@ class BrutalButton extends StatefulWidget {
     this.kind = BrutalButtonKind.neutral,
     this.heavy = false,
     this.minHeight = BrutalMetrics.tap,
+    this.compact = false,
   });
 
   final String label;
@@ -31,6 +32,10 @@ class BrutalButton extends StatefulWidget {
   /// Larger label and the heavy rule as the border (primary actions).
   final bool heavy;
   final double minHeight;
+
+  /// Less padding and a smaller label, for a cell that is narrow (a row of three on a phone), so
+  /// a word is not broken across two lines.
+  final bool compact;
 
   @override
   State<BrutalButton> createState() => _BrutalButtonState();
@@ -77,7 +82,9 @@ class _BrutalButtonState extends State<BrutalButton> {
               duration: duration,
               curve: Curves.easeOut,
               constraints: BoxConstraints(minHeight: widget.minHeight, minWidth: BrutalMetrics.tap),
-              padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
+              padding: widget.compact
+                  ? const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapXs + 2, vertical: BrutalMetrics.gapXs)
+                  : const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
               decoration: BoxDecoration(
                 color: _enabled ? fill : c.muted.withValues(alpha: 0.18),
                 border: Border.all(color: _enabled ? c.line : c.muted, width: border),
@@ -108,9 +115,9 @@ class _BrutalButtonState extends State<BrutalButton> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: BrutalFonts.display,
-                      fontSize: widget.heavy ? 22 : 17,
+                      fontSize: widget.heavy ? 22 : (widget.compact ? 16 : 17),
                       height: 1.1,
-                      letterSpacing: 0.8,
+                      letterSpacing: widget.compact ? 0.4 : 0.8,
                       color: _enabled ? text : c.muted,
                     ),
                     child: Text(widget.label.toUpperCase()),

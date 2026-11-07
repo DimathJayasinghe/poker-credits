@@ -14,9 +14,8 @@ import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/describe.dart';
 import 'package:poker_credits/util/strings.dart';
-import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
-import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
+import 'package:poker_credits/widget/brutal/fit_page.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
 import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_row.dart';
@@ -31,10 +30,13 @@ final RegExp _nameRule = RegExp(r'^[A-Za-z0-9 _-]{1,20}$');
 /// network does not let the search through. A rejected join (bad name, full table) stays on this
 /// page so it can be fixed and retried.
 class JoinPage extends StatefulWidget {
-  const JoinPage({super.key, this.initial});
+  const JoinPage({super.key, this.initial, this.scanSupported});
 
   /// Pre-filled from a scanned code or a link.
   final JoinLink? initial;
+
+  /// Whether the phone can scan a QR code; the platform decides when this is null.
+  final bool? scanSupported;
 
   @override
   State<JoinPage> createState() => _JoinPageState();
@@ -244,6 +246,51 @@ class _JoinPageState extends State<JoinPage> with Refena {
     );
   }
 
+  /// The games found on the Wi-Fi, drawn without a frame for a page that is short of height. The
+  /// search button sits on the status line instead of under it.
+  Widget _nearbyFlat(FitInfo info, bool busy) {
+    final c = BrutalTheme.of(context).colors;
+    final picked = JoinLink.normalizeRoomCode(_code.text);
+    final status = _scanning && _nearby.isEmpty
+        ? Text(
+            Strings.nearbyLooking.toUpperCase(),
+            style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 13, color: c.muted),
+          )
+        : Text(
+            _nearby.isEmpty ? Strings.nearbyNoneShort : Strings.nearbyPick,
+            style: TextStyle(fontSize: 13, height: 1.3, color: c.muted),
+          );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.only(bottom: BrutalMetrics.gapXs),
+          child: Text(
+            Strings.nearbyTitle.toUpperCase(),
+            style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2, color: c.ink),
+          ),
+        ),
+        for (final lobby in _nearby)
+          BrutalRow(
+            label: lobby.hostName.isEmpty ? lobby.roomCode : lobby.hostName,
+            caption: Strings.nearbySeats(lobby.roomCode, lobby.playerCount, lobby.maxPlayers, virtual: lobby.isVirtual),
+            emphasis: picked == lobby.roomCode,
+            dense: true,
+            onTap: busy ? null : () => _pickNearby(lobby),
+          ),
+        Row(
+          children: <Widget>[
+            Expanded(child: status),
+            if (!_scanning) ...<Widget>[
+              const SizedBox(width: BrutalMetrics.gapS),
+              BrutalButton(label: Strings.nearbyAgain, onPressed: busy ? null : () => setState(_scanNearby)),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = context.ref.watch(sessionProvider);
@@ -269,109 +316,133 @@ class _JoinPageState extends State<JoinPage> with Refena {
     final canFind = ref.read(joinProvider).canFind;
     final showAddress = _showAddress || !canFind;
 
-    return PaperScaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          AppTopBar(title: Strings.joinTitle, onBack: () => Navigator.of(context).maybePop()),
-          Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(BrutalMetrics.gapM),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      if (searching) ...<Widget>[
-                        const BrutalBanner(message: Strings.searchingHost),
-                        const SizedBox(height: BrutalMetrics.gapM),
-                      ] else if (problem != null) ...<Widget>[
-                        BrutalBanner(message: problem, kind: connecting ? BrutalBannerKind.warning : BrutalBannerKind.error),
-                        const SizedBox(height: BrutalMetrics.gapM),
-                      ] else if (connecting) ...<Widget>[
-                        const BrutalBanner(message: Strings.connecting),
-                        const SizedBox(height: BrutalMetrics.gapM),
-                      ],
-                      if (canFind) ...<Widget>[
-                        _nearbyCard(busy),
-                        const SizedBox(height: BrutalMetrics.gapM),
-                      ],
-                      if (qrScanSupported) ...<Widget>[
-                        BrutalButton(
-                          label: Strings.scanQr,
-                          kind: BrutalButtonKind.info,
-                          minHeight: BrutalMetrics.tapPlayer,
-                          onPressed: busy ? null : _scan,
-                        ),
-                        const SizedBox(height: BrutalMetrics.gapM),
-                      ],
-                      BrutalCard(
-                        header: Strings.joinGame,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: <Widget>[
-                            BrutalTextField(
-                              label: Strings.joinCode,
-                              controller: _code,
-                              maxLength: 4,
-                              textCapitalization: TextCapitalization.characters,
-                              errorText: _submitted && JoinLink.normalizeRoomCode(_code.text) == null ? Strings.codeInvalid : null,
-                            ),
-                            const SizedBox(height: BrutalMetrics.gapM),
-                            if (showAddress) ...<Widget>[
-                              BrutalTextField(
-                                label: Strings.joinAddress,
-                                controller: _address,
-                                keyboardType: TextInputType.url,
-                                errorText: _submitted && _address.text.trim().isNotEmpty && JoinLink.normalizeAddress(_address.text) == null
-                                    ? Strings.addressInvalid
-                                    : null,
-                              ),
-                              const SizedBox(height: BrutalMetrics.gapM),
-                            ],
-                            BrutalTextField(
-                              label: Strings.joinName,
-                              controller: _name,
-                              maxLength: 20,
-                              errorText: _submitted && !_nameRule.hasMatch(_name.text.trim()) ? Strings.nameInvalid : null,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: BrutalMetrics.gapL),
-                      BrutalButton(
-                        label: Strings.joinButton,
-                        kind: BrutalButtonKind.primary,
-                        heavy: true,
-                        minHeight: BrutalMetrics.tapPlayer,
-                        onPressed: busy ? null : () => _join(spectator: false),
-                      ),
-                      const SizedBox(height: BrutalMetrics.gapM),
-                      BrutalButton(
-                        label: Strings.watchButton,
-                        minHeight: BrutalMetrics.tapPlayer,
-                        onPressed: busy ? null : () => _join(spectator: true),
-                      ),
-                      if (canFind) ...<Widget>[
-                        const SizedBox(height: BrutalMetrics.gapM),
-                        BrutalButton(
-                          label: showAddress ? Strings.useCode : Strings.useAddress,
-                          onPressed: busy ? null : () => setState(() => _showAddress = !showAddress),
-                        ),
-                      ],
-                      if (busy) ...<Widget>[
-                        const SizedBox(height: BrutalMetrics.gapM),
-                        BrutalButton(label: Strings.cancel, kind: BrutalButtonKind.danger, onPressed: _cancel),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
+    final scanSupported = widget.scanSupported ?? qrScanSupported;
+
+    return FitPage(
+      title: Strings.joinTitle,
+      onBack: () => Navigator.of(context).maybePop(),
+      compactBelow: 760,
+      tightBelow: 560,
+      footer: (context, info) {
+        final height = info.roomy ? BrutalMetrics.tapPlayer : 52.0;
+        if (busy) return BrutalButton(label: Strings.cancel, kind: BrutalButtonKind.danger, minHeight: height, onPressed: _cancel);
+        final join = BrutalButton(
+          label: Strings.joinButton,
+          kind: BrutalButtonKind.primary,
+          heavy: true,
+          minHeight: height,
+          onPressed: () => _join(spectator: false),
+        );
+        final watch = BrutalButton(label: Strings.watchButton, minHeight: height, onPressed: () => _join(spectator: true));
+        if (info.sideBySide) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              join,
+              SizedBox(height: info.gap),
+              watch,
+            ],
+          );
+        }
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Expanded(flex: 3, child: join),
+              SizedBox(width: info.gap),
+              Expanded(flex: 2, child: watch),
+            ],
           ),
-        ],
-      ),
+        );
+      },
+      builder: (context, info) {
+        Widget gap() => SizedBox(height: info.gap);
+        final banner = searching
+            ? const BrutalBanner(message: Strings.searchingHost)
+            : problem != null
+            ? BrutalBanner(message: problem, kind: connecting ? BrutalBannerKind.warning : BrutalBannerKind.error)
+            : connecting
+            ? const BrutalBanner(message: Strings.connecting)
+            : null;
+        final nearby = !canFind ? null : (info.roomy ? _nearbyCard(busy) : _nearbyFlat(info, busy));
+        final scan = !scanSupported
+            ? null
+            : BrutalButton(
+                label: Strings.scanQr,
+                kind: BrutalButtonKind.info,
+                minHeight: info.roomy ? BrutalMetrics.tapPlayer : BrutalMetrics.tap,
+                onPressed: busy ? null : _scan,
+              );
+        final code = BrutalTextField(
+          label: Strings.joinCode,
+          controller: _code,
+          maxLength: 4,
+          textCapitalization: TextCapitalization.characters,
+          errorText: _submitted && JoinLink.normalizeRoomCode(_code.text) == null ? Strings.codeInvalid : null,
+        );
+        final name = BrutalTextField(
+          label: Strings.joinName,
+          controller: _name,
+          maxLength: 20,
+          errorText: _submitted && !_nameRule.hasMatch(_name.text.trim()) ? Strings.nameInvalid : null,
+        );
+        final address = !showAddress
+            ? null
+            : BrutalTextField(
+                label: Strings.joinAddress,
+                controller: _address,
+                keyboardType: TextInputType.url,
+                errorText: _submitted && _address.text.trim().isNotEmpty && JoinLink.normalizeAddress(_address.text) == null
+                    ? Strings.addressInvalid
+                    : null,
+              );
+        final toggle = !canFind
+            ? null
+            : BrutalButton(
+                label: showAddress ? Strings.useCode : Strings.useAddress,
+                onPressed: busy ? null : () => setState(() => _showAddress = !showAddress),
+              );
+        // The room code is four characters: it shares a line with the name instead of taking one.
+        final codeAndName = Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(flex: 2, child: code),
+            SizedBox(width: info.gap),
+            Expanded(flex: 3, child: name),
+          ],
+        );
+        final form = FitSection(
+          info: info,
+          label: info.roomy ? Strings.joinGame : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              if (info.sideBySide) ...<Widget>[code, gap(), name] else codeAndName,
+              if (address != null) ...<Widget>[gap(), address],
+            ],
+          ),
+        );
+        final above = <Widget>[?banner, ?nearby, ?scan];
+        final below = <Widget>[form, ?toggle];
+        Widget stack(List<Widget> items) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            for (var i = 0; i < items.length; i++) ...<Widget>[if (i > 0) gap(), items[i]],
+          ],
+        );
+        if (info.sideBySide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(child: stack(above)),
+              SizedBox(width: info.pad),
+              Expanded(child: stack(below)),
+            ],
+          );
+        }
+        return stack(<Widget>[...above, ...below]);
+      },
     );
   }
 }

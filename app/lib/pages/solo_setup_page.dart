@@ -6,14 +6,12 @@ import 'package:poker_credits/provider/solo_provider.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
-import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
-import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_segmented.dart';
 import 'package:poker_credits/widget/brutal/brutal_slider.dart';
 import 'package:poker_credits/widget/brutal/brutal_text_field.dart';
-import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
+import 'package:poker_credits/widget/brutal/fit_page.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 
@@ -82,115 +80,118 @@ class _SoloSetupPageState extends State<SoloSetupPage> with Refena {
     final settings = context.ref.watch(settingsProvider);
     final busy = solo.phase == SoloPhase.starting;
     final record = settings.recordFor(_bots, _skill);
-    return PaperScaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          AppTopBar(title: Strings.soloTitle, onBack: busy ? null : () => Navigator.of(context).maybePop()),
-          Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(BrutalMetrics.gapM),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      if (solo.error != null) ...<Widget>[
-                        BrutalBanner(message: _errorText(solo.error!), kind: BrutalBannerKind.error),
-                        const SizedBox(height: BrutalMetrics.gapM),
-                      ],
-                      BrutalCard(
-                        child: BrutalTextField(
-                          label: Strings.hostName,
-                          controller: _name,
-                          maxLength: 20,
-                          errorText: _submitted && !_nameRule.hasMatch(_name.text.trim()) ? Strings.nameInvalid : null,
-                        ),
-                      ),
-                      const SizedBox(height: BrutalMetrics.gapM),
-                      BrutalCard(
-                        header: Strings.soloOpponents,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: <Widget>[
-                            BrutalSlider(
-                              value: _bots,
-                              min: minSoloBots,
-                              max: maxSoloBots,
-                              stepButtons: true,
-                              semanticLabel: Strings.soloOpponents,
-                              onChanged: busy ? (_) {} : (v) => setState(() => _bots = v),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: BrutalMetrics.gapM),
-                      BrutalCard(
-                        header: Strings.soloSkill,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: <Widget>[
-                            BrutalSegmented<BotSkill>(
-                              semanticLabel: Strings.soloSkill,
-                              value: _skill,
-                              options: const <(BotSkill, String)>[
-                                (BotSkill.easy, Strings.skillEasy),
-                                (BotSkill.normal, Strings.skillNormal),
-                                (BotSkill.hard, Strings.skillHard),
-                              ],
-                              onChanged: busy ? (_) {} : (v) => setState(() => _skill = v),
-                            ),
-                            const SizedBox(height: BrutalMetrics.gapS),
-                            Text(_skillCaption(_skill), style: TextStyle(fontSize: 13, color: c.muted)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: BrutalMetrics.gapM),
-                      BrutalCard(
-                        header: Strings.soloLength,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: <Widget>[
-                            BrutalSegmented<SoloLength>(
-                              semanticLabel: Strings.soloLength,
-                              value: _length,
-                              options: const <(SoloLength, String)>[
-                                (SoloLength.quick, Strings.lengthQuick),
-                                (SoloLength.standard, Strings.lengthStandard),
-                                (SoloLength.long, Strings.lengthLong),
-                              ],
-                              onChanged: busy ? (_) {} : (v) => setState(() => _length = v),
-                            ),
-                            const SizedBox(height: BrutalMetrics.gapS),
-                            Text(_lengthCaption(_length), style: TextStyle(fontSize: 13, color: c.muted)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: BrutalMetrics.gapM),
-                      Text(Strings.soloRules, style: TextStyle(fontSize: 13, color: c.muted)),
-                      const SizedBox(height: BrutalMetrics.gapS),
-                      Text(
-                        record == null ? Strings.soloRecordNone : Strings.soloRecordLine(record.bestPlace, record.wins, record.played),
-                        key: const ValueKey<String>('solo-record'),
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: c.ink),
-                      ),
-                      const SizedBox(height: BrutalMetrics.gapL),
-                      BrutalButton(
-                        label: busy ? Strings.soloStarting : Strings.startSolo,
-                        kind: BrutalButtonKind.primary,
-                        heavy: true,
-                        minHeight: BrutalMetrics.tapPlayer,
-                        onPressed: busy ? null : _start,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+    return FitPage(
+      title: Strings.soloTitle,
+      onBack: busy ? null : () => Navigator.of(context).maybePop(),
+      compactBelow: 860,
+      tightBelow: 560,
+      footer: (context, info) => BrutalButton(
+        label: busy ? Strings.soloStarting : Strings.startSolo,
+        kind: BrutalButtonKind.primary,
+        heavy: true,
+        minHeight: info.roomy ? BrutalMetrics.tapPlayer : 52,
+        onPressed: busy ? null : _start,
       ),
+      builder: (context, info) {
+        final name = FitSection(
+          info: info,
+          child: BrutalTextField(
+            label: Strings.hostName,
+            controller: _name,
+            maxLength: 20,
+            errorText: _submitted && !_nameRule.hasMatch(_name.text.trim()) ? Strings.nameInvalid : null,
+          ),
+        );
+        final opponents = FitSection(
+          info: info,
+          label: Strings.soloOpponents,
+          child: BrutalSlider(
+            value: _bots,
+            min: minSoloBots,
+            max: maxSoloBots,
+            stepButtons: true,
+            compact: !info.roomy,
+            semanticLabel: Strings.soloOpponents,
+            onChanged: busy ? (_) {} : (v) => setState(() => _bots = v),
+          ),
+        );
+        final skill = FitSection(
+          info: info,
+          label: Strings.soloSkill,
+          hint: _skillCaption(_skill),
+          child: BrutalSegmented<BotSkill>(
+            semanticLabel: Strings.soloSkill,
+            value: _skill,
+            options: const <(BotSkill, String)>[
+              (BotSkill.easy, Strings.skillEasy),
+              (BotSkill.normal, Strings.skillNormal),
+              (BotSkill.hard, Strings.skillHard),
+            ],
+            onChanged: busy ? (_) {} : (v) => setState(() => _skill = v),
+          ),
+        );
+        final length = FitSection(
+          info: info,
+          label: Strings.soloLength,
+          hint: _lengthCaption(_length),
+          child: BrutalSegmented<SoloLength>(
+            semanticLabel: Strings.soloLength,
+            value: _length,
+            options: const <(SoloLength, String)>[
+              (SoloLength.quick, Strings.lengthQuick),
+              (SoloLength.standard, Strings.lengthStandard),
+              (SoloLength.long, Strings.lengthLong),
+            ],
+            onChanged: busy ? (_) {} : (v) => setState(() => _length = v),
+          ),
+        );
+        final notes = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text(info.tight ? Strings.soloRulesShort : Strings.soloRules, style: TextStyle(fontSize: 13, height: 1.3, color: c.muted)),
+            // With no finished game yet there is nothing to report; a short page keeps its height.
+            if (record != null || !info.tight) ...<Widget>[
+              SizedBox(height: info.tight ? BrutalMetrics.gapXs : BrutalMetrics.gapS),
+              Text(
+                record == null ? Strings.soloRecordNone : Strings.soloRecordLine(record.bestPlace, record.wins, record.played),
+                key: const ValueKey<String>('solo-record'),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: c.ink),
+              ),
+            ],
+          ],
+        );
+        final error = solo.error == null
+            ? null
+            : Padding(
+                padding: EdgeInsets.only(bottom: info.gap),
+                child: BrutalBanner(message: _errorText(solo.error!), kind: BrutalBannerKind.error),
+              );
+        Widget gap() => SizedBox(height: info.gap);
+        if (info.sideBySide) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              ?error,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[name, gap(), opponents, gap(), notes]),
+                  ),
+                  SizedBox(width: info.pad),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[skill, gap(), length]),
+                  ),
+                ],
+              ),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[?error, name, gap(), opponents, gap(), skill, gap(), length, gap(), notes],
+        );
+      },
     );
   }
 }

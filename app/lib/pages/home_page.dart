@@ -120,56 +120,152 @@ class _HomePageState extends State<HomePage> with Refena {
     ref.notifier(settingsProvider).update((s) => s.copyWith(theme: showingDark ? ThemeChoice.light : ThemeChoice.dark));
   }
 
-  /// Title, tagline and the actions: the Play destination.
-  Widget _actions(BuildContext context, {required bool supported}) {
+  /// The wordmark and, when there is room, the tagline. [size] 0 draws the one-line mini mark.
+  Widget _header(BuildContext context, {required double size, required bool tagline, required double pad}) {
     final c = BrutalTheme.of(context).colors;
-    final hasSolo = context.ref.watch(soloProvider.select((s) => s.hasSaved));
-    final resume = (_hosted != null && supported) ? _hosted : null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Container(
-          padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapL, BrutalMetrics.gapXl, BrutalMetrics.gapL, BrutalMetrics.gapL),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
+    final mini = size < 40;
+    return Container(
+      padding: EdgeInsets.fromLTRB(BrutalMetrics.gapL, pad, BrutalMetrics.gapL, pad),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          // The wordmark is a logo, not reading text: it keeps its size when the text is enlarged.
+          MediaQuery.withNoTextScaling(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: EdgeInsets.only(top: mini ? 0 : size * 0.1, left: BrutalMetrics.gapS),
+                child: EchoTitle(mini ? <String>[Strings.appName] : Strings.appName.split(' '), size: size),
+              ),
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          if (tagline) ...<Widget>[
+            const SizedBox(height: BrutalMetrics.gapM),
+            Text(Strings.tagline, style: TextStyle(fontSize: 14, height: 1.4, color: c.muted)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// The actions: the Play destination. [snug] draws them tighter on a short screen; [captions]
+  /// false leaves out the line under each label.
+  List<Widget> _rows({required bool supported, required bool hasSolo, required bool snug, bool captions = true}) {
+    final resume = (_hosted != null && supported) ? _hosted : null;
+    return <Widget>[
+      if (_resumeError != null) BrutalBanner(message: _resumeError!, kind: BrutalBannerKind.error),
+      if (resume != null)
+        BrutalRow(
+          label: '${Strings.resumeHosting} ${resume.roomCode}',
+          emphasis: true,
+          dense: snug,
+          snug: snug,
+          onTap: _resuming ? null : _resume,
+        ),
+      if (_playing != null)
+        BrutalRow(label: '${Strings.resumeGame} ${_playing!.roomCode}', emphasis: resume == null, dense: snug, snug: snug, onTap: _resumePlaying),
+      if (hasSolo && supported)
+        BrutalRow(label: Strings.resumeSolo, emphasis: resume == null && _playing == null, dense: snug, snug: snug, onTap: _resumeSolo),
+      BrutalRow(
+        label: Strings.hostGame,
+        caption: captions ? (supported ? Strings.hostRowCaption : Strings.hostUnsupported) : null,
+        emphasis: resume == null && _playing == null && !hasSolo && supported,
+        dense: snug,
+        snug: snug,
+        onTap: supported ? () => _push(const HostPage()) : null,
+      ),
+      if (supported)
+        BrutalRow(
+          label: Strings.playAlone,
+          caption: captions ? Strings.playAloneCaption : null,
+          dense: snug,
+          snug: snug,
+          onTap: () => _push(const SoloSetupPage()),
+        ),
+      BrutalRow(
+        label: Strings.joinGame,
+        caption: captions ? Strings.joinRowCaption : null,
+        dense: snug,
+        snug: snug,
+        onTap: () => _push(const JoinPage()),
+      ),
+    ];
+  }
+
+  /// The Play destination. It never scrolls on a phone (docs/UI_DESIGN.md "No scrolling"): the
+  /// wordmark gets smaller as the height gets shorter, the rows get tighter, and the felt panel
+  /// is only what is left over, or nothing.
+  Widget _play(BuildContext context, {required bool supported, required bool hasSolo, required bool felt}) {
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    return LayoutBuilder(
+      builder: (context, box) {
+        final height = box.maxHeight / (textScale < 1 ? 1 : textScale);
+        final screen = MediaQuery.sizeOf(context);
+        final side = screen.width >= 600 && screen.height < 460;
+        // Extra rows (back to a game) take the space the big wordmark and the tagline would have used.
+        final extra =
+            (_hosted != null && supported ? 1 : 0) +
+            (_playing != null ? 1 : 0) +
+            (context.ref.watch(soloProvider.select((s) => s.hasSaved)) && supported ? 1 : 0);
+        final roomy = !side && height >= 660 + extra * 80;
+        final snug = side || height < 520;
+        // A phone on its side has the rows' height only: with a game to go back to, or big text,
+        // the one-line captions go and the labels carry the rows.
+        final rows = _rows(supported: supported, hasSolo: hasSolo, snug: snug, captions: !(side && (extra > 0 || textScale > 1.15)));
+        if (side) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              // Fits the width at any text size instead of overflowing.
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: BrutalMetrics.gapL, left: BrutalMetrics.gapS),
-                  child: EchoTitle(Strings.appName.split(' ')),
+              Expanded(
+                // Centred when there is room; scrolls only if the text is enlarged past it.
+                child: SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: box.maxHeight),
+                    child: Center(child: _header(context, size: 52, tagline: true, pad: BrutalMetrics.gapM)),
+                  ),
                 ),
               ),
-              const SizedBox(height: BrutalMetrics.gapM),
-              Text(Strings.tagline, style: TextStyle(fontSize: 14, height: 1.4, color: c.muted)),
+              Expanded(
+                flex: 2,
+                child: SingleChildScrollView(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows),
+                ),
+              ),
             ],
+          );
+        }
+        final header = _header(
+          context,
+          size: roomy ? 104 : (extra > 0 ? 34 : (height >= 560 ? 76 : 52)),
+          tagline: roomy,
+          pad: roomy ? BrutalMetrics.gapL : BrutalMetrics.gapM,
+        );
+        // Whatever height is left is the felt; too little of it is not worth drawing. The scroll
+        // view is only the last resort (a text size past 1.3).
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: box.maxHeight),
+            child: IntrinsicHeight(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  header,
+                  ...rows,
+                  // In the two-pane layout the felt is the right pane, not a band under the rows.
+                  if (felt) const Expanded(child: FeltPanel(hideBelow: 72)) else const Spacer(),
+                ],
+              ),
+            ),
           ),
-        ),
-        if (_resumeError != null) BrutalBanner(message: _resumeError!, kind: BrutalBannerKind.error),
-        if (resume != null)
-          BrutalRow(
-            label: '${Strings.resumeHosting} ${resume.roomCode}',
-            emphasis: true,
-            onTap: _resuming ? null : _resume,
-          ),
-        if (_playing != null) BrutalRow(label: '${Strings.resumeGame} ${_playing!.roomCode}', emphasis: resume == null, onTap: _resumePlaying),
-        if (hasSolo && supported) BrutalRow(label: Strings.resumeSolo, emphasis: resume == null && _playing == null, onTap: _resumeSolo),
-        BrutalRow(
-          label: Strings.hostGame,
-          caption: supported ? Strings.hostRowCaption : Strings.hostUnsupported,
-          emphasis: resume == null && _playing == null && !hasSolo && supported,
-          onTap: supported ? () => _push(const HostPage()) : null,
-        ),
-        if (supported) BrutalRow(label: Strings.playAlone, caption: Strings.playAloneCaption, onTap: () => _push(const SoloSetupPage())),
-        BrutalRow(label: Strings.joinGame, caption: Strings.joinRowCaption, onTap: () => _push(const JoinPage())),
-      ],
+        );
+      },
     );
   }
 
@@ -177,7 +273,10 @@ class _HomePageState extends State<HomePage> with Refena {
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
     final supported = context.ref.watch(hostServerProvider).isSupported;
-    final wide = MediaQuery.sizeOf(context).width >= BrutalMetrics.wide;
+    final hasSolo = context.ref.watch(soloProvider.select((s) => s.hasSaved));
+    final size = MediaQuery.sizeOf(context);
+    // The two panes need room in both directions; a phone on its side has none to spare.
+    final wide = size.width >= BrutalMetrics.wide && size.height >= 460;
     final play = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -192,15 +291,7 @@ class _HomePageState extends State<HomePage> with Refena {
           ],
         ),
         Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                _actions(context, supported: supported),
-                if (!wide) const FeltPanel(height: 180),
-              ],
-            ),
-          ),
+          child: _play(context, supported: supported, hasSolo: hasSolo, felt: !wide),
         ),
       ],
     );

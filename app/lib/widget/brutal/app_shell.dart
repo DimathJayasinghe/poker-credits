@@ -236,14 +236,17 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    final wide = MediaQuery.sizeOf(context).width >= BrutalMetrics.wide;
+    final size = MediaQuery.sizeOf(context);
+    final wide = size.width >= BrutalMetrics.wide && size.height >= 460;
+    // A phone held on its side has no height to spare for a bottom bar: a narrow rail instead.
+    final side = size.width >= 600 && size.height < 460;
     Widget cell(int i, {required bool rail}) => _NavCell(label: destinations[i].label, selected: i == index, rail: rail, onTap: () => onSelect(i));
-    if (wide) {
+    if (wide || side) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Container(
-            width: 220,
+            width: wide ? 220 : 132,
             decoration: BoxDecoration(
               border: Border(
                 right: BorderSide(color: c.line, width: BrutalMetrics.border),

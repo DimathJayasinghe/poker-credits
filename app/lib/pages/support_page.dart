@@ -5,10 +5,10 @@ import 'package:poker_credits/provider/services.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
-import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
 import 'package:poker_credits/widget/brutal/brutal_row.dart';
-import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
+import 'package:poker_credits/widget/brutal/brutal_sheet.dart';
+import 'package:poker_credits/widget/brutal/fit_page.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 
@@ -30,90 +30,112 @@ class _SupportPageState extends State<SupportPage> with Refena {
     setState(() => _last = result);
   }
 
+  /// The address as a QR code in a sheet, for a page too short to carry it.
+  void _showCode() {
+    showBrutalSheet<void>(
+      context: context,
+      title: Strings.supportScan,
+      builder: (context) {
+        final height = MediaQuery.sizeOf(context).height;
+        return Padding(
+          padding: const EdgeInsets.all(BrutalMetrics.gapM),
+          child: _RepoCode(url: ProjectLinks.repository, size: (height - 220).clamp(110.0, 168.0), showTitle: false),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    return PaperScaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          AppTopBar(title: Strings.supportTitle, onBack: () => Navigator.of(context).maybePop()),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapL, BrutalMetrics.gapXl, BrutalMetrics.gapL, BrutalMetrics.gapL),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Semantics(
-                              header: true,
-                              child: Text(
-                                Strings.supportHeadline.toUpperCase(),
-                                style: TextStyle(fontFamily: BrutalFonts.display, fontSize: BrutalType.headline, height: 1.05, color: c.ink),
-                              ),
-                            ),
-                            const SizedBox(height: BrutalMetrics.gapM),
-                            Text(
-                              Strings.supportBody,
-                              style: TextStyle(
-                                fontFamily: BrutalFonts.mono,
-                                fontSize: BrutalType.body,
-                                height: BrutalType.bodyHeight,
-                                color: c.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_last == LinkResult.copied) const BrutalBanner(message: Strings.linkCopied),
-                      if (_last == LinkResult.failed) const BrutalBanner(message: Strings.linkFailed, kind: BrutalBannerKind.error),
-                      _Hairline(c.line),
-                      BrutalRow(
-                        dense: true,
-                        label: Strings.supportStar,
-                        caption: Strings.supportStarCaption,
-                        emphasis: true,
-                        onTap: () => _open(ProjectLinks.repository),
-                      ),
-                      BrutalRow(
-                        dense: true,
-                        label: Strings.supportFollow,
-                        caption: Strings.supportFollowCaption,
-                        onTap: () => _open(ProjectLinks.profile),
-                      ),
-                      BrutalRow(
-                        dense: true,
-                        label: Strings.supportIssues,
-                        caption: Strings.supportIssuesCaption,
-                        onTap: () => _open(ProjectLinks.issues),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(BrutalMetrics.gapL),
-                        child: _RepoCode(url: ProjectLinks.repository),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: BrutalMetrics.gapXxl),
-                        child: Center(
-                          child: Text(
-                            Strings.supportThanks.toUpperCase(),
-                            style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 22, letterSpacing: 1, color: c.ink),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+    return FitPage(
+      title: Strings.supportTitle,
+      onBack: () => Navigator.of(context).maybePop(),
+      maxWidth: 640,
+      compactBelow: 900,
+      tightBelow: 560,
+      padding: EdgeInsets.zero,
+      builder: (context, info) {
+        final header = FitHeader(
+          info: info,
+          headline: Strings.supportHeadline,
+          body: Strings.supportBody,
+          bodyShort: Strings.supportBodyShort,
+          bodyTiny: Strings.supportBodyTiny,
+        );
+        // Without room for captions each row is its label alone; the label says what it does.
+        final captions = !info.tight;
+        final rows = <Widget>[
+          if (_last == LinkResult.copied) const BrutalBanner(message: Strings.linkCopied),
+          if (_last == LinkResult.failed) const BrutalBanner(message: Strings.linkFailed, kind: BrutalBannerKind.error),
+          _Hairline(c.line),
+          BrutalRow(
+            dense: true,
+            snug: !info.roomy,
+            label: Strings.supportStar,
+            caption: captions ? Strings.supportStarCaption : null,
+            emphasis: true,
+            onTap: () => _open(ProjectLinks.repository),
+          ),
+          BrutalRow(
+            dense: true,
+            snug: !info.roomy,
+            label: Strings.supportFollow,
+            caption: captions ? Strings.supportFollowCaption : null,
+            onTap: () => _open(ProjectLinks.profile),
+          ),
+          BrutalRow(
+            dense: true,
+            snug: !info.roomy,
+            label: Strings.supportIssues,
+            caption: captions ? Strings.supportIssuesCaption : null,
+            onTap: () => _open(ProjectLinks.issues),
+          ),
+          if (!info.roomy)
+            BrutalRow(
+              dense: true,
+              snug: true,
+              label: Strings.supportShowCode,
+              caption: captions ? Strings.supportShowCodeCaption : null,
+              onTap: _showCode,
+            ),
+        ];
+        final thanks = Padding(
+          padding: EdgeInsets.symmetric(vertical: info.roomy ? BrutalMetrics.gapL : BrutalMetrics.gapM),
+          child: Center(
+            child: Text(
+              Strings.supportThanks.toUpperCase(),
+              style: TextStyle(fontFamily: BrutalFonts.display, fontSize: info.roomy ? 22 : 18, letterSpacing: 1, color: c.ink),
             ),
           ),
-        ],
-      ),
+        );
+        if (info.sideBySide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[header, thanks]),
+              ),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows),
+              ),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            header,
+            ...rows,
+            if (info.roomy)
+              Padding(
+                padding: const EdgeInsets.all(BrutalMetrics.gapL),
+                child: _RepoCode(url: ProjectLinks.repository),
+              ),
+            thanks,
+          ],
+        );
+      },
     );
   }
 }
@@ -130,9 +152,11 @@ class _Hairline extends StatelessWidget {
 /// The repository address as a QR code and as text. The code is always dark on light paper,
 /// in both themes, so every scanner can read it.
 class _RepoCode extends StatelessWidget {
-  const _RepoCode({required this.url});
+  const _RepoCode({required this.url, this.size = 168, this.showTitle = true});
 
   final Uri url;
+  final double size;
+  final bool showTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -140,12 +164,14 @@ class _RepoCode extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
-        Text(
-          Strings.supportScan.toUpperCase(),
-          textAlign: TextAlign.center,
-          style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 2, color: c.muted),
-        ),
-        const SizedBox(height: BrutalMetrics.gapM),
+        if (showTitle) ...<Widget>[
+          Text(
+            Strings.supportScan.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 2, color: c.muted),
+          ),
+          const SizedBox(height: BrutalMetrics.gapM),
+        ],
         Semantics(
           label: Strings.supportScan,
           image: true,
@@ -153,8 +179,8 @@ class _RepoCode extends StatelessWidget {
             color: BrutalColors.light.paper,
             padding: const EdgeInsets.all(BrutalMetrics.gapM),
             child: SizedBox(
-              width: 168,
-              height: 168,
+              width: size,
+              height: size,
               child: PrettyQrView.data(
                 data: url.toString(),
                 decoration: PrettyQrDecoration(shape: PrettyQrSquaresSymbol(color: BrutalColors.light.ink)),

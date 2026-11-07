@@ -6,11 +6,9 @@ import 'package:poker_credits/provider/settings_provider.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/strings.dart';
-import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_banner.dart';
-import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
+import 'package:poker_credits/widget/brutal/fit_page.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
-import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_segmented.dart';
 import 'package:poker_credits/widget/brutal/brutal_text_field.dart';
 import 'package:poker_protocol/poker_protocol.dart';
@@ -87,115 +85,135 @@ class _HostPageState extends State<HostPage> with Refena {
 
   @override
   Widget build(BuildContext context) {
+    final c = BrutalTheme.of(context).colors;
     final host = context.ref.watch(hostProvider);
     final busy = host.phase == HostPhase.starting;
-    return PaperScaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          AppTopBar(title: Strings.hostTitle, onBack: busy ? null : () => Navigator.of(context).maybePop()),
-          Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(BrutalMetrics.gapM),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      if (host.error != null) ...<Widget>[
-                        BrutalBanner(message: _errorText(host.error!), kind: BrutalBannerKind.error),
-                        const SizedBox(height: BrutalMetrics.gapM),
-                      ],
-                      BrutalCard(
-                        header: Strings.you,
-                        child: BrutalTextField(
-                          label: Strings.hostName,
-                          controller: _name,
-                          autofocus: true,
-                          maxLength: 20,
-                          errorText: _submitted && !_nameRule.hasMatch(_name.text.trim()) ? Strings.nameInvalid : null,
-                        ),
-                      ),
-                      const SizedBox(height: BrutalMetrics.gapM),
-                      BrutalCard(
-                        header: Strings.gameSettings,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: <Widget>[
-                            BrutalTextField(
-                              label: Strings.startingChips,
-                              controller: _chips,
-                              keyboardType: TextInputType.number,
-                              errorText: _numberError(_chips),
-                            ),
-                            const SizedBox(height: BrutalMetrics.gapM),
-                            Row(
-                              children: <Widget>[
-                                Expanded(
-                                  child: BrutalTextField(
-                                    label: Strings.smallBlind,
-                                    controller: _small,
-                                    keyboardType: TextInputType.number,
-                                    errorText: _numberError(_small),
-                                  ),
-                                ),
-                                const SizedBox(width: BrutalMetrics.gapM),
-                                Expanded(
-                                  child: BrutalTextField(
-                                    label: Strings.bigBlind,
-                                    controller: _big,
-                                    keyboardType: TextInputType.number,
-                                    errorText: _numberError(_big),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: BrutalMetrics.gapM),
-                            BrutalTextField(
-                              label: Strings.turnSeconds,
-                              controller: _seconds,
-                              keyboardType: TextInputType.number,
-                              errorText: _numberError(_seconds),
-                            ),
-                            const SizedBox(height: BrutalMetrics.gapM),
-                            Text(
-                              Strings.cardsLabel,
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: BrutalTheme.of(context).colors.ink),
-                            ),
-                            const SizedBox(height: BrutalMetrics.gapS),
-                            BrutalSegmented<CardMode>(
-                              semanticLabel: Strings.cardsLabel,
-                              value: _cards,
-                              options: const <(CardMode, String)>[
-                                (CardMode.physical, Strings.cardsReal),
-                                (CardMode.virtual, Strings.cardsVirtual),
-                              ],
-                              onChanged: busy ? (_) {} : (v) => setState(() => _cards = v),
-                            ),
-                            if (_cards == CardMode.virtual) ...<Widget>[
-                              const SizedBox(height: BrutalMetrics.gapS),
-                              const BrutalBanner(message: Strings.hostTrustNote, kind: BrutalBannerKind.info),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: BrutalMetrics.gapL),
-                      BrutalButton(
-                        label: busy ? Strings.starting : Strings.startHosting,
-                        kind: BrutalButtonKind.primary,
-                        heavy: true,
-                        minHeight: BrutalMetrics.tapPlayer,
-                        onPressed: busy ? null : _start,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+    return FitPage(
+      title: Strings.hostTitle,
+      onBack: busy ? null : () => Navigator.of(context).maybePop(),
+      compactBelow: 800,
+      tightBelow: 560,
+      footer: (context, info) => BrutalButton(
+        label: busy ? Strings.starting : Strings.startHosting,
+        kind: BrutalButtonKind.primary,
+        heavy: true,
+        minHeight: info.roomy ? BrutalMetrics.tapPlayer : 52,
+        onPressed: busy ? null : _start,
       ),
+      builder: (context, info) {
+        Widget gap() => SizedBox(height: info.gap);
+        Widget number(String label, TextEditingController controller) =>
+            BrutalTextField(label: label, controller: controller, keyboardType: TextInputType.number, errorText: _numberError(controller));
+        Widget pair(Widget a, Widget b) => Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(child: a),
+            SizedBox(width: info.gap),
+            Expanded(child: b),
+          ],
+        );
+        final name = BrutalTextField(
+          label: Strings.hostName,
+          controller: _name,
+          maxLength: 20,
+          errorText: _submitted && !_nameRule.hasMatch(_name.text.trim()) ? Strings.nameInvalid : null,
+        );
+        final timerHint = Text(Strings.turnSecondsHint, style: TextStyle(fontSize: 13, height: 1.3, color: c.muted));
+        final seconds = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            number(Strings.turnSeconds, _seconds),
+            const SizedBox(height: BrutalMetrics.gapXs),
+            timerHint,
+          ],
+        );
+        final cards = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            if (!info.tight) ...<Widget>[
+              Text(
+                Strings.cardsLabel,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: c.ink),
+              ),
+              const SizedBox(height: BrutalMetrics.gapS),
+            ],
+            BrutalSegmented<CardMode>(
+              semanticLabel: Strings.cardsLabel,
+              value: _cards,
+              options: const <(CardMode, String)>[(CardMode.physical, Strings.cardsReal), (CardMode.virtual, Strings.cardsVirtual)],
+              onChanged: busy ? (_) {} : (v) => setState(() => _cards = v),
+            ),
+            if (_cards == CardMode.virtual) ...<Widget>[
+              const SizedBox(height: BrutalMetrics.gapS),
+              const BrutalBanner(message: Strings.hostTrustNote, kind: BrutalBannerKind.info),
+            ],
+          ],
+        );
+        final error = host.error == null
+            ? null
+            : Padding(
+                padding: EdgeInsets.only(bottom: info.gap),
+                child: BrutalBanner(message: _errorText(host.error!), kind: BrutalBannerKind.error),
+              );
+        if (info.sideBySide) {
+          // On its side: who you are, the timer and the cards on the left, the stakes on the right.
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              ?error,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        name,
+                        gap(),
+                        seconds,
+                        gap(),
+                        cards,
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: info.pad),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        number(Strings.startingChips, _chips),
+                        gap(),
+                        number(Strings.smallBlind, _small),
+                        gap(),
+                        number(Strings.bigBlind, _big),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        }
+        final settings = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            pair(number(Strings.startingChips, _chips), seconds),
+            gap(),
+            pair(number(Strings.smallBlind, _small), number(Strings.bigBlind, _big)),
+            gap(),
+            cards,
+          ],
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            ?error,
+            FitSection(info: info, label: info.roomy ? Strings.you : null, child: name),
+            gap(),
+            FitSection(info: info, label: info.roomy ? Strings.gameSettings : null, child: settings),
+          ],
+        );
+      },
     );
   }
 }

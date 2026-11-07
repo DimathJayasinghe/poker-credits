@@ -44,7 +44,7 @@ class _ArrowPainter extends CustomPainter {
 /// Home actions and Settings navigation use it. [emphasis] fills it with the accent (use for the
 /// one thing the screen is for).
 class BrutalRow extends StatelessWidget {
-  const BrutalRow({super.key, required this.label, required this.onTap, this.caption, this.emphasis = false, this.dense = false});
+  const BrutalRow({super.key, required this.label, required this.onTap, this.caption, this.emphasis = false, this.dense = false, this.snug = false});
 
   final String label;
   final String? caption;
@@ -54,6 +54,10 @@ class BrutalRow extends StatelessWidget {
   /// A tighter row for lists of settings and links: a smaller label and a shorter cell. The two
   /// Home actions keep the full size.
   final bool dense;
+
+  /// Tighter still, for a screen short of height: less padding around the label and a shorter
+  /// arrow cell. Implies [dense].
+  final bool snug;
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +79,7 @@ class BrutalRow extends StatelessWidget {
           return AnimatedContainer(
             duration: duration,
             curve: Curves.easeOut,
-            constraints: BoxConstraints(minHeight: dense ? 64 : 76),
+            constraints: BoxConstraints(minHeight: snug ? 56 : (dense ? 64 : 76)),
             decoration: BoxDecoration(
               color: fill,
               border: Border(
@@ -88,7 +92,10 @@ class BrutalRow extends StatelessWidget {
                 children: <Widget>[
                   Expanded(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: BrutalMetrics.gapL, vertical: dense ? BrutalMetrics.gapS + 4 : BrutalMetrics.gapM),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: snug ? BrutalMetrics.gapM : BrutalMetrics.gapL,
+                        vertical: snug ? BrutalMetrics.gapS : (dense ? BrutalMetrics.gapS + 4 : BrutalMetrics.gapM),
+                      ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,7 +104,7 @@ class BrutalRow extends StatelessWidget {
                             duration: duration,
                             style: TextStyle(
                               fontFamily: BrutalFonts.display,
-                              fontSize: dense ? BrutalType.rowLabelDense : BrutalType.rowLabel,
+                              fontSize: dense || snug ? BrutalType.rowLabelDense : BrutalType.rowLabel,
                               height: 1.05,
                               letterSpacing: 0.8,
                               color: enabled ? text : c.muted,
@@ -117,7 +124,7 @@ class BrutalRow extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    width: dense ? 64 : 76,
+                    width: snug ? 56 : (dense ? 64 : 76),
                     decoration: BoxDecoration(
                       border: Border(
                         left: BorderSide(color: c.line, width: BrutalMetrics.border),

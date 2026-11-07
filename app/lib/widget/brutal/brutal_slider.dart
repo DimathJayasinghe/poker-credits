@@ -31,6 +31,7 @@ class BrutalSlider extends StatelessWidget {
     this.step = 1,
     this.semanticLabel,
     this.stepButtons = false,
+    this.compact = false,
   }) : assert(max >= min, 'max must not be below min');
 
   final int value;
@@ -45,6 +46,10 @@ class BrutalSlider extends StatelessWidget {
   /// holding repeats, and the longer it is held the bigger the jumps, so a long range is quick to
   /// cross and a single tap is still exact.
   final bool stepButtons;
+
+  /// For a short screen: the value box and its step buttons only, without the track, so the
+  /// control is one row high.
+  final bool compact;
 
   static const double _thumb = 32;
   static const double _track = 12;
@@ -83,13 +88,16 @@ class BrutalSlider extends StatelessWidget {
               Expanded(
                 child: Container(
                   alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapS),
+                  padding: EdgeInsets.symmetric(vertical: compact ? BrutalMetrics.gapXs : BrutalMetrics.gapS),
                   decoration: BoxDecoration(
                     color: c.surface,
                     border: Border.all(color: c.line, width: BrutalMetrics.border),
                   ),
                   // A big text size makes the digits wider than the box between the step buttons.
-                  child: FittedBox(fit: BoxFit.scaleDown, child: BrutalNumber(_clamped, size: 56)),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: BrutalNumber(_clamped, size: compact ? 36 : 56),
+                  ),
                 ),
               ),
               if (stepButtons) ...<Widget>[
@@ -99,82 +107,83 @@ class BrutalSlider extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: BrutalMetrics.gapM),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final usable = width - _thumb;
-            return Semantics(
-              slider: true,
-              label: semanticLabel,
-              value: '$_clamped',
-              increasedValue: '${(_clamped + step).clamp(min, max)}',
-              decreasedValue: '${(_clamped - step).clamp(min, max)}',
-              onIncrease: () => _nudge(1),
-              onDecrease: () => _nudge(-1),
-              child: Focus(
-                onKeyEvent: (node, event) {
-                  if (event is KeyUpEvent) return KeyEventResult.ignored;
-                  if (event.logicalKey == LogicalKeyboardKey.arrowRight || event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                    _nudge(1);
-                    return KeyEventResult.handled;
-                  }
-                  if (event.logicalKey == LogicalKeyboardKey.arrowLeft || event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                    _nudge(-1);
-                    return KeyEventResult.handled;
-                  }
-                  return KeyEventResult.ignored;
-                },
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapDown: (d) => onChanged(_fromDx(d.localPosition.dx, width)),
-                  onHorizontalDragUpdate: (d) => onChanged(_fromDx(d.localPosition.dx, width)),
-                  child: SizedBox(
-                    height: BrutalMetrics.tapPlayer,
-                    child: Stack(
-                      alignment: Alignment.centerLeft,
-                      children: <Widget>[
-                        Positioned(
-                          left: _thumb / 2,
-                          right: _thumb / 2,
-                          child: Container(
-                            height: _track,
-                            decoration: BoxDecoration(
-                              color: c.surface,
-                              border: Border.all(color: c.line, width: BrutalMetrics.border),
+        if (!compact) const SizedBox(height: BrutalMetrics.gapM),
+        if (!compact)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final usable = width - _thumb;
+              return Semantics(
+                slider: true,
+                label: semanticLabel,
+                value: '$_clamped',
+                increasedValue: '${(_clamped + step).clamp(min, max)}',
+                decreasedValue: '${(_clamped - step).clamp(min, max)}',
+                onIncrease: () => _nudge(1),
+                onDecrease: () => _nudge(-1),
+                child: Focus(
+                  onKeyEvent: (node, event) {
+                    if (event is KeyUpEvent) return KeyEventResult.ignored;
+                    if (event.logicalKey == LogicalKeyboardKey.arrowRight || event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                      _nudge(1);
+                      return KeyEventResult.handled;
+                    }
+                    if (event.logicalKey == LogicalKeyboardKey.arrowLeft || event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                      _nudge(-1);
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  },
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (d) => onChanged(_fromDx(d.localPosition.dx, width)),
+                    onHorizontalDragUpdate: (d) => onChanged(_fromDx(d.localPosition.dx, width)),
+                    child: SizedBox(
+                      height: BrutalMetrics.tapPlayer,
+                      child: Stack(
+                        alignment: Alignment.centerLeft,
+                        children: <Widget>[
+                          Positioned(
+                            left: _thumb / 2,
+                            right: _thumb / 2,
+                            child: Container(
+                              height: _track,
+                              decoration: BoxDecoration(
+                                color: c.surface,
+                                border: Border.all(color: c.line, width: BrutalMetrics.border),
+                              ),
                             ),
                           ),
-                        ),
-                        Positioned(
-                          left: _thumb / 2,
-                          width: usable * _fraction,
-                          child: Container(
-                            height: _track,
-                            color: c.signal,
-                            foregroundDecoration: BoxDecoration(
-                              border: Border.all(color: c.ink, width: BrutalMetrics.border),
+                          Positioned(
+                            left: _thumb / 2,
+                            width: usable * _fraction,
+                            child: Container(
+                              height: _track,
+                              color: c.signal,
+                              foregroundDecoration: BoxDecoration(
+                                border: Border.all(color: c.ink, width: BrutalMetrics.border),
+                              ),
                             ),
                           ),
-                        ),
-                        Positioned(
-                          left: usable * _fraction,
-                          child: Container(
-                            width: _thumb,
-                            height: _thumb,
-                            decoration: BoxDecoration(
-                              color: c.accent,
-                              border: Border.all(color: c.line, width: BrutalMetrics.borderHeavy),
+                          Positioned(
+                            left: usable * _fraction,
+                            child: Container(
+                              width: _thumb,
+                              height: _thumb,
+                              decoration: BoxDecoration(
+                                color: c.accent,
+                                border: Border.all(color: c.line, width: BrutalMetrics.borderHeavy),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
-        ),
+              );
+            },
+          ),
         if (ticks.isNotEmpty) ...<Widget>[
           const SizedBox(height: BrutalMetrics.gapS),
           Wrap(

@@ -11,9 +11,12 @@ import 'package:poker_credits/theme/tokens.dart';
 /// panel's proportions (a short band on a phone, a tall column beside the title on a tablet, a
 /// wide window), the table keeps the same proportions and the felt fills the rest.
 class FeltPanel extends StatelessWidget {
-  const FeltPanel({super.key, this.height});
+  const FeltPanel({super.key, this.height, this.hideBelow = 0});
 
   final double? height;
+
+  /// Draws nothing when the panel is shorter than this: a sliver of felt is only noise.
+  final double hideBelow;
 
   /// Width over height of the drawing.
   static const double aspect = 1.7;
@@ -36,12 +39,10 @@ class FeltPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
     return ExcludeSemantics(
-      child: Container(
+      child: SizedBox(
         height: height,
-        color: c.felt,
         child: CustomPaint(
-          painter: _TablePainter(line: c.onFelt, chip: c.chip, accent: c.accent, onAccent: c.onAccent),
-          child: const SizedBox.expand(),
+          painter: _TablePainter(felt: c.felt, line: c.onFelt, chip: c.chip, accent: c.accent, onAccent: c.onAccent, hideBelow: hideBelow),
         ),
       ),
     );
@@ -49,8 +50,10 @@ class FeltPanel extends StatelessWidget {
 }
 
 class _TablePainter extends CustomPainter {
-  _TablePainter({required this.line, required this.chip, required this.accent, required this.onAccent});
+  _TablePainter({required this.felt, required this.line, required this.chip, required this.accent, required this.onAccent, required this.hideBelow});
 
+  final Color felt;
+  final double hideBelow;
   final Color line;
   final Color chip;
   final Color accent;
@@ -58,6 +61,8 @@ class _TablePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.height < hideBelow) return;
+    canvas.drawRect(Offset.zero & size, Paint()..color = felt);
     final scene = FeltPanel.sceneRect(size);
     if (scene.isEmpty) return;
     final unit = scene.height / 100; // everything below is in 1/100 of the drawing's height
@@ -120,5 +125,10 @@ class _TablePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_TablePainter oldDelegate) =>
-      oldDelegate.line != line || oldDelegate.chip != chip || oldDelegate.accent != accent || oldDelegate.onAccent != onAccent;
+      oldDelegate.felt != felt ||
+      oldDelegate.hideBelow != hideBelow ||
+      oldDelegate.line != line ||
+      oldDelegate.chip != chip ||
+      oldDelegate.accent != accent ||
+      oldDelegate.onAccent != onAccent;
 }
