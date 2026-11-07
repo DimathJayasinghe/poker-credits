@@ -134,7 +134,7 @@ Join: top bar title, then stacked cells: code, name (prefilled from Settings), f
 Cells separated by hairlines: a four-step strip, ten ranked hand cards (rank number, name in Anton, one plain line, example in mono such as `A K Q J 10 same suit`), betting words as a two-column grid, "If it drops" with the reconnect story.
 
 ### Settings
-Rows grouped by a caption cell:
+After the sections below, ABOUT also holds a Terms and safety row and a Support the developer row (section 9). Rows grouped by a caption cell:
 - **APPEARANCE**: Theme (System / Light / Dark), Paper texture (switch).
 - **TABLE**: Sound, Vibration, Keep the screen on during a game (switches).
 - **YOU**: Default name (used to prefill Join).
@@ -145,7 +145,7 @@ Settings persist in a small JSON file (`path_provider`, behind a platform seam; 
 ## 6. Accessibility
 - Contrast: body 7:1 or better; `muted` 4.5:1 or better; checked by `test/theme/contrast_test.dart` for both themes.
 - Semantics label on every actionable cell; a 3 px `accent`-contrast focus outline with offset for keyboard use.
-- Text scales to 3.0 without clipping or overflow on Home, Join, Host, Player and Settings, and to 2.0 on the host Table (a shared display with fixed geometry; it clamps there on purpose). The Player screen scrolls as a whole at huge sizes so the action buttons stay reachable. Widget tests (`test/pages/text_scale_test.dart`, `home_page_test.dart`) fail on any overflow at 1.0, 2.0 and 3.0 on 320x640, 390x844 and 1280x800.
+- Text scales to 3.0 without clipping or overflow on Home, Join, Host, Player, Settings, Guide, Support, the splash, terms, intro and the tours, and to 2.0 on the host Table (a shared display with fixed geometry; it clamps there on purpose). The Player screen scrolls as a whole at huge sizes so the action buttons stay reachable. Widget tests (`test/pages/text_scale_test.dart`, `home_page_test.dart`) fail on any overflow at 1.0, 2.0 and 3.0 on 320x640, 390x844 and 1280x800.
 - Colour never carries meaning alone (section 2). Reduced motion honoured. Texture can be switched off.
 
 ## 7. Implementation rules
@@ -170,3 +170,15 @@ Spec and mockups: `docs/superpowers/specs/2026-11-07-virtual-cards-design.md` se
 - **Motion:** the flip is an X-scale squash through `BrutalTheme.duration`; reduced motion makes it instant.
 - **Not built yet:** a deal slide, haptics on deal and flip, tapping a showdown row to see the hand large on the board, and a winner lift on the Table. The raise sheet can cover the dock while it is open.
 - **Tests:** `cards_test` (widgets), `cards_gallery_golden_test` (four galleries: both themes, two and four colours), `player_cards_test`, `table_cards_test`, `runout_pacer_test`, goldens for the Player and Table in virtual rooms, and the text-scale sweep (1.0, 2.0, 3.0 on 320x640, 390x844, 1280x800) with a full board and a showdown.
+
+## 9. First run, tours and support (ADR-017)
+
+- **Launch:** `LaunchGate` (splash, terms, intro, Home). The splash is a flush of five cards turning over with a filling bar, tap to skip; the whole picture scales down on a short screen and its caption wraps. Reduced motion shows the cards face up at once.
+- **Terms** (`TermsPage`): five sections, an agree switch, ACCEPT disabled until ticked, DECLINE closes the app. The read-only version opens from Settings.
+- **Intro** (`IntroPage`): Take the app tour, Learn poker, or Skip. Never shown again once chosen.
+- **Tours** (`WalkthroughPage`): progress cells at the top, one illustrated step per page, Back / Next / Done below, a Skip cell always present. Swipe, arrow keys and Escape work.
+- **Support** (`SupportPage`): headline, a short text from the developer, three large link rows (Star, Follow, Report a bug; the first is the accent cell) and the repository QR. Reached from Settings (About) and the bottom of the Guide.
+- **Guide additions:** a Tours block (Learn poker, Replay the app tour), sections Cards in the app and Play safe, the jump chips Cards and Safety.
+- **Seat plates** have one fixed height (`FeltLayout.plateHeightFor`); their content shrinks to fit rather than growing the plate. **Top bar cells** (`TopBarStat`) use a fixed value slot and a label whose text scale is clamped at 1.4, so ROOM, HAND and PHASE share their lines.
+- **Tests:** `screens_layout_test` sweeps Home, Settings, Guide, Support and the first-run screens over five sizes (320x568 to 1920x1080), three text sizes and both themes, and checks every pressable cell is at least 44 px; `launch_golden_test`, `walkthrough_golden_test`, `seat_plate_test`, `top_bar_test`.
+

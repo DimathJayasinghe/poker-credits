@@ -239,3 +239,21 @@ Full detail in `docs/RESILIENCE_AND_CRASH_HANDLING.md`. Summary of what is copie
 **Why:** keeps the single source of truth in Rust, keeps replay exact (randomness is data), makes the cloud move a deployment change, and leaves physical rooms untouched.
 
 **Consequences:** new engine modules and a larger test surface (exhaustive hand-rank counts, no-leak oracle, replay with forced showdowns); card widgets and a stand-alone Player screen in the app; in host (LAN) mode the host's device is trusted with the deck (documented limit, gone in cloud mode). Open calls for the owner are listed in section 14 of the spec.
+
+## ADR-017: First-run flow, tours, support screen
+
+**Status:** Accepted 2026-11-07 (owner request; implemented on `feature/engine-cards`, awaiting merge).
+
+**Context:** the app opened straight onto Home. The owner wanted a loading screen, a first-use notice (for example, play on a Wi-Fi you trust), a skippable demo of the app, a lesson for people new to poker, and a screen asking for a GitHub star and follow.
+
+**Decision:**
+1. `LaunchGate` is the app's home. It shows the splash (a flush of five cards turning over, a filling bar, tap to skip; half as long for a returning player), then the terms until `AppSettings.acceptedTerms >= currentTermsVersion`, then the intro until `introDone`, then Home. Raising `currentTermsVersion` asks everybody again. Nothing before Home blocks on the network or on a slow disk: settings are loaded before the first frame.
+2. Terms are plain-language, five short sections (a Wi-Fi you trust, the host holds the cards in virtual mode, just for fun, data stays with you, no warranty), in `util/terms_content.dart`. ACCEPT stays disabled until the agree switch is on; declining closes the app. They stay readable in Settings. The text is **not legal advice** and should be reviewed before a store release.
+3. Tours reuse one engine, `WalkthroughPage` (PageView, progress cells, Back/Next/Done, Skip on every step, arrow keys and Escape; the system back counts as skip). Steps are data (`model/walkthrough.dart`), illustrated by the app's own widgets (`widget/walkthrough/step_art.dart`), so an illustration cannot drift from the real UI. Two tours: the app tour (7 steps) and Learn poker (10 steps, taught with the real card widgets and the Guide's hand list; the Dart app still holds no rules). The intro offers both or skip; both are replayable from the Guide.
+4. The Support screen shows the repository and profile links, an issues link and a QR of the repository. Links open through an `ExternalLinks` seam (`platform/external_links.dart`). The shipped implementation copies the address to the clipboard and says so; it never opens anything itself. Only `https` URLs are accepted.
+5. All of the above lives in `app/lib/pages`, `util` and `widget/walkthrough`; strings in `strings.dart` or `util/*_content.dart`; colours from tokens.
+
+**Why:** a first-run gate is the one place to say what the app cannot protect against (an untrusted network); tours as data keep copy editable and tests simple; the seam keeps the web build and tests free of platform code.
+
+**Consequences:** `url_launcher` is **not** an approved dependency (`docs/AGENT_CODING_GUIDE.md` section 6), so a tap copies a link instead of opening it. Adding it is one more `ExternalLinks` implementation and needs the owner's approval. The first run adds one screen of friction by design; a returning player sees only a half-length splash.
+

@@ -1,15 +1,34 @@
 # Project Status & Handoff
 
+Last updated: 2026-11-07 (branch `feature/engine-cards`, committed, not merged, not pushed). The older text below is from 2026-11-04 on `feature/hardening`; the Phase 0/1 snapshot is older still. **Start with "Resume here"**.
+
+## Polish pass, first run and tours (ADR-017): 2026-11-07, version 1.2.0
+Owner bug reports and requests, all committed one change at a time on `feature/engine-cards`: top bar cells (ROOM / HAND / PHASE) share their lines; every seat plate has the same size; a splash screen; first-run terms (trusted Wi-Fi and four more points) with a Settings row to re-read them; an intro that offers an app tour (7 steps), a Learn poker lesson (10 steps) or skip, both replayable from the Guide; a Support the developer screen (repository, profile, issues, QR); the Guide covers cards in the app, safety, tours and support; an audit that found and fixed the splash overflowing on a short screen and at big text, and the undo note under the host controls being left half cut off on a tablet. Spec of the screens: `docs/UI_DESIGN.md` section 9; decision: ADR-017.
+
+**Gates (2026-11-07, all green):** `fvm flutter analyze` clean, 646 app tests, 70 protocol tests, `dart format`, `tool/check_web_safe.sh` (pre-commit hook on every commit). Rust files did not change after the 1.1.0 gate (only the version in `Cargo.toml` and `Cargo.lock`), so the Rust gate is the one listed under "Virtual cards" below.
+
+**Audit result.** `test/pages/screens_layout_test.dart` sweeps Home, Settings, Guide, Support and the splash, terms and intro at 320x568, 390x844, 844x390, 1280x800 and 1920x1080, text sizes 1.0, 2.0 and 3.0, light and dark (150 cases), and checks every pressable cell outside a game is at least 44 px. The game screens keep their own sweeps (`text_scale_test`, `table_layout_test`).
+
+**Not verified / open:**
+- The new screens were checked in widget tests and goldens only. The emulator on the machine still has the 1.1.0 APK: rebuild and reinstall to see the splash, terms, intro, tours and Support on a device.
+- **Support links copy the address, they do not open it:** `url_launcher` is not on the approved list. Needs the owner's yes; the change is one more `ExternalLinks` implementation.
+- **The terms text is plain language, not legal advice.** Have it reviewed before a store release.
+- On a 1280x800 tablet the seated host's table scrolls a little (cards dock + oval + host controls need about 830 px); the last line of the undo note sits under the fold until scrolled. Reachable, not clipped.
+- The raise sheet covers the lower part of the screen while open; the cards stay visible above it on a phone (behind the dimmed backdrop). Left as is.
+- Everything from the Virtual cards "Not verified" list below still stands (real LAN, release build, desktop builds, haptics).
+
+# Project Status & Handoff
+
 Last updated: 2026-11-07 (branch `feature/engine-cards`: virtual cards, uncommitted). The older text below is from 2026-11-04 on `feature/hardening`; the Phase 0/1 snapshot is older still. **Start with "Resume here"**.
 
-## Virtual cards (ADR-016): built 2026-11-07, on `feature/engine-cards`, uncommitted, not merged
+## Virtual cards (ADR-016): built 2026-11-07, on `feature/engine-cards`, committed, not merged
 The app can now shuffle and deal. A host picks "Cards in the app" on the host form (default stays real cards); friends on the same Wi-Fi join as usual. Each player's two cards arrive in a private `HOLE_CARDS` message and sit face down until tapped; the board, the opponents' backs, the showdown (every contender's cards, hand names, who won each pot) and the payout come from the server, which runs the showdown itself. Design: `docs/superpowers/specs/2026-11-07-virtual-cards-design.md`; plan: `docs/superpowers/plans/2026-11-07-virtual-cards-plan.md`. The present-tense docs are GAME_LOGIC 10, API 9, ARCHITECTURE 10, UI_DESIGN 8, RESILIENCE 6, SECURITY 6.5.1, AGENT_CODING_GUIDE Phase 8 and ADR-016 (accepted). Version bumped to 1.1.0 (`app/pubspec.yaml`, workspace `Cargo.toml`).
 
 **Gates at the end of the work (all green):** `cargo fmt --check`, `cargo clippy --workspace --all-targets -D warnings`, `cargo test --workspace` (PROPTEST_CASES=256; 1000 earlier) and `cargo test --release --workspace`, `bash tool/check_no_state_logging.sh`, `bash tool/check_web_safe.sh`, `dart format`, `fvm flutter analyze` and 426 app tests, 70 protocol tests, bridge Dart tests.
 
 **Verified on the Android emulator (Medium_Phone, debug APK, 2026-11-07):** host a room with CARDS IN THE APP (the loopback RESUME passes the `UPDATE_REQUIRED` gate), a scripted bot joins with `features: ["VIRTUAL_CARDS"]`, START HAND deals private cards (backs until tapped, then faces), the flop, turn and river appear, and showdown reveals both hands on the seat plates with a WINS tag and the pot line (correct winner). **Not verified:** a real device or second phone on a real LAN, a release APK build, the Linux and Windows desktop builds, haptics, and the hold-to-peek gesture on a shared screen (covered by widget tests only).
 
-**Known gaps:** no deal slide, no haptics on deal or flip, no tap-a-row-to-enlarge in the showdown list, no winner lift on the Table; the raise sheet can cover the cards while it is open; the Join page's found-by-code card does not say the room is virtual (the nearby list does). In host (LAN) mode the host's device holds the deck (documented limit). Nothing is committed: commit when the owner asks, Conventional Commits, no AI attribution.
+**Known gaps:** no deal slide, no haptics on deal or flip, no tap-a-row-to-enlarge in the showdown list, no winner lift on the Table; the raise sheet can cover the cards while it is open; the Join page's found-by-code card does not say the room is virtual (the nearby list does). In host (LAN) mode the host's device holds the deck (documented limit). Commits: Conventional Commits, no AI attribution.
 
 ## Resume here (2026-11-04)
 **Release state (2026-11-04):** `main` was the old TypeScript scaffold (2 commits). It was fast-forwarded to `feature/hardening` at the owner's request (no force push; the old commits stay in history). PR #1 was marked merged by that push and #2 to #7 were closed (their commits are in `main`). GitHub Actions now runs: **CI** (Rust fmt/clippy/test, cargo deny, Dart format/analyze/tests, web build) and **Desktop builds** (Windows and Linux bundles) are green. First pre-release `v0.1.0-beta.1` ships a Windows zip, a Linux tar.gz and an Android APK. These are **unsigned** (Android uses the debug key), untested on real phones and on Windows, and iOS is not built (needs a Mac runner, an Apple Developer account and signing).
