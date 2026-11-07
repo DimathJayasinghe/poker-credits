@@ -133,7 +133,7 @@ impl Default for Timings {
             bot_think_scale: 1.0,
             bot_next_hand_ms: 3_500,
             bot_showdown_ms: 3_000,
-            bot_look_ms: 1_400,
+            bot_look_ms: 1_100,
             bot_runout_step_ms: 1_600,
         }
     }

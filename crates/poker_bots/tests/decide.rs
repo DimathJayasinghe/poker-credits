@@ -198,7 +198,7 @@ fn think_time_ranges() {
             for closeness in [0.0, 0.5, 1.0] {
                 for _ in 0..200 {
                     let ms = think_time(&view, action, closeness, &p, &mut rng);
-                    assert!((700..=11_000).contains(&ms), "{action:?} {owed} {ms}");
+                    assert!((350..=10_000).contains(&ms), "{action:?} {owed} {ms}");
                 }
             }
         }
@@ -226,7 +226,7 @@ fn think_time_follows_the_spot() {
         close_call < all_in,
         "a big decision takes the longest: {close_call} {all_in}"
     );
-    assert!(check > 900.0 && all_in > 4_000.0, "{check} {all_in}");
+    assert!(check > 500.0 && all_in > 2_500.0, "{check} {all_in}");
 }
 
 #[test]
@@ -236,7 +236,7 @@ fn a_slow_player_takes_longer_than_a_quick_one() {
     let quick = average(&view, PlayerAction::Call, 0.5, &p);
     p.think_speed = 0.0;
     let slow = average(&view, PlayerAction::Call, 0.5, &p);
-    assert!(slow > quick * 1.3, "{quick} {slow}");
+    assert!(slow > quick * 1.8, "{quick} {slow}");
 }
 
 #[test]
@@ -377,4 +377,36 @@ fn decide_cost_budget() {
         "hard postflop median decision: {median:?} over {} decisions",
         times.len()
     );
+}
+
+#[test]
+fn a_table_has_no_single_rhythm() {
+    // Across every kind of player and spot, most moves are quick, a few are slow, and the
+    // spread between a quick player and a slow one is wide: nobody waits long for most moves.
+    let (mut view, mut p) = a_view();
+    view.to_call = chips(40);
+    let mut rng = BotRng::from_seed(21);
+    let mut times: Vec<u32> = Vec::new();
+    for speed in [0.0_f32, 0.25, 0.5, 0.75, 1.0] {
+        p.think_speed = speed;
+        for action in [PlayerAction::Fold, PlayerAction::Call, PlayerAction::Check] {
+            for closeness in [0.0, 0.4, 0.8] {
+                for _ in 0..80 {
+                    times.push(think_time(&view, action, closeness, &p, &mut rng));
+                }
+            }
+        }
+    }
+    times.sort_unstable();
+    let at = |q: usize| times[times.len() * q / 100];
+    assert!(at(25) < 1_200, "a quarter of the moves take {} ms", at(25));
+    assert!(at(50) < 2_200, "half of the moves take {} ms", at(50));
+    assert!(at(90) > 3_000, "the slow tail takes {} ms", at(90));
+    let mut quick = 0.0_f32;
+    let mut slow = 0.0_f32;
+    p.think_speed = 1.0;
+    quick += average(&view, PlayerAction::Call, 0.5, &p);
+    p.think_speed = 0.0;
+    slow += average(&view, PlayerAction::Call, 0.5, &p);
+    assert!(slow > quick * 2.5, "tempos differ: {quick} vs {slow}");
 }

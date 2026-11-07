@@ -510,14 +510,16 @@ pub fn legalize(wanted: PlayerAction, view: &BotView) -> PlayerAction {
 }
 
 /// The shortest thinking time of any decision, and the longest.
-pub const THINK_MIN_MS: u32 = 700;
+pub const THINK_MIN_MS: u32 = 350;
 /// See [`THINK_MIN_MS`].
-pub const THINK_MAX_MS: u32 = 11_000;
+pub const THINK_MAX_MS: u32 = 10_000;
 
-/// Thinking time, so a bot seems to weigh its spot like a person: a check or an easy fold is
-/// quick, a call or a bet takes a moment, a close decision takes longer, and a big bet against
-/// it (or an all-in) sometimes makes it tank for several seconds. The river gets a little longer,
-/// the bot's own speed shifts everything, and an occasional snap decision breaks the rhythm.
+/// Thinking time, so a bot seems to weigh its spot like a person without making anyone wait: a
+/// routine move (an easy fold, a check, a clear call) is quick, a call or a bet takes a moment, a
+/// close decision takes longer, and a big bet against it (or an all-in) sometimes makes it tank
+/// for a few seconds. Players differ in tempo (the quickest act in a third of the time of the
+/// slowest), the same player varies from move to move, and some decisions are snap decisions, so
+/// a table has no single rhythm.
 #[must_use]
 pub fn think_time(
     view: &BotView,
@@ -533,33 +535,39 @@ pub fn think_time(
     let preflop = view.board.is_empty();
     // The base: what the action itself asks of a person.
     let (low, high) = match action {
-        PlayerAction::Fold if preflop && pressure < 0.15 => (700.0, 1_500.0),
-        PlayerAction::Fold => (1_400.0, 3_000.0),
-        PlayerAction::Check => (900.0, 2_000.0),
-        PlayerAction::Call => (1_500.0, 3_200.0),
-        PlayerAction::Raise { .. } => (1_800.0, 3_800.0),
-        PlayerAction::AllIn => (2_200.0, 4_500.0),
+        PlayerAction::Fold if preflop && pressure < 0.15 => (400.0, 1_100.0),
+        PlayerAction::Fold | PlayerAction::Call => (900.0, 2_400.0),
+        PlayerAction::Check => (500.0, 1_500.0),
+        PlayerAction::Raise { .. } => (1_200.0, 3_000.0),
+        PlayerAction::AllIn => (1_800.0, 3_800.0),
     };
     let mut ms = low + (high - low) * rng.unit();
     // A close decision is a harder one.
-    ms += closeness * (1_500.0 + 3_000.0 * rng.unit());
+    ms += closeness * (1_000.0 + 2_500.0 * rng.unit());
+    // A routine spot (nothing close, little at stake) is acted on quickly.
+    if closeness < 0.3 && pressure < 0.15 {
+        ms *= 0.65;
+    }
     // A lot of the stack on the line: now and then the bot really thinks it over.
-    if pressure >= 0.3 || matches!(action, PlayerAction::AllIn) {
-        let weight = 0.30 + 0.30 * pressure;
-        if rng.chance(weight) {
-            ms += 3_000.0 + 5_000.0 * rng.unit();
-        }
+    if (pressure >= 0.3 || matches!(action, PlayerAction::AllIn))
+        && rng.chance(0.20 + 0.25 * pressure)
+    {
+        ms += 2_500.0 + 3_500.0 * rng.unit();
     }
     if view.board.len() >= 5 {
-        ms *= 1.2;
+        ms *= 1.15;
     }
-    // Quick players are quick, slow ones slow (think_speed is 1.0 for the quickest).
-    ms *= 0.75 + (1.0 - p.think_speed.clamp(0.0, 1.0)) * 0.6;
+    // Tempo: think_speed is 1.0 for the quickest player (x0.45) and 0.0 for the slowest (x1.55).
+    ms *= 0.45 + (1.0 - p.think_speed.clamp(0.0, 1.0)) * 1.1;
+    // The same player is not the same twice: most moves are a little quicker than the average
+    // and a few much slower.
+    let u = rng.unit();
+    ms *= 0.55 + 1.1 * u * u;
     // Sometimes it just acts.
-    if rng.chance(0.08) {
-        ms *= 0.5;
+    if rng.chance(0.12) {
+        ms *= 0.45;
     }
-    to_u32(ms.clamp(700.0, 11_000.0))
+    to_u32(ms.clamp(350.0, 10_000.0))
 }
 
 fn to_u32(value: f32) -> u32 {

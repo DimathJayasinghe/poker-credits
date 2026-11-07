@@ -266,7 +266,7 @@ fn since(start: tokio::time::Instant) -> u64 {
 #[tokio::test(start_paused = true)]
 async fn bots_take_a_human_amount_of_time() {
     // Default pacing: after a hand is dealt no bot acts for at least the look time, and a bot's
-    // answer to the human takes at least the shortest thinking time.
+    // answer to the human takes at least the shortest thinking time (350 ms, read in 100 ms steps).
     let timings = Timings::default();
     let room = room(4, Skill::Normal, 6, &timings, None);
     let mut human = attach(&room, 1).await;
@@ -335,7 +335,7 @@ async fn bots_take_a_human_amount_of_time() {
         "no bot ever answered the human"
     );
     assert!(
-        gaps_after_human.iter().all(|gap| *gap >= 700),
+        gaps_after_human.iter().all(|gap| *gap >= 250),
         "a bot answered too fast: {gaps_after_human:?}"
     );
 }
