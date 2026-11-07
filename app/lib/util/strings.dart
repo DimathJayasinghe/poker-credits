@@ -5,6 +5,11 @@ abstract final class Strings {
   static const String tagline = 'Chips and pots, with real or in-app cards';
   static const String initErrorTitle = 'Startup failed';
   static const String initErrorHint = 'Copy this report when asking for help.';
+  static const String initErrorHintRelease =
+      'Something went wrong while starting. Quote this ID when asking for help. The technical details stay on this device unless you copy them.';
+  static const String initErrorIdHeader = 'Error ID';
+  static const String initErrorIdLabel = 'Error ID';
+  static const String copyTechnical = 'Copy technical details';
   static const String copy = 'Copy report';
   static const String copied = 'Copied';
   static const String hostGame = 'Host a game';
