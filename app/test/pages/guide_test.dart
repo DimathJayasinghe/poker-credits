@@ -127,6 +127,17 @@ void main() {
       expect(find.byType(WalkthroughPage), findsOneWidget);
     });
 
+    testWidgets('the jump cells are compact and share rows instead of stacking full width', (tester) async {
+      await _openGuideTab(tester, size: const Size(390, 844));
+      final tops = <double>{};
+      for (final label in <String>['HANDS', 'A HAND', 'CARDS', 'WORDS', 'RULES', 'DROPS', 'SAFETY']) {
+        final cell = find.ancestor(of: find.text(label), matching: find.byType(AnimatedContainer)).first;
+        expect(tester.getSize(cell).width, lessThan(200), reason: '$label is a compact cell');
+        tops.add(tester.getTopLeft(cell).dy);
+      }
+      expect(tops.length, lessThanOrEqualTo(3), reason: 'seven cells fit in three rows or fewer on a phone: $tops');
+    });
+
     testWidgets('a jump cell scrolls to its section', (tester) async {
       await _openGuideTab(tester);
       expect(find.text('IF THE CONNECTION DROPS').hitTestable(), findsNothing, reason: 'far below the fold at first');

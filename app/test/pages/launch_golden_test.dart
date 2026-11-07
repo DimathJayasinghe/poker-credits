@@ -44,6 +44,21 @@ void main() {
         await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/terms_$name.png'));
       });
 
+      for (final tab in <String>[Strings.navPlay, Strings.navGuide, Strings.navSettings]) {
+        testWidgets('${tab.toLowerCase()} tab, $name', (tester) async {
+          final harness = TestHarness();
+          harness.settings.value = harness.settings.value.copyWith(theme: dark ? ThemeChoice.dark : ThemeChoice.light);
+          await _launch(tester, harness, entry.value);
+          await tester.pumpAndSettle();
+          if (tab != Strings.navPlay) {
+            await tester.tap(find.text(tab.toUpperCase()).first);
+            await tester.pumpAndSettle();
+          }
+          expect(tester.takeException(), isNull);
+          await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/tab_${tab.toLowerCase()}_$name.png'));
+        });
+      }
+
       testWidgets('support, $name', (tester) async {
         final harness = TestHarness();
         harness.settings.value = harness.settings.value.copyWith(theme: dark ? ThemeChoice.dark : ThemeChoice.light);

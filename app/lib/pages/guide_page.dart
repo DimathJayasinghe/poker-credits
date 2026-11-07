@@ -180,21 +180,26 @@ class _Jump extends StatelessWidget {
           duration: duration,
           constraints: const BoxConstraints(minHeight: BrutalMetrics.tap),
           padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
-          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: pressed ? c.ink : c.surface,
             border: Border.all(color: c.line, width: BrutalMetrics.border),
           ),
-          child: AnimatedDefaultTextStyle(
-            duration: duration,
-            style: TextStyle(
-              fontFamily: BrutalFonts.mono,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              letterSpacing: 1.5,
-              color: pressed ? c.paper : c.ink,
+          // Centred but only as wide as the label: an `alignment` would stretch the cell to the
+          // full width of its row and stack the cells one under another.
+          child: Center(
+            widthFactor: 1,
+            heightFactor: 1,
+            child: AnimatedDefaultTextStyle(
+              duration: duration,
+              style: TextStyle(
+                fontFamily: BrutalFonts.mono,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                letterSpacing: 1.5,
+                color: pressed ? c.paper : c.ink,
+              ),
+              child: Text(label.toUpperCase()),
             ),
-            child: Text(label.toUpperCase()),
           ),
         ),
       ),
