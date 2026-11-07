@@ -37,6 +37,9 @@ final appVersionProvider = Provider<Future<String> Function()>(
   },
 );
 
+/// How long the loading screen stays up for a first launch; tests set it to zero.
+final splashDurationProvider = Provider<Duration>((ref) => const Duration(milliseconds: 1600));
+
 /// Local clock; overridden in tests.
 final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 

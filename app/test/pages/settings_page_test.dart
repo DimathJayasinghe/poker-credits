@@ -76,7 +76,7 @@ void main() {
 
   testWidgets('a saved theme is applied on the first frame', (tester) async {
     final harness = TestHarness();
-    harness.settings.value = const AppSettings(theme: ThemeChoice.dark);
+    harness.settings.value = harness.settings.value.copyWith(theme: ThemeChoice.dark);
     await tester.pumpWidget(harness.scope(const PokerCreditsApp()));
     expect(_themeMode(tester), ThemeMode.dark);
   });

@@ -1,0 +1,147 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:poker_credits/main.dart';
+import 'package:poker_credits/model/app_settings.dart';
+import 'package:poker_credits/pages/home_page.dart';
+import 'package:poker_credits/pages/splash_page.dart';
+import 'package:poker_credits/pages/terms_page.dart';
+import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/util/terms_content.dart';
+import 'package:poker_credits/widget/brutal/brutal_switch_row.dart';
+
+import '../support/fakes.dart';
+import '../support/test_app.dart';
+
+Future<void> _launch(WidgetTester tester, TestHarness harness, {Size size = const Size(390, 844)}) async {
+  tester.view
+    ..physicalSize = size
+    ..devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(harness.scope(const PokerCreditsApp()));
+  await tester.pump();
+}
+
+void main() {
+  setUpAll(loadBrutalFonts);
+
+  group('splash', () {
+    testWidgets('shows first, then gives way to the terms on a first run', (tester) async {
+      final harness = TestHarness(firstRun: true, splash: const Duration(seconds: 2));
+      await _launch(tester, harness);
+      expect(find.byType(SplashView), findsOneWidget);
+      expect(find.byType(TermsPage), findsNothing);
+      await tester.pump(const Duration(milliseconds: 1900));
+      expect(find.byType(SplashView), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+      expect(find.byType(SplashView), findsNothing);
+      expect(find.byType(TermsPage), findsOneWidget);
+    });
+
+    testWidgets('a tap skips the wait', (tester) async {
+      final harness = TestHarness(firstRun: true, splash: const Duration(seconds: 30));
+      await _launch(tester, harness);
+      await tester.tap(find.byType(SplashView));
+      await tester.pumpAndSettle();
+      expect(find.byType(TermsPage), findsOneWidget);
+    });
+
+    testWidgets('a returning player waits only half as long and lands on Home', (tester) async {
+      final harness = TestHarness(splash: const Duration(seconds: 2));
+      await _launch(tester, harness);
+      expect(find.byType(SplashView), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 1100));
+      await tester.pumpAndSettle();
+      expect(find.byType(HomePage), findsOneWidget);
+      expect(find.byType(TermsPage), findsNothing);
+    });
+
+    testWidgets('with reduced motion it still finishes and shows every card face up at once', (tester) async {
+      final harness = TestHarness(firstRun: true, splash: const Duration(seconds: 2));
+      tester.view
+        ..physicalSize = const Size(390, 844)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+      await tester.pumpWidget(harness.scope(const PokerCreditsApp()));
+      await tester.pump();
+      expect(find.byType(SplashView), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(find.byType(TermsPage), findsOneWidget);
+    });
+  });
+
+  group('terms', () {
+    testWidgets('ACCEPT stays off until the box is ticked, then saves the version and opens Home', (tester) async {
+      final harness = TestHarness(firstRun: true);
+      await _launch(tester, harness);
+      await tester.pumpAndSettle();
+      expect(find.byType(TermsPage), findsOneWidget);
+      // The trusted Wi-Fi advice is on the page.
+      expect(find.text(termsSections.first.title.toUpperCase()), findsOneWidget);
+      expect(termsSections.first.title, contains('Wi-Fi you trust'));
+
+      final acceptButton = find.text(Strings.termsAccept.toUpperCase());
+      await tester.ensureVisible(acceptButton);
+      await tester.tap(acceptButton);
+      await tester.pumpAndSettle();
+      expect(find.byType(TermsPage), findsOneWidget, reason: 'nothing happens until the box is ticked');
+      expect(harness.settings.value.termsAccepted, isFalse);
+
+      await tester.ensureVisible(find.byType(BrutalSwitchRow));
+      await tester.tap(find.byType(BrutalSwitchRow));
+      await tester.pump();
+      await tester.tap(acceptButton);
+      await tester.pumpAndSettle();
+      expect(harness.settings.value.acceptedTerms, currentTermsVersion);
+      expect(find.byType(TermsPage), findsNothing);
+      expect(find.byType(HomePage), findsOneWidget);
+    });
+
+    testWidgets('declining leaves the app and saves nothing', (tester) async {
+      final harness = TestHarness(firstRun: true);
+      final calls = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        calls.add(call.method);
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+      await _launch(tester, harness);
+      await tester.pumpAndSettle();
+      final decline = find.text(Strings.termsDecline.toUpperCase());
+      await tester.ensureVisible(decline);
+      await tester.tap(decline);
+      await tester.pump();
+      expect(calls, contains('SystemNavigator.pop'));
+      expect(harness.settings.value.termsAccepted, isFalse);
+    });
+
+    testWidgets('a notice accepted for an older version is asked for again', (tester) async {
+      final harness = TestHarness(firstRun: true);
+      harness.settings.value = const AppSettings(acceptedTerms: currentTermsVersion - 1, introDone: true);
+      await _launch(tester, harness);
+      await tester.pumpAndSettle();
+      expect(find.byType(TermsPage), findsOneWidget);
+    });
+
+    testWidgets('read from Settings it has no accept controls and goes back', (tester) async {
+      final harness = TestHarness();
+      await _launch(tester, harness);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('SETTINGS'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text(Strings.termsRow.toUpperCase()), 200, scrollable: find.byType(Scrollable).first);
+      await tester.tap(find.text(Strings.termsRow.toUpperCase()));
+      await tester.pumpAndSettle();
+      expect(find.byType(TermsPage), findsOneWidget);
+      expect(find.byType(BrutalSwitchRow), findsNothing);
+      expect(find.text(Strings.termsAccept.toUpperCase()), findsNothing);
+      await tester.tap(find.bySemanticsLabel('Back'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TermsPage), findsNothing);
+    });
+  });
+}

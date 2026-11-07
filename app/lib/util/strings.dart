@@ -344,4 +344,17 @@ abstract final class Strings {
   static const String supportThanks = 'Thank you for playing.';
   static const String linkCopied = 'Link copied. Paste it into your browser.';
   static const String linkFailed = 'Could not open or copy the link. Type the address shown below.';
+
+  // Splash and terms
+  static const String splashLoading = 'Dealing';
+  static const String splashSkip = 'Tap to skip';
+  static const String termsTitle = 'Before you play';
+  static const String termsIntro = 'A few things to know before the first hand. It takes a minute.';
+  static const String termsAgree = 'I understand and agree';
+  static const String termsAgreeCaption = 'Required to use the app';
+  static const String termsAccept = 'Accept and continue';
+  static const String termsDecline = 'No thanks, close the app';
+  static const String termsRow = 'Terms and safety';
+  static const String termsRowCaption = 'Play fair, play safe, trusted Wi-Fi';
+  static const String termsVersionLine = 'Version';
 }

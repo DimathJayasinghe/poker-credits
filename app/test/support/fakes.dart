@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/net/socket_client.dart';
 import 'package:poker_credits/net/transport.dart';
@@ -154,9 +155,17 @@ class FakeHostServer implements HostServer {
 
 /// Everything a page test needs: fakes wired through provider overrides.
 class TestHarness {
-  TestHarness({FakeHostServer? host, TokenStore? tokens, this.addresses = const <String>['192.168.1.5']})
-    : host = host ?? FakeHostServer(),
-      tokens = tokens ?? MemoryTokenStore();
+  /// [firstRun] starts with nothing accepted, like a fresh install. By default the player is past
+  /// the terms and the intro, and the splash screen does not wait.
+  TestHarness({
+    FakeHostServer? host,
+    TokenStore? tokens,
+    this.addresses = const <String>['192.168.1.5'],
+    bool firstRun = false,
+    this.splash = Duration.zero,
+  }) : host = host ?? FakeHostServer(),
+       tokens = tokens ?? MemoryTokenStore(),
+       settings = MemorySettingsStore(firstRun ? AppSettings.defaults : const AppSettings(acceptedTerms: currentTermsVersion, introDone: true));
 
   final FakeHostServer host;
   final TokenStore tokens;
@@ -167,7 +176,8 @@ class TestHarness {
   final FakeSound sound = FakeSound();
   final FakeHostFinder finder = FakeHostFinder();
   final FakeKeepAlive keepAlive = FakeKeepAlive();
-  final MemorySettingsStore settings = MemorySettingsStore();
+  final MemorySettingsStore settings;
+  final Duration splash;
   DateTime clock = DateTime.fromMillisecondsSinceEpoch(1730000000000);
 
   /// Wraps [child] in a Refena scope with every service replaced by a fake.
@@ -182,6 +192,7 @@ class TestHarness {
       settingsStoreProvider.overrideWithValue(settings),
       appVersionProvider.overrideWithValue(() async => '0.1.0+1'),
       initialSettingsProvider.overrideWithValue(settings.value),
+      splashDurationProvider.overrideWithValue(splash),
       hostKeepAliveProvider.overrideWithValue(keepAlive),
       localAddressesProvider.overrideWithValue(() async => addresses),
       clockProvider.overrideWithValue(() => clock),

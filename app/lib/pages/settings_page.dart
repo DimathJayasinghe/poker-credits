@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/pages/support_page.dart';
+import 'package:poker_credits/pages/terms_page.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_credits/provider/settings_provider.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
@@ -189,6 +190,11 @@ class _SettingsViewState extends State<SettingsView> with Refena {
                     ),
                     _Fact(Strings.versionLabel, _version.isEmpty ? '-' : _version),
                     const _Fact(Strings.protocolLabel, 'v$protocolVersion'),
+                    BrutalRow(
+                      label: Strings.termsRow,
+                      caption: Strings.termsRowCaption,
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TermsPage.readOnly())),
+                    ),
                     BrutalRow(
                       label: Strings.licences,
                       onTap: () => showLicensePage(context: context, applicationName: Strings.appName, applicationVersion: _version),

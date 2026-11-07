@@ -113,7 +113,8 @@ void main() {
   });
 
   testWidgets('the setting "show my cards at once" deals face up, and still hides on a new hand per the setting', (tester) async {
-    final harness = TestHarness()..settings.value = const AppSettings(cardsFaceUp: true);
+    final harness = TestHarness();
+    harness.settings.value = harness.settings.value.copyWith(cardsFaceUp: true);
     await _seated(tester, harness: harness);
     expect(_dockCards(tester), <PokerCard?>[card('As'), card('Kd')]);
     await _close(tester);

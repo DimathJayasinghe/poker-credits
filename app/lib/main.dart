@@ -5,7 +5,7 @@ import 'package:poker_credits/config/error_hooks.dart';
 import 'package:poker_credits/config/init.dart';
 import 'package:poker_credits/config/init_error.dart';
 import 'package:poker_credits/model/app_settings.dart';
-import 'package:poker_credits/pages/home_page.dart';
+import 'package:poker_credits/pages/launch_gate.dart';
 import 'package:poker_credits/platform/settings_store.dart';
 import 'package:poker_credits/provider/settings_provider.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
@@ -47,7 +47,7 @@ class PokerCreditsApp extends StatelessWidget {
         ThemeChoice.dark => ThemeMode.dark,
       },
       builder: (context, child) => BrutalTexture(enabled: settings.texture, child: child ?? const SizedBox.shrink()),
-      home: const HomePage(),
+      home: const LaunchGate(),
     );
   }
 }
