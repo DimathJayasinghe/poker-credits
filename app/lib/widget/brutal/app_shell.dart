@@ -61,6 +61,12 @@ class TopBarStat extends StatelessWidget {
   /// Defaults to ink. Use the accent only for something that needs attention.
   final Color? valueColor;
 
+  /// Height of the value line: the 22 px type at its line height, rounded up.
+  static const double valueHeight = 25;
+
+  /// The most the label's text size grows with the system text size.
+  static const double labelMaxScale = 1.4;
+
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
@@ -80,21 +86,28 @@ class TopBarStat extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              label.toUpperCase(),
-              maxLines: 1,
-              style: TextStyle(
-                fontFamily: BrutalFonts.mono,
-                fontWeight: FontWeight.bold,
-                fontSize: 10,
-                height: 1.2,
-                letterSpacing: 1.4,
-                color: c.muted,
+            // The bar has a fixed height, so the small label stops growing at 1.4x; the value shrinks to fit.
+            MediaQuery.withClampedTextScaling(
+              maxScaleFactor: labelMaxScale,
+              child: Text(
+                label.toUpperCase(),
+                maxLines: 1,
+                style: TextStyle(
+                  fontFamily: BrutalFonts.mono,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                  height: 1.2,
+                  letterSpacing: 1.4,
+                  color: c.muted,
+                ),
               ),
             ),
             const SizedBox(height: 2),
             // A long value (a phase name on a narrow phone) shrinks instead of wrapping or overflowing.
-            Flexible(
+            // The slot has a fixed height: a shrunk value would otherwise make its cell shorter, and the
+            // centred label of that cell would sit lower than the labels of its neighbours.
+            SizedBox(
+              height: valueHeight,
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
