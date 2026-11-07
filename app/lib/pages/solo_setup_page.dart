@@ -52,6 +52,11 @@ class _SoloSetupPageState extends State<SoloSetupPage> with Refena {
     super.dispose();
   }
 
+  /// A message about a field goes away as soon as the field is fixed, not at the next press of Start.
+  void _recheck(String _) {
+    if (_submitted) setState(() {});
+  }
+
   Future<void> _start() async {
     setState(() => _submitted = true);
     final name = _name.text.trim();
@@ -99,6 +104,7 @@ class _SoloSetupPageState extends State<SoloSetupPage> with Refena {
             label: Strings.hostName,
             controller: _name,
             maxLength: 20,
+            onChanged: _recheck,
             errorText: _submitted && !_nameRule.hasMatch(_name.text.trim()) ? Strings.nameInvalid : null,
           ),
         );

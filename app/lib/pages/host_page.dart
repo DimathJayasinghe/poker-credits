@@ -46,6 +46,11 @@ class _HostPageState extends State<HostPage> with Refena {
 
   String? _numberError(TextEditingController controller) => _submitted && _number(controller) == null ? Strings.numberInvalid : null;
 
+  /// A message about a field goes away as soon as the field is fixed, not at the next press of Start.
+  void _recheck(String _) {
+    if (_submitted) setState(() {});
+  }
+
   Future<void> _start() async {
     setState(() => _submitted = true);
     final name = _name.text.trim();
@@ -102,8 +107,13 @@ class _HostPageState extends State<HostPage> with Refena {
       ),
       builder: (context, info) {
         Widget gap() => SizedBox(height: info.gap);
-        Widget number(String label, TextEditingController controller) =>
-            BrutalTextField(label: label, controller: controller, keyboardType: TextInputType.number, errorText: _numberError(controller));
+        Widget number(String label, TextEditingController controller) => BrutalTextField(
+          label: label,
+          controller: controller,
+          keyboardType: TextInputType.number,
+          onChanged: _recheck,
+          errorText: _numberError(controller),
+        );
         Widget pair(Widget a, Widget b) => Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -116,6 +126,7 @@ class _HostPageState extends State<HostPage> with Refena {
           label: Strings.hostName,
           controller: _name,
           maxLength: 20,
+          onChanged: _recheck,
           errorText: _submitted && !_nameRule.hasMatch(_name.text.trim()) ? Strings.nameInvalid : null,
         );
         final timerHint = Text(Strings.turnSecondsHint, style: TextStyle(fontSize: 13, height: 1.3, color: c.muted));

@@ -128,6 +128,11 @@ class _JoinPageState extends State<JoinPage> with Refena {
     });
   }
 
+  /// A message about a field goes away as soon as the field is fixed, not at the next press of Join.
+  void _recheck(String _) {
+    if (_submitted) setState(() {});
+  }
+
   void _join({required bool spectator}) {
     setState(() {
       _submitted = true;
@@ -381,12 +386,14 @@ class _JoinPageState extends State<JoinPage> with Refena {
           controller: _code,
           maxLength: 4,
           textCapitalization: TextCapitalization.characters,
+          onChanged: _recheck,
           errorText: _submitted && JoinLink.normalizeRoomCode(_code.text) == null ? Strings.codeInvalid : null,
         );
         final name = BrutalTextField(
           label: Strings.joinName,
           controller: _name,
           maxLength: 20,
+          onChanged: _recheck,
           errorText: _submitted && !_nameRule.hasMatch(_name.text.trim()) ? Strings.nameInvalid : null,
         );
         final address = !showAddress
@@ -395,6 +402,7 @@ class _JoinPageState extends State<JoinPage> with Refena {
                 label: Strings.joinAddress,
                 controller: _address,
                 keyboardType: TextInputType.url,
+                onChanged: _recheck,
                 errorText: _submitted && _address.text.trim().isNotEmpty && JoinLink.normalizeAddress(_address.text) == null
                     ? Strings.addressInvalid
                     : null,
