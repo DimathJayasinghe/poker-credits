@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:poker_credits/model/walkthrough.dart';
+import 'package:poker_credits/pages/walkthrough_page.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/guide_content.dart';
+import 'package:poker_credits/util/lesson_content.dart';
+import 'package:poker_credits/util/tour_content.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
+import 'package:poker_credits/widget/brutal/brutal_row.dart';
 import 'package:poker_credits/widget/brutal/paper_backdrop.dart';
 import 'package:poker_credits/widget/guide/guide_widgets.dart';
 
@@ -36,6 +41,14 @@ class _GuideViewState extends State<GuideView> {
   final GlobalKey _words = GlobalKey();
   final GlobalKey _rules = GlobalKey();
   final GlobalKey _drops = GlobalKey();
+
+  void _walk(String title, List<WalkthroughStep> steps) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => WalkthroughPage(title: title, steps: steps),
+      ),
+    );
+  }
 
   void _jump(GlobalKey key) {
     final target = key.currentContext;
@@ -100,6 +113,17 @@ class _GuideViewState extends State<GuideView> {
                           ),
                         ],
                       ),
+                    ),
+                    const GuideHeading(Strings.guideTours),
+                    BrutalRow(
+                      label: Strings.guideLearnRow,
+                      caption: Strings.guideLearnRowCaption,
+                      onTap: () => _walk(Strings.learnTitle, pokerLessonSteps),
+                    ),
+                    BrutalRow(
+                      label: Strings.guideTourRow,
+                      caption: Strings.guideTourRowCaption,
+                      onTap: () => _walk(Strings.tourTitle, appTourSteps),
                     ),
                     const GuideHeading(Strings.guideSectionNight),
                     const GuideSteps(guideNight),

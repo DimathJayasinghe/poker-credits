@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/main.dart';
 import 'package:poker_credits/pages/guide_page.dart';
+import 'package:poker_credits/pages/walkthrough_page.dart';
+import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/util/guide_content.dart';
 import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/guide/guide_sheet.dart';
@@ -220,6 +222,26 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(GuidePage), findsNothing);
       expect(find.text('YOUR CHIPS · ALICE'), findsOneWidget, reason: 'back to the game, still seated');
+    });
+  });
+
+  group('tours', () {
+    testWidgets('the Guide tab offers the app tour and the poker lesson, and both open', (tester) async {
+      await _openGuideTab(tester);
+      for (final (row, title) in <(String, String)>[
+        (Strings.guideLearnRow, Strings.learnTitle),
+        (Strings.guideTourRow, Strings.tourTitle),
+      ]) {
+        await tester.ensureVisible(find.text(row.toUpperCase()));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(row.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(find.byType(WalkthroughPage), findsOneWidget, reason: row);
+        expect(find.text(title.toUpperCase()), findsWidgets);
+        await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(find.byType(WalkthroughPage), findsNothing);
+      }
     });
   });
 }

@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/main.dart';
 import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/pages/home_page.dart';
+import 'package:poker_credits/pages/intro_page.dart';
+import 'package:poker_credits/pages/walkthrough_page.dart';
 import 'package:poker_credits/pages/splash_page.dart';
 import 'package:poker_credits/pages/terms_page.dart';
 import 'package:poker_credits/util/strings.dart';
@@ -98,7 +100,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(harness.settings.value.acceptedTerms, currentTermsVersion);
       expect(find.byType(TermsPage), findsNothing);
-      expect(find.byType(HomePage), findsOneWidget);
+      expect(find.byType(IntroPage), findsOneWidget, reason: 'a first run is offered the tour next');
     });
 
     testWidgets('declining leaves the app and saves nothing', (tester) async {
@@ -142,6 +144,54 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       expect(find.byType(TermsPage), findsNothing);
+    });
+  });
+
+  group('intro', () {
+    Future<void> pastTerms(WidgetTester tester, TestHarness harness) async {
+      harness.settings.value = harness.settings.value.copyWith(acceptedTerms: currentTermsVersion);
+      await _launch(tester, harness);
+      await tester.pumpAndSettle();
+      expect(find.byType(IntroPage), findsOneWidget);
+    }
+
+    testWidgets('skipping goes straight to Home and is remembered', (tester) async {
+      final harness = TestHarness(firstRun: true);
+      await pastTerms(tester, harness);
+      await tester.tap(find.text(Strings.introSkip.toUpperCase()));
+      await tester.pumpAndSettle();
+      expect(find.byType(HomePage), findsOneWidget);
+      expect(find.byType(WalkthroughPage), findsNothing);
+      expect(harness.settings.value.introDone, isTrue);
+    });
+
+    testWidgets('the app tour opens over Home, and leaving it lands on Home', (tester) async {
+      final harness = TestHarness(firstRun: true);
+      await pastTerms(tester, harness);
+      await tester.tap(find.text(Strings.introTour.toUpperCase()));
+      await tester.pumpAndSettle();
+      expect(find.byType(WalkthroughPage), findsOneWidget);
+      expect(find.text(Strings.tourTitle.toUpperCase()), findsWidgets);
+      expect(harness.settings.value.introDone, isTrue, reason: 'asked once, even if the app closes mid-tour');
+      await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
+      await tester.pumpAndSettle();
+      expect(find.byType(HomePage), findsOneWidget);
+    });
+
+    testWidgets('the poker lesson opens from the intro', (tester) async {
+      final harness = TestHarness(firstRun: true);
+      await pastTerms(tester, harness);
+      await tester.tap(find.text(Strings.introLearn.toUpperCase()));
+      await tester.pumpAndSettle();
+      expect(find.text(Strings.learnTitle.toUpperCase()), findsWidgets);
+    });
+
+    testWidgets('once answered, the intro never comes back', (tester) async {
+      final harness = TestHarness();
+      await _launch(tester, harness);
+      await tester.pumpAndSettle();
+      expect(find.byType(IntroPage), findsNothing);
+      expect(find.byType(HomePage), findsOneWidget);
     });
   });
 }

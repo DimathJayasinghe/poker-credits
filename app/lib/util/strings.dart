@@ -357,4 +357,25 @@ abstract final class Strings {
   static const String termsRow = 'Terms and safety';
   static const String termsRowCaption = 'Play fair, play safe, trusted Wi-Fi';
   static const String termsVersionLine = 'Version';
+
+  // Walkthroughs and the first-run intro
+  static const String tourTitle = 'App tour';
+  static const String learnTitle = 'Learn poker';
+  static const String walkNext = 'Next';
+  static const String walkDone = 'Done';
+  static const String walkSkip = 'Skip';
+  static String walkStep(int step, int total) => 'Step $step of $total';
+  static const String introTitle = 'Welcome';
+  static const String introBody = 'Want a quick look around before the first hand? Both are optional and you can find them again in the Guide.';
+  static const String introTour = 'Take the app tour';
+  static const String introTourCaption = 'How hosting, joining and playing work. About 2 minutes.';
+  static const String introLearn = 'Learn poker';
+  static const String introLearnCaption = 'New to Texas Hold\'em? The basics in 10 short steps.';
+  static const String introSkip = 'Skip, I know my way';
+  static const String introSkipCaption = 'Go straight to the app.';
+  static const String guideTours = 'Tours';
+  static const String guideTourRow = 'Replay the app tour';
+  static const String guideTourRowCaption = 'Hosting, joining and playing in 7 steps';
+  static const String guideLearnRow = 'Learn poker';
+  static const String guideLearnRowCaption = 'A first lesson for new players';
 }
