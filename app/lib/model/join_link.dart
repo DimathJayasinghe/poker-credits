@@ -1,20 +1,37 @@
-/// What the host's QR code carries: where the server is and which room to join.
+import 'package:poker_credits/net/pin.dart';
+
+/// What the host's QR code carries: where the server is, which room to join and the fingerprint
+/// of the host's certificate (ADR-019).
 ///
-/// `pokercredits://join?h=192.168.1.5:7878&c=KQ7M`
+/// `pokercredits://join?h=192.168.1.5:7878&c=KQ7M&f=<43 characters>`
+///
+/// The fingerprint is what makes a scanned code safe: the guest talks only to a device that holds
+/// the certificate it names. A link without one (an older code, or an address typed by hand) has
+/// to be completed first by looking at what the host shows (trust on first use).
 class JoinLink {
-  const JoinLink({required this.hostAndPort, required this.roomCode});
+  const JoinLink({required this.hostAndPort, required this.roomCode, this.fingerprint});
 
   /// `address:port` of the server on the LAN.
   final String hostAndPort;
   final String roomCode;
 
+  /// Pin of the host's certificate, or `null` when not known yet.
+  final String? fingerprint;
+
   static const String scheme = 'pokercredits';
 
-  @override
-  String toString() => Uri(scheme: scheme, host: 'join', queryParameters: <String, String>{'h': hostAndPort, 'c': roomCode}).toString();
+  /// This link with a fingerprint learned another way.
+  JoinLink withFingerprint(String? fingerprint) => JoinLink(hostAndPort: hostAndPort, roomCode: roomCode, fingerprint: fingerprint);
 
-  /// WebSocket address of the server (`ws://` on the LAN, ADR-012).
-  Uri get webSocketUri => Uri.parse('ws://$hostAndPort/v1/ws');
+  @override
+  String toString() => Uri(
+    scheme: scheme,
+    host: 'join',
+    queryParameters: <String, String>{'h': hostAndPort, 'c': roomCode, 'f': ?fingerprint},
+  ).toString();
+
+  /// Secure WebSocket address of the server, pinned to [fingerprint] when there is one.
+  Uri get webSocketUri => withPin(Uri.parse('wss://$hostAndPort/v1/ws'), fingerprint);
 
   /// Parses a scanned code; `null` when it is not ours or is malformed.
   static JoinLink? tryParse(String text) {
@@ -27,8 +44,11 @@ class JoinLink {
     if (uri.scheme != scheme || uri.host != 'join') return null;
     final hostAndPort = uri.queryParameters['h'];
     final code = uri.queryParameters['c'];
+    final fingerprint = uri.queryParameters['f'];
     if (hostAndPort == null || code == null || !_hostAndPort.hasMatch(hostAndPort) || !_roomCode.hasMatch(code.toUpperCase())) return null;
-    return JoinLink(hostAndPort: hostAndPort, roomCode: code.toUpperCase());
+    // A fingerprint that is present but malformed is a damaged or forged code, not an old one.
+    if (fingerprint != null && !isPin(fingerprint)) return null;
+    return JoinLink(hostAndPort: hostAndPort, roomCode: code.toUpperCase(), fingerprint: fingerprint);
   }
 
   /// The port a host listens on unless it picked another one.
@@ -65,8 +85,9 @@ class JoinLink {
   static final RegExp _roomCode = RegExp(r'^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$');
 
   @override
-  bool operator ==(Object other) => other is JoinLink && other.hostAndPort == hostAndPort && other.roomCode == roomCode;
+  bool operator ==(Object other) =>
+      other is JoinLink && other.hostAndPort == hostAndPort && other.roomCode == roomCode && other.fingerprint == fingerprint;
 
   @override
-  int get hashCode => Object.hash(hostAndPort, roomCode);
+  int get hashCode => Object.hash(hostAndPort, roomCode, fingerprint);
 }

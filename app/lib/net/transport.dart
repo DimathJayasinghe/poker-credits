@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:poker_credits/platform/secure_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// One open WebSocket carrying JSON text frames. A seam so the client can be tested without a
@@ -18,12 +19,9 @@ abstract interface class Transport {
 /// Opens a [Transport]; the future fails when the socket cannot be opened.
 typedef TransportFactory = Future<Transport> Function(Uri uri);
 
-/// The real thing, on `web_socket_channel` (works on native and web).
-Future<Transport> connectWebSocket(Uri uri) async {
-  final channel = WebSocketChannel.connect(uri);
-  await channel.ready;
-  return _ChannelTransport(channel);
-}
+/// The real thing, on `web_socket_channel` (works on native and web). A pin carried by [uri]
+/// (`#pin=…`) is checked against the host's certificate, see `openChannel`.
+Future<Transport> connectWebSocket(Uri uri) async => _ChannelTransport(await openChannel(uri));
 
 class _ChannelTransport implements Transport {
   _ChannelTransport(this._channel);

@@ -4,6 +4,7 @@ import 'package:logging/logging.dart';
 import 'package:poker_credits/net/backoff.dart';
 import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/net/features.dart';
+import 'package:poker_credits/net/pin.dart';
 import 'package:poker_credits/net/transport.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
@@ -76,6 +77,7 @@ class RoomClient {
   DateTime? _downSince;
   int _lastStateVersion = -1;
   int _generation = 0;
+  int _insecureAttempts = 0;
   bool _closed = false;
 
   /// Every decoded server message, in order.
@@ -148,6 +150,27 @@ class RoomClient {
     final Transport transport;
     try {
       transport = await _connect(uri);
+      _insecureAttempts = 0;
+    } on PinMismatch {
+      // Not a glitch: somebody else answers at this address. Retrying would only hand it more
+      // chances, so the link gives up and the user decides.
+      _log.warning('the host showed a different certificate than the pinned one');
+      if (generation == _generation) _fail(LinkFailure.hostNotTrusted, null);
+      return;
+    } on InsecureAddress {
+      _log.warning('refusing a plaintext connection to another device');
+      if (generation == _generation) _fail(LinkFailure.hostOutdated, null);
+      return;
+    } on NoSecureChannel {
+      // One failed handshake can be a flaky network; two in a row mean the host is not speaking TLS.
+      _log.info('the host does not speak TLS');
+      if (generation != _generation) return;
+      if (++_insecureAttempts >= 2) {
+        _fail(LinkFailure.hostOutdated, null);
+      } else {
+        _scheduleRetry();
+      }
+      return;
     } on Object catch (error) {
       _log.info('connect failed: $error');
       if (generation == _generation) _scheduleRetry();

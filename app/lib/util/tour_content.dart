@@ -58,7 +58,7 @@ const List<WalkthroughStep> appTourSteps = <WalkthroughStep>[
   WalkthroughStep(
     title: 'Play safe',
     body:
-        'Use your own Wi-Fi, or a phone hotspot with a password, never a public network. If your connection drops, open the app and tap Back to my game: your seat and chips are kept.',
+        'Use your own Wi-Fi, or a hotspot with a password, never a public network. Scan the host\'s QR code to join safely. If you drop, tap Back to my game: your seat and chips are kept.',
     art: StepArt.staySafe,
     artLabel: 'A Wi-Fi symbol with a padlock.',
   ),

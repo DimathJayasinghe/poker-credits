@@ -197,7 +197,8 @@ const List<GuideStep> guideAlone = <GuideStep>[
 /// Staying safe on a shared network.
 const List<String> guideSafety = <String>[
   'Use your own Wi-Fi, or a phone hotspot with a password. Avoid public or shared Wi-Fi such as a cafe, hotel or school.',
-  'The game connection is not encrypted. Give the room code only to the people at your table.',
+  'The game connection is encrypted, and your phone remembers which phone is the host. Joining by the host\'s QR code is the safest way, because the code also proves you reached the right phone.',
+  'Give the room code only to the people at your table.',
   'With cards in the app, the host phone holds the deck and knows every card. Play that way only with people you would trust to host.',
   'Chips are counters. The app never moves real money.',
   'You can read the full notice again in Settings under Terms and safety.',

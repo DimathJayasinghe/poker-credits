@@ -9,16 +9,20 @@ export 'host_finder_stub.dart' if (dart.library.io) 'host_finder_io.dart';
 
 /// Where a hosted room was found.
 class DiscoveredHost {
-  const DiscoveredHost(this.hostAndPort);
+  const DiscoveredHost(this.hostAndPort, {this.fingerprint});
 
   /// `address:port`, ready for `JoinLink`.
   final String hostAndPort;
 
-  @override
-  bool operator ==(Object other) => other is DiscoveredHost && other.hostAndPort == hostAndPort;
+  /// Pin of the certificate the host showed. Whoever answers the search is taken at its word
+  /// (trust on first use): the pin only keeps the later connection with the same device.
+  final String? fingerprint;
 
   @override
-  int get hashCode => hostAndPort.hashCode;
+  bool operator ==(Object other) => other is DiscoveredHost && other.hostAndPort == hostAndPort && other.fingerprint == fingerprint;
+
+  @override
+  int get hashCode => Object.hash(hostAndPort, fingerprint);
 }
 
 /// An open game found on the local network: a room still in its lobby with a free seat.
@@ -30,12 +34,13 @@ class DiscoveredLobby {
     required this.playerCount,
     required this.maxPlayers,
     this.isVirtual = false,
+    this.fingerprint,
   });
 
   /// Reads one entry of the server's `lobbies` list. The answer comes from the network, so
   /// nothing in it is trusted: a malformed entry gives `null`, the name is cut to a printable
   /// length and the counts are clamped.
-  static DiscoveredLobby? tryParse(Object? json, String hostAndPort) {
+  static DiscoveredLobby? tryParse(Object? json, String hostAndPort, {String? fingerprint}) {
     if (json is! Map<String, dynamic>) return null;
     final code = json['roomCode'];
     final name = json['hostName'];
@@ -52,6 +57,7 @@ class DiscoveredLobby {
       playerCount: count.clamp(0, max),
       maxPlayers: max,
       isVirtual: json['cardMode'] == 'VIRTUAL',
+      fingerprint: fingerprint,
     );
   }
 
@@ -65,6 +71,9 @@ class DiscoveredLobby {
   /// The room deals cards in the app. Older hosts do not say, which means real cards.
   final bool isVirtual;
 
+  /// Pin of the certificate the host showed while it was listed (trust on first use).
+  final String? fingerprint;
+
   @override
   bool operator ==(Object other) =>
       other is DiscoveredLobby &&
@@ -73,10 +82,11 @@ class DiscoveredLobby {
       other.hostName == hostName &&
       other.playerCount == playerCount &&
       other.maxPlayers == maxPlayers &&
-      other.isVirtual == isVirtual;
+      other.isVirtual == isVirtual &&
+      other.fingerprint == fingerprint;
 
   @override
-  int get hashCode => Object.hash(hostAndPort, roomCode, hostName, playerCount, maxPlayers, isVirtual);
+  int get hashCode => Object.hash(hostAndPort, roomCode, hostName, playerCount, maxPlayers, isVirtual, fingerprint);
 }
 
 /// A scan of the local network for open games. [lobbies] emits the full list each time it grows;
@@ -107,4 +117,8 @@ abstract interface class HostFinder {
 
   /// Lists the open games on the local network.
   LobbyBrowse browse();
+
+  /// The pin of the certificate the host at [hostAndPort] shows (a typed address has none yet),
+  /// or `null` when nothing there speaks TLS. Trust on first use, like a search by code.
+  Future<String?> fingerprintOf(String hostAndPort);
 }

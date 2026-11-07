@@ -6,9 +6,28 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/platform/host_finder_io.dart';
 
+/// A pin-shaped stand-in for the real fingerprint: 43 URL-safe characters taken from the
+/// certificate, so equal certificates give equal pins without the native library.
+String _fakeHash(List<int> der) => base64Url.encode(der.take(32).toList()).replaceAll('=', '');
+
+/// An HTTPS server with the throwaway test certificate, like a host's embedded server.
+Future<HttpServer> _secure() {
+  final context = SecurityContext()
+    ..useCertificateChain('test/fixtures/tls/cert.pem')
+    ..usePrivateKey('test/fixtures/tls/key.pem');
+  return HttpServer.bindSecure(InternetAddress.loopbackIPv4, 0, context);
+}
+
+/// What the test certificate's pin is under [_fakeHash].
+String get _testCertPin {
+  final pem = File('test/fixtures/tls/cert.pem').readAsStringSync();
+  final body = pem.replaceAll(RegExp(r'-----[A-Z ]+-----|\s'), '');
+  return _fakeHash(base64.decode(body));
+}
+
 /// Answers `GET /v1/room/{code}` like the Poker Credits server: 200 with `exists`.
 Future<HttpServer> _host({required String code, int status = 200, String? body}) async {
-  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  final server = await _secure();
   server.listen((request) {
     final asked = request.uri.pathSegments.last;
     request.response
@@ -20,8 +39,14 @@ Future<HttpServer> _host({required String code, int status = 200, String? body})
   return server;
 }
 
-LanHostFinder _finder(List<String> hosts, List<int> ports, {Duration deadline = const Duration(seconds: 5)}) =>
-    LanHostFinder(candidates: () async => hosts, ports: ports, probeTimeout: const Duration(milliseconds: 400), deadline: deadline, concurrency: 8);
+LanHostFinder _finder(List<String> hosts, List<int> ports, {Duration deadline = const Duration(seconds: 5)}) => LanHostFinder(
+  candidates: () async => hosts,
+  ports: ports,
+  probeTimeout: const Duration(milliseconds: 400),
+  deadline: deadline,
+  concurrency: 8,
+  hasher: _fakeHash,
+);
 
 void main() {
   test('finds the host that holds the room, among addresses that do not answer', () async {
@@ -29,6 +54,45 @@ void main() {
     addTearDown(() => server.close(force: true));
     final found = await _finder(<String>['127.0.0.2', '127.0.0.1'], <int>[server.port]).search('KQ7M').result;
     expect(found?.hostAndPort, '127.0.0.1:${server.port}');
+  });
+
+  test('a found host comes with the fingerprint of the certificate it showed', () async {
+    final server = await _host(code: 'KQ7M');
+    addTearDown(() => server.close(force: true));
+    final found = await _finder(<String>['127.0.0.1'], <int>[server.port]).search('KQ7M').result;
+    expect(found?.fingerprint, _testCertPin);
+    expect(found?.fingerprint, hasLength(43));
+  });
+
+  test('a host that only speaks plain HTTP (an older version) is not found', () async {
+    final plain = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    plain.listen((request) {
+      request.response
+        ..write(jsonEncode(<String, Object?>{'exists': true}))
+        ..close();
+    });
+    addTearDown(() => plain.close(force: true));
+    expect(await _finder(<String>['127.0.0.1'], <int>[plain.port]).search('KQ7M').result, isNull);
+  });
+
+  group('the fingerprint of a typed address', () {
+    test('is what the host shows', () async {
+      final server = await _host(code: 'KQ7M');
+      addTearDown(() => server.close(force: true));
+      expect(await _finder(<String>[], <int>[]).fingerprintOf('127.0.0.1:${server.port}'), _testCertPin);
+    });
+
+    test('is nothing for a plain HTTP host or a dead port', () async {
+      final plain = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      plain.listen((request) => unawaited(request.response.close()));
+      addTearDown(() => plain.close(force: true));
+      final closed = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final deadPort = closed.port;
+      await closed.close();
+      final finder = _finder(<String>[], <int>[]);
+      expect(await finder.fingerprintOf('127.0.0.1:${plain.port}'), isNull);
+      expect(await finder.fingerprintOf('127.0.0.1:$deadPort'), isNull);
+    });
   });
 
   test('tries the second port when the first has nobody', () async {
@@ -101,7 +165,7 @@ void main() {
 
   group('browsing for open games', () {
     Future<HttpServer> lobbyHost(Object? body, {int status = 200}) async {
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final server = await _secure();
       server.listen((request) {
         request.response
           ..statusCode = status
@@ -127,6 +191,14 @@ void main() {
       await sub.cancel();
       return latest;
     }
+
+    test('every listed game carries the fingerprint of the host that listed it', () async {
+      final server = await lobbyHost(<String, Object?>{
+        'lobbies': <Object?>[entry('KQ7M')],
+      });
+      final list = await lastList(_finder(<String>['127.0.0.1'], <int>[server.port]).browse());
+      expect(list.single.fingerprint, _testCertPin);
+    });
 
     test('lists every open game, from every host that answers', () async {
       final one = await lobbyHost(<String, Object?>{

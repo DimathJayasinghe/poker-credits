@@ -223,6 +223,9 @@ abstract final class Strings {
   static const String linkFailedUpdate = 'This room uses virtual cards. Update the app to join';
   static const String linkFailedRate = 'Too many attempts from this address. Wait a few minutes';
   static const String linkFailedRefused = 'The server refused the connection';
+  static const String linkFailedNotTrusted =
+      'This is not the host you joined: its security certificate changed. Nothing was sent. Scan the host\'s QR code again';
+  static const String linkFailedOutdated = 'This host cannot make a secure connection. Ask the host to update Poker Credits';
   static const String roomEndedTitle = 'Room closed';
   static const String presenceCheck = 'Is this player still here?';
   static const String presenceHint = 'Players are asked first; your answer is final.';
@@ -407,7 +410,7 @@ abstract final class Strings {
   static const String guideSumWords = 'What each button and term means';
   static const String guideSumRules = 'What the app keeps fair for you';
   static const String guideSumDrops = 'Lost your connection? Your seat is safe';
-  static const String guideSumSafety = 'Wi-Fi, the deck and your chips';
+  static const String guideSumSafety = 'Wi-Fi, joining safely, the deck and your chips';
   static const String guideSumManners = 'A few habits for real cards';
   static const String guideTabCards = 'Cards';
   static const String guideTabAlone = 'Alone';
@@ -459,7 +462,7 @@ abstract final class Strings {
   static const String termsAccept = 'Accept and continue';
   static const String termsDecline = 'No thanks, close the app';
   static const String termsRow = 'Terms and safety';
-  static const String termsRowCaption = 'Play fair, play safe, trusted Wi-Fi';
+  static const String termsRowCaption = 'Play fair, play safe, your own Wi-Fi';
   static const String termsVersionLine = 'Version';
 
   // Walkthroughs and the first-run intro

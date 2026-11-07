@@ -1,3 +1,4 @@
+import 'package:poker_credits/net/pin.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
 /// Table settings a host starts with. Only a starting point: the server validates every value
@@ -54,6 +55,7 @@ class HostedRoom {
     required this.sessionToken,
     required this.hostToken,
     required this.port,
+    this.fingerprint,
   });
 
   final String roomCode;
@@ -65,6 +67,10 @@ class HostedRoom {
 
   /// Port the embedded server listens on.
   final int port;
+
+  /// The pin guests need to trust this host (ADR-019). `null` for a server that only this
+  /// device can reach.
+  final String? fingerprint;
 }
 
 /// Why hosting failed.
@@ -144,6 +150,10 @@ class StoredSession {
     final roomCode = json['roomCode'];
     final sessionToken = json['sessionToken'];
     if (serverUri is! String || roomCode is! String || sessionToken is! String) return null;
+    // A session made before the games were encrypted points at a plaintext address of another
+    // device. It is dropped instead of ever being sent there (ADR-019).
+    final address = Uri.tryParse(serverUri);
+    if (address == null || (address.scheme == 'ws' && !isLoopbackHost(address.host))) return null;
     final hostToken = json['hostToken'];
     final playerId = json['playerId'];
     final soloBots = json['soloBots'];

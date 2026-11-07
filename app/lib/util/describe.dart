@@ -66,6 +66,8 @@ String linkFailureText(LinkFailure failure) => switch (failure) {
   LinkFailure.updateRequired => Strings.linkFailedUpdate,
   LinkFailure.rateLimited => Strings.linkFailedRate,
   LinkFailure.refused => Strings.linkFailedRefused,
+  LinkFailure.hostNotTrusted => Strings.linkFailedNotTrusted,
+  LinkFailure.hostOutdated => Strings.linkFailedOutdated,
 };
 
 /// Words for a server error shown while joining or acting.

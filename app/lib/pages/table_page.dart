@@ -367,7 +367,7 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
       seatCount: tableSeats,
       occupied: seatsByIndex.keys.toSet(),
       center: lobby
-          ? QrPanel(roomCode: view.roomCode, addresses: host.joinAddresses)
+          ? QrPanel(roomCode: view.roomCode, addresses: host.joinAddresses, fingerprint: host.fingerprint)
           : Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
@@ -386,7 +386,13 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
               ],
             ),
       compactCenter: lobby
-          ? QrPanel(roomCode: view.roomCode, addresses: host.joinAddresses, qrSize: onItsSide ? 96 : fit.qr, compact: true)
+          ? QrPanel(
+              roomCode: view.roomCode,
+              addresses: host.joinAddresses,
+              fingerprint: host.fingerprint,
+              qrSize: onItsSide ? 96 : fit.qr,
+              compact: true,
+            )
           : compactCenter,
       framed: !lobby,
       seatBuilder: (context, index, width) {

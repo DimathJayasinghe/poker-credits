@@ -62,7 +62,11 @@ void main() {
     // The session is stored so the app can resume after being killed.
     final stored = await harness.tokens.read();
     expect(stored!.hostToken, 'host-secret');
-    expect(stored.serverUri, 'ws://127.0.0.1:7878/v1/ws');
+    expect(
+      stored.serverUri,
+      'wss://127.0.0.1:7878/v1/ws#pin=$testPin',
+      reason: 'the host talks to its own server over TLS, pinned to its own certificate',
+    );
 
     await tester.tap(find.text('START HAND'));
     await tester.pump();

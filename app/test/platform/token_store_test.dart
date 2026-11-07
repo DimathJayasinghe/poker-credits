@@ -4,8 +4,10 @@ import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/platform/token_store_io.dart';
 
+import '../support/fakes.dart';
+
 const _session = StoredSession(
-  serverUri: 'ws://192.168.1.5:7878/v1/ws',
+  serverUri: 'wss://192.168.1.5:7878/v1/ws#pin=$testPin',
   roomCode: 'KQ7M',
   sessionToken: 'session-secret',
   hostToken: 'host-secret',

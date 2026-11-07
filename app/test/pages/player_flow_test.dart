@@ -94,7 +94,7 @@ void main() {
     await _fillAndJoin(tester);
 
     expect(harness.finder.searched, <String>['KQ7M']);
-    expect(harness.network.uris.last.toString(), 'ws://192.168.1.5:7878/v1/ws');
+    expect(harness.network.uris.last.toString(), 'wss://192.168.1.5:7878/v1/ws#pin=$testPin');
     final join = harness.network.last.sent.single as JoinRoom;
     expect((join.roomCode, join.name, join.spectator), ('KQ7M', 'Alice', false));
     expect(join.features, contains(featureVirtualCards), reason: 'join_sends_virtual_cards_feature');
@@ -115,7 +115,7 @@ void main() {
     // The session is stored for resuming.
     final stored = await harness.tokens.read();
     expect(stored!.sessionToken, 'alice-token');
-    expect(stored.serverUri, 'ws://192.168.1.5:7878/v1/ws');
+    expect(stored.serverUri, 'wss://192.168.1.5:7878/v1/ws#pin=$testPin');
     expect(stored.playerId, 'p_1');
     expect(stored.hostToken, isNull);
     await _close(tester);
@@ -145,7 +145,9 @@ void main() {
   testWidgets('a join that fails never wipes the stored session of another room', (tester) async {
     _phone(tester);
     final tokens = MemoryTokenStore();
-    await tokens.write(const StoredSession(serverUri: 'ws://10.0.0.9:7878/v1/ws', roomCode: 'ABCD', sessionToken: 'keep-me', playerId: 'p_9'));
+    await tokens.write(
+      const StoredSession(serverUri: 'wss://10.0.0.9:7878/v1/ws#pin=$testPin', roomCode: 'ABCD', sessionToken: 'keep-me', playerId: 'p_9'),
+    );
     final harness = TestHarness(tokens: tokens);
     await _openJoin(tester, harness);
     await _fillAndJoin(tester, code: 'ZZZZ');
@@ -401,7 +403,9 @@ void main() {
   testWidgets('a stored guest session offers "back to my game" and resumes it', (tester) async {
     _phone(tester);
     final tokens = MemoryTokenStore();
-    await tokens.write(const StoredSession(serverUri: 'ws://192.168.1.5:7878/v1/ws', roomCode: 'KQ7M', sessionToken: 'alice-token', playerId: 'p_1'));
+    await tokens.write(
+      const StoredSession(serverUri: 'wss://192.168.1.5:7878/v1/ws#pin=$testPin', roomCode: 'KQ7M', sessionToken: 'alice-token', playerId: 'p_1'),
+    );
     final harness = TestHarness(tokens: tokens);
     await tester.pumpWidget(harness.scope(const PokerCreditsApp()));
     await tester.pump();
@@ -486,7 +490,7 @@ void main() {
     await tester.tap(find.text('JOIN'));
     await tester.pump();
     await tester.pump();
-    expect(harness.network.uris.last.toString(), 'ws://192.168.1.9:7878/v1/ws');
+    expect(harness.network.uris.last.toString(), 'wss://192.168.1.9:7878/v1/ws#pin=$testPin');
     expect(harness.finder.searched, hasLength(1), reason: 'a typed address skips the search');
     await _close(tester);
   });
@@ -516,9 +520,11 @@ void main() {
   testWidgets('a guest whose host moved finds it again by the room code and resumes there', (tester) async {
     _phone(tester);
     final tokens = MemoryTokenStore();
-    await tokens.write(const StoredSession(serverUri: 'ws://192.168.1.5:7878/v1/ws', roomCode: 'KQ7M', sessionToken: 'alice-token', playerId: 'p_1'));
+    await tokens.write(
+      const StoredSession(serverUri: 'wss://192.168.1.5:7878/v1/ws#pin=$testPin', roomCode: 'KQ7M', sessionToken: 'alice-token', playerId: 'p_1'),
+    );
     final harness = TestHarness(tokens: tokens);
-    harness.finder.found = const DiscoveredHost('192.168.1.23:7878');
+    harness.finder.found = const DiscoveredHost('192.168.1.23:7878', fingerprint: testPin);
     await tester.pumpWidget(harness.scope(const PokerCreditsApp()));
     await tester.pump();
     await tester.pump();
@@ -547,13 +553,50 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
     }
     await tester.pump();
-    expect(harness.network.uris.last.toString(), 'ws://192.168.1.23:7878/v1/ws');
+    expect(harness.network.uris.last.toString(), 'wss://192.168.1.23:7878/v1/ws#pin=$testPin');
     expect(harness.network.opened.length, greaterThan(opened));
     expect(find.byType(PlayerPage), findsOneWidget, reason: 'the table stays on screen while the new address connects');
     expect(findNumber(940), findsOneWidget, reason: 'with the last known chips, not a blank screen');
     expect(find.text('RECONNECTING'), findsWidgets);
     expect(harness.network.last.sent.single, isA<Resume>());
-    expect((await tokens.read())!.serverUri, 'ws://192.168.1.23:7878/v1/ws');
+    expect((await tokens.read())!.serverUri, 'wss://192.168.1.23:7878/v1/ws#pin=$testPin');
+    await _close(tester);
+  });
+
+  testWidgets('a device that answers for the room code with another certificate is not followed', (tester) async {
+    _phone(tester);
+    final tokens = MemoryTokenStore();
+    await tokens.write(
+      const StoredSession(serverUri: 'wss://192.168.1.5:7878/v1/ws#pin=$testPin', roomCode: 'KQ7M', sessionToken: 'alice-token', playerId: 'p_1'),
+    );
+    final harness = TestHarness(tokens: tokens);
+    harness.finder.found = const DiscoveredHost('192.168.1.99:7878', fingerprint: otherTestPin);
+    await tester.pumpWidget(harness.scope(const PokerCreditsApp()));
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(find.text('BACK TO MY GAME KQ7M'));
+    await tester.pump();
+    await tester.pump();
+    harness.network.last.serverSends(snapshot(version: 8, serverTime: harness.clock.millisecondsSinceEpoch, view: _betting(active: 2)));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    harness.network.refuseConnections = true;
+    harness.network.last.drop();
+    for (var t = 0; t < 120 && harness.finder.searched.isEmpty; t++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+    expect(harness.finder.searched, <String>['KQ7M'], reason: 'the search still runs');
+    harness.network.refuseConnections = false;
+    for (var t = 0; t < 30; t++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+    expect(
+      harness.network.uris.every((uri) => uri.host == '192.168.1.5'),
+      isTrue,
+      reason: 'the session token never goes to the other device: ${harness.network.uris}',
+    );
+    expect((await tokens.read())!.serverUri, 'wss://192.168.1.5:7878/v1/ws#pin=$testPin');
     await _close(tester);
   });
 }

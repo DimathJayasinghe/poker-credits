@@ -49,6 +49,13 @@ enum LinkFailure {
 
   /// The server refused the join and the socket was closed (full room, ...).
   refused,
+
+  /// The host showed a different certificate than the one this device was told to expect. The
+  /// connection was stopped before anything was sent (ADR-019).
+  hostNotTrusted,
+
+  /// The host does not speak the encrypted protocol: it runs an older version of the app.
+  hostOutdated,
 }
 
 /// Snapshot of the link, for banners and buttons.

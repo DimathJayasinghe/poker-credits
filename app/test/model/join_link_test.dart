@@ -1,11 +1,41 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/model/join_link.dart';
+import 'package:poker_credits/net/pin.dart';
+
+import '../support/fakes.dart';
 
 void main() {
   test('round trips through its text form', () {
-    const link = JoinLink(hostAndPort: '192.168.1.5:7878', roomCode: 'KQ7M');
+    const link = JoinLink(hostAndPort: '192.168.1.5:7878', roomCode: 'KQ7M', fingerprint: testPin);
     expect(JoinLink.tryParse(link.toString()), link);
-    expect(link.webSocketUri.toString(), 'ws://192.168.1.5:7878/v1/ws');
+    expect(link.webSocketUri.toString(), 'wss://192.168.1.5:7878/v1/ws#pin=$testPin');
+    expect(pinOf(link.webSocketUri), testPin);
+  });
+
+  group('the host fingerprint (ADR-019)', () {
+    test('travels in the QR text as f', () {
+      const link = JoinLink(hostAndPort: '192.168.1.5:7878', roomCode: 'KQ7M', fingerprint: testPin);
+      expect(link.toString(), 'pokercredits://join?h=192.168.1.5%3A7878&c=KQ7M&f=$testPin');
+    });
+
+    test('an older code without one still parses, and has nothing to pin', () {
+      final link = JoinLink.tryParse('pokercredits://join?h=10.0.0.2:7878&c=KQ7M')!;
+      expect(link.fingerprint, isNull);
+      expect(pinOf(link.webSocketUri), isNull);
+      expect(link.webSocketUri.scheme, 'wss', reason: 'never plaintext, with or without a pin');
+    });
+
+    test('a damaged or forged fingerprint makes the whole code invalid', () {
+      for (final bad in <String>['short', '${testPin}x', testPin.replaceFirst('A', '+'), '']) {
+        expect(JoinLink.tryParse('pokercredits://join?h=10.0.0.2:7878&c=KQ7M&f=$bad'), isNull, reason: bad);
+      }
+    });
+
+    test('links with different fingerprints are different links', () {
+      const a = JoinLink(hostAndPort: '10.0.0.2:7878', roomCode: 'KQ7M', fingerprint: testPin);
+      expect(a, isNot(a.withFingerprint(otherTestPin)));
+      expect(a.withFingerprint(null).fingerprint, isNull);
+    });
   });
 
   test('lowercase room codes are accepted and uppercased', () {

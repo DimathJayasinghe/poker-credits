@@ -78,7 +78,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(harness.finder.searched, isEmpty, reason: 'the address is already known');
-    expect(harness.network.uris.last.toString(), 'ws://192.168.1.41:7879/v1/ws');
+    expect(harness.network.uris.last.toString(), 'wss://192.168.1.41:7879/v1/ws#pin=$testPin');
     final join = harness.network.last.sent.single as JoinRoom;
     expect((join.roomCode, join.name), ('WXYZ', 'Alice'));
     harness.network.last

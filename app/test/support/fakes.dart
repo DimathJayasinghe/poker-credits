@@ -109,13 +109,22 @@ Snapshot snapshot({int version = 1, int serverTime = 0, int nextActionSeq = 0, R
 // App-level fakes
 // ---------------------------------------------------------------------------------------------
 
+/// A certificate fingerprint of the right shape, for tests that only need "some pin".
+const String testPin = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
+/// A second one, for "a different certificate".
+const String otherTestPin = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+
 /// A host server that never touches the native library.
 class FakeHostServer implements HostServer {
-  FakeHostServer({this.supported = true, this.failure, this.portNumber = 7878});
+  FakeHostServer({this.supported = true, this.failure, this.portNumber = 7878, this.pin = testPin});
 
   final bool supported;
   final HostException? failure;
   final int portNumber;
+
+  /// The fingerprint the server reports while it runs; `null` is a server not on the network.
+  final String? pin;
   int started = 0;
   RoomConfig? lastConfig;
   int ensured = 0;
@@ -129,6 +138,9 @@ class FakeHostServer implements HostServer {
   int? get port => running ? portNumber : null;
 
   @override
+  String? get fingerprint => running ? pin : null;
+
+  @override
   Future<int> startServer() async {
     if (failure != null) throw failure!;
     running = true;
@@ -140,7 +152,7 @@ class FakeHostServer implements HostServer {
   Future<HostedRoom> hostGame({required String hostName, required RoomConfig config}) async {
     await startServer();
     lastConfig = config;
-    return HostedRoom(roomCode: 'KQ7M', playerId: 'p_host', sessionToken: 'sess', hostToken: 'host-secret', port: portNumber);
+    return HostedRoom(roomCode: 'KQ7M', playerId: 'p_host', sessionToken: 'sess', hostToken: 'host-secret', port: portNumber, fingerprint: pin);
   }
 
   SoloConfig? lastSolo;
@@ -241,6 +253,12 @@ class FakeHostFinder implements HostFinder {
   final List<String> searched = <String>[];
   final List<FakeSearch> pending = <FakeSearch>[];
 
+  /// What a typed address shows when asked for its certificate; `null` means nothing answered.
+  String? shown = testPin;
+
+  /// Every address whose certificate was looked at.
+  final List<String> fingerprintRequests = <String>[];
+
   /// Every scan for open games, in the order they were started.
   final List<FakeBrowse> browses = <FakeBrowse>[];
 
@@ -249,6 +267,12 @@ class FakeHostFinder implements HostFinder {
     final browse = FakeBrowse();
     browses.add(browse);
     return browse;
+  }
+
+  @override
+  Future<String?> fingerprintOf(String hostAndPort) async {
+    fingerprintRequests.add(hostAndPort);
+    return shown;
   }
 
   @override

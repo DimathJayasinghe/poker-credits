@@ -20,6 +20,10 @@ class JoinService {
 
   final Ref _ref;
 
+  /// Bumped by every [join] and [leave], so a join that was still looking at the host's
+  /// certificate when the player cancelled does not connect afterwards.
+  int _attempt = 0;
+
   /// Whether this platform can look for a host by room code.
   bool get canFind => _ref.read(hostFinderProvider).isSupported;
 
@@ -31,12 +35,23 @@ class JoinService {
 
   /// Opens a socket to [link] and sends `JOIN_ROOM`. Any earlier attempt is dropped first (a
   /// fixable error such as a bad name is retried this way, with the fields corrected).
-  void join({required JoinLink link, required String name, bool spectator = false}) {
+  ///
+  /// The connection is encrypted and pinned to the host's certificate (ADR-019). A link from a QR
+  /// code carries the pin; for a typed address the certificate the host shows now is taken
+  /// (trust on first use) and the connection is pinned to that device.
+  Future<void> join({required JoinLink link, required String name, bool spectator = false}) async {
+    final attempt = ++_attempt;
+    var target = link;
+    if (target.fingerprint == null) {
+      final pin = await _ref.read(hostFinderProvider).fingerprintOf(link.hostAndPort);
+      if (attempt != _attempt) return;
+      target = target.withFingerprint(pin);
+    }
     _ref
         .notifier(sessionProvider)
         .attach(
-          uri: link.webSocketUri,
-          first: JoinRoom(roomCode: link.roomCode, name: name.trim(), spectator: spectator, features: appFeatures),
+          uri: target.webSocketUri,
+          first: JoinRoom(roomCode: target.roomCode, name: name.trim(), spectator: spectator, features: appFeatures),
           host: false,
         );
   }
@@ -61,5 +76,8 @@ class JoinService {
   }
 
   /// Gives up an attempt or leaves the room; forgets the stored session only if one was made.
-  Future<void> leave() => _ref.notifier(sessionProvider).leave();
+  Future<void> leave() {
+    _attempt++;
+    return _ref.notifier(sessionProvider).leave();
+  }
 }

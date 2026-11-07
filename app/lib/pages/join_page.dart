@@ -98,7 +98,7 @@ class _JoinPageState extends State<JoinPage> with Refena {
   void _pickNearby(DiscoveredLobby lobby) {
     setState(() {
       _code.text = lobby.roomCode;
-      _known = JoinLink(hostAndPort: lobby.hostAndPort, roomCode: lobby.roomCode);
+      _known = JoinLink(hostAndPort: lobby.hostAndPort, roomCode: lobby.roomCode, fingerprint: lobby.fingerprint);
       _notFound = false;
       _showAddress = false;
     });
@@ -140,8 +140,10 @@ class _JoinPageState extends State<JoinPage> with Refena {
     if (_showAddress && typed == null && _address.text.trim().isNotEmpty) return;
     final String? address = typed ?? (known != null && known.roomCode == code ? known.hostAndPort : null);
     if (address != null) {
+      // The pin only goes with the address it came with: a typed address starts without one.
+      final pin = known != null && known.hostAndPort == address && known.roomCode == code ? known.fingerprint : null;
       _connect(
-        JoinLink(hostAndPort: address, roomCode: code),
+        JoinLink(hostAndPort: address, roomCode: code, fingerprint: pin),
         spectator: spectator,
       );
       return;
@@ -167,7 +169,7 @@ class _JoinPageState extends State<JoinPage> with Refena {
         return;
       }
       _connect(
-        JoinLink(hostAndPort: found.hostAndPort, roomCode: code),
+        JoinLink(hostAndPort: found.hostAndPort, roomCode: code, fingerprint: found.fingerprint),
         spectator: spectator,
       );
     });
@@ -178,7 +180,7 @@ class _JoinPageState extends State<JoinPage> with Refena {
       _attempting = true;
       _spectator = spectator;
     });
-    ref.read(joinProvider).join(link: link, name: _name.text, spectator: spectator);
+    unawaited(ref.read(joinProvider).join(link: link, name: _name.text, spectator: spectator));
   }
 
   Future<void> _cancel() async {

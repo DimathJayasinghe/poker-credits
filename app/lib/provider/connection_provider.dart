@@ -6,6 +6,7 @@ import 'package:poker_credits/model/join_link.dart';
 import 'package:poker_credits/model/room_state.dart';
 import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/net/features.dart';
+import 'package:poker_credits/net/pin.dart';
 import 'package:poker_credits/net/socket_client.dart';
 import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/provider/services.dart';
@@ -181,6 +182,8 @@ class SessionNotifier extends Notifier<SessionState> {
         failure != LinkFailure.refused &&
         failure != LinkFailure.versionMismatch &&
         failure != LinkFailure.updateRequired &&
+        failure != LinkFailure.hostNotTrusted &&
+        failure != LinkFailure.hostOutdated &&
         failure != LinkFailure.rateLimited) {
       // The room or the session is gone; the stored tokens are useless now.
       unawaited(ref.read(tokenStoreProvider).clear(slot: _slot));
@@ -197,7 +200,15 @@ class SessionNotifier extends Notifier<SessionState> {
     if (uri == null || !JoinLink.isLanAddress(uri.host)) return;
     final found = await finder.search(stored.roomCode).result;
     if (found == null || state.serverUri != stored.serverUri || state.link.isLive) return;
-    final moved = Uri.tryParse('${uri.scheme}://${found.hostAndPort}${uri.path}');
+    // A host that moved still shows the certificate this device pinned. Another device that
+    // answers for the same room code does not get the session token.
+    final pin = pinOf(uri);
+    if (pin != null && found.fingerprint != pin) {
+      _log.warning('a device answered for room ${stored.roomCode} with another certificate; ignoring it');
+      return;
+    }
+    final movedBase = Uri.tryParse('${uri.scheme}://${found.hostAndPort}${uri.path}');
+    final moved = movedBase == null ? null : withPin(movedBase, pin);
     if (moved == null || moved == uri) return;
     _log.info('host of room ${stored.roomCode} moved');
     await ref

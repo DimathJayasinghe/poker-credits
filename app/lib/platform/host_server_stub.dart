@@ -15,6 +15,9 @@ final class _UnsupportedHostServer implements HostServer {
   int? get port => null;
 
   @override
+  String? get fingerprint => null;
+
+  @override
   Future<int> startServer() => Future<int>.error(const HostException(HostFailure.unavailable, 'Hosting is not available on this platform'));
 
   @override

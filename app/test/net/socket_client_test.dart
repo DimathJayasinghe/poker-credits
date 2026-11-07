@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_credits/net/backoff.dart';
 import 'package:poker_credits/net/connection_state.dart';
+import 'package:poker_credits/net/pin.dart';
 import 'package:poker_credits/net/socket_client.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
@@ -265,6 +266,69 @@ void main() {
       async.flushMicrotasks();
       expect(client.state.stillTrying(_start.add(async.elapsed)), isTrue);
       client.close();
+    });
+  });
+
+  group('a host that cannot be trusted (ADR-019)', () {
+    RoomClient clientFailingWith(FakeAsync async, Object error, List<int> attempts) => RoomClient(
+      uri: Uri.parse('wss://192.168.1.5:7878/v1/ws'),
+      firstMessage: _join,
+      transport: (uri) async {
+        attempts.add(attempts.length);
+        throw error;
+      },
+      backoff: Backoff(random: Random(7)),
+      now: () => _start.add(async.elapsed),
+    );
+
+    test('a different certificate stops the link at once and is never retried', () {
+      fakeAsync((async) {
+        final attempts = <int>[];
+        final client = clientFailingWith(async, const PinMismatch(), attempts)..start();
+        async.flushMicrotasks();
+        async.elapse(const Duration(minutes: 5));
+        expect(client.state.phase, LinkPhase.failed);
+        expect(client.state.failure, LinkFailure.hostNotTrusted);
+        expect(attempts, hasLength(1), reason: 'no second chance for whoever answers');
+        client.close();
+      });
+    });
+
+    test('a host without TLS is reported as outdated on the second failed handshake', () {
+      fakeAsync((async) {
+        final attempts = <int>[];
+        final client = clientFailingWith(async, const NoSecureChannel(), attempts)..start();
+        async.flushMicrotasks();
+        expect(client.state.phase, LinkPhase.waiting, reason: 'once can be a flaky network');
+        async.elapse(const Duration(seconds: 30));
+        expect(client.state.phase, LinkPhase.failed);
+        expect(client.state.failure, LinkFailure.hostOutdated);
+        expect(attempts, hasLength(2));
+        client.close();
+      });
+    });
+
+    test('a plaintext address of another device is refused for good', () {
+      fakeAsync((async) {
+        final attempts = <int>[];
+        final client = clientFailingWith(async, InsecureAddress(Uri.parse('ws://192.168.1.5:7878/v1/ws')), attempts)..start();
+        async.flushMicrotasks();
+        expect(client.state.failure, LinkFailure.hostOutdated);
+        expect(attempts, hasLength(1));
+        client.close();
+      });
+    });
+
+    test('an ordinary network error keeps retrying', () {
+      fakeAsync((async) {
+        final attempts = <int>[];
+        final client = clientFailingWith(async, StateError('no route'), attempts)..start();
+        async.flushMicrotasks();
+        async.elapse(const Duration(minutes: 1));
+        expect(client.state.failure, isNull);
+        expect(attempts.length, greaterThan(2));
+        client.close();
+      });
     });
   });
 }

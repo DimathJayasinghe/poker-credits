@@ -3,7 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:logging/logging.dart';
+import 'package:poker_bridge/poker_bridge.dart';
+import 'package:poker_credits/net/pin.dart';
 import 'package:poker_credits/platform/host_finder.dart';
+import 'package:poker_credits/platform/secure_channel_io.dart';
 import 'package:poker_credits/platform/server_address.dart';
 
 final _log = Logger('HostFinder');
@@ -20,6 +23,10 @@ HostFinder createHostFinder() => LanHostFinder();
 /// Only the answer `exists: true` counts, and nothing is listed: a host reveals nothing about
 /// rooms whose code the asker does not already know. A rogue server on the network can at most
 /// see the code being asked for and then the player's name.
+///
+/// The probes are HTTPS (ADR-019). A host's certificate is self-signed, so nothing is verified
+/// here: the finder takes the certificate fingerprint of whoever answers and the join pins that
+/// device (trust on first use). Hosts of older versions speak plain HTTP and are not found.
 final class LanHostFinder implements HostFinder {
   LanHostFinder({
     Future<List<String>> Function()? candidates,
@@ -27,9 +34,50 @@ final class LanHostFinder implements HostFinder {
     this.concurrency = 48,
     this.probeTimeout = const Duration(milliseconds: 700),
     this.deadline = const Duration(seconds: 12),
-  }) : _candidates = candidates ?? _lanCandidates;
+    CertHasher? hasher,
+  }) : _candidates = candidates ?? _lanCandidates,
+       _hasher = hasher;
 
+  final CertHasher? _hasher;
   final Future<List<String>> Function() _candidates;
+
+  /// A client for the probes: TLS 1.3, no authority trusted, and every certificate noted in
+  /// [seen] under `address:port` so the answer can be paired with the fingerprint.
+  Future<HttpClient> _newClient(Map<String, String> seen) async {
+    final hash = _hasher ?? (await _bridgeHasher());
+    final context = SecurityContext(withTrustedRoots: false)..minimumTlsProtocolVersion = TlsProtocolVersion.tls1_3;
+    return HttpClient(context: context)
+      ..connectionTimeout = probeTimeout
+      ..badCertificateCallback = (cert, host, port) {
+        seen['$host:$port'] = hash(cert.der);
+        return true;
+      };
+  }
+
+  static Future<CertHasher> _bridgeHasher() async {
+    await initBridge();
+    return (List<int> der) => certFingerprint(der: der);
+  }
+
+  @override
+  Future<String?> fingerprintOf(String hostAndPort) async {
+    final seen = <String, String>{};
+    HttpClient? client;
+    try {
+      client = await _newClient(seen);
+      final uri = Uri.parse('https://$hostAndPort/health');
+      final request = await client.getUrl(uri).timeout(probeTimeout * 4);
+      final response = await request.close().timeout(probeTimeout * 4);
+      await response.drain<void>().timeout(probeTimeout * 4);
+      final pin = seen['${uri.host}:${uri.port}'];
+      return isPin(pin) ? pin : null;
+    } on Object {
+      return null;
+    } finally {
+      client?.close(force: true);
+    }
+  }
+
   final List<int> ports;
 
   /// Probes in flight at once.
@@ -80,6 +128,7 @@ final class _Search implements HostSearch {
   final LanHostFinder _finder;
   final String _code;
   final Completer<DiscoveredHost?> _done = Completer<DiscoveredHost?>();
+  final Map<String, String> _seen = <String, String>{};
   HttpClient? _client;
   Timer? _deadline;
   bool _cancelled = false;
@@ -110,7 +159,11 @@ final class _Search implements HostSearch {
     try {
       final candidates = await _finder._candidates();
       if (_cancelled) return;
-      final client = HttpClient()..connectionTimeout = _finder.probeTimeout;
+      final client = await _finder._newClient(_seen);
+      if (_cancelled) {
+        client.close(force: true);
+        return;
+      }
       _client = client;
       _log.info('looking for room on ${candidates.length} addresses');
       for (final port in _finder.ports) {
@@ -135,7 +188,11 @@ final class _Search implements HostSearch {
       while (found == null && !_cancelled) {
         final index = next++;
         if (index >= hosts.length) return;
-        if (await _probe(client, hosts[index], port)) found ??= DiscoveredHost('${hosts[index]}:$port');
+        if (await _probe(client, hosts[index], port)) {
+          final address = '${hosts[index]}:$port';
+          final pin = _seen['${hosts[index]}:$port'];
+          found ??= DiscoveredHost(address, fingerprint: isPin(pin) ? pin : null);
+        }
       }
     }
 
@@ -145,7 +202,7 @@ final class _Search implements HostSearch {
 
   Future<bool> _probe(HttpClient client, String host, int port) async {
     try {
-      final request = await client.getUrl(Uri(scheme: 'http', host: host, port: port, path: '/v1/room/$_code')).timeout(_finder.probeTimeout);
+      final request = await client.getUrl(Uri(scheme: 'https', host: host, port: port, path: '/v1/room/$_code')).timeout(_finder.probeTimeout);
       final response = await request.close().timeout(_finder.probeTimeout);
       if (response.statusCode != HttpStatus.ok) {
         await response.drain<void>().timeout(_finder.probeTimeout);
@@ -174,6 +231,7 @@ final class _Browse implements LobbyBrowse {
   final StreamController<List<DiscoveredLobby>> _updates = StreamController<List<DiscoveredLobby>>.broadcast();
   final Completer<void> _done = Completer<void>();
   final List<DiscoveredLobby> _found = <DiscoveredLobby>[];
+  final Map<String, String> _seen = <String, String>{};
   HttpClient? _client;
   Timer? _deadline;
   bool _cancelled = false;
@@ -208,7 +266,11 @@ final class _Browse implements LobbyBrowse {
     try {
       final candidates = await _finder._candidates();
       if (_cancelled) return;
-      final client = HttpClient()..connectionTimeout = _finder.probeTimeout;
+      final client = await _finder._newClient(_seen);
+      if (_cancelled) {
+        client.close(force: true);
+        return;
+      }
       _client = client;
       _log.info('browsing ${candidates.length} addresses for open games');
       for (final port in _finder.ports) {
@@ -236,7 +298,7 @@ final class _Browse implements LobbyBrowse {
 
   Future<void> _probe(HttpClient client, String host, int port) async {
     try {
-      final request = await client.getUrl(Uri(scheme: 'http', host: host, port: port, path: '/v1/lobbies')).timeout(_finder.probeTimeout);
+      final request = await client.getUrl(Uri(scheme: 'https', host: host, port: port, path: '/v1/lobbies')).timeout(_finder.probeTimeout);
       final response = await request.close().timeout(_finder.probeTimeout);
       if (response.statusCode != HttpStatus.ok) {
         await response.drain<void>().timeout(_finder.probeTimeout);
@@ -251,9 +313,10 @@ final class _Browse implements LobbyBrowse {
       final list = body is Map<String, dynamic> ? body['lobbies'] : null;
       if (list is! List) return;
       final hostAndPort = '$host:$port';
+      final pin = _seen[hostAndPort];
       var grew = false;
       for (final entry in list.take(16)) {
-        final lobby = DiscoveredLobby.tryParse(entry, hostAndPort);
+        final lobby = DiscoveredLobby.tryParse(entry, hostAndPort, fingerprint: isPin(pin) ? pin : null);
         if (lobby != null && !_found.contains(lobby)) {
           _found.add(lobby);
           grew = true;

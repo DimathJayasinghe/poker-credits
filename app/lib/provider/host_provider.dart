@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:logging/logging.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/net/features.dart';
+import 'package:poker_credits/net/pin.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_protocol/poker_protocol.dart';
@@ -23,6 +24,9 @@ class HostState {
   final List<String> addresses;
   final HostException? error;
 
+  /// The pin guests need (it goes into the QR code), or `null` when the server is not on the network.
+  String? get fingerprint => room?.fingerprint;
+
   /// `host:port` strings to type, one per address.
   List<String> get joinAddresses {
     final port = room?.port;
@@ -39,7 +43,10 @@ class HostNotifier extends Notifier<HostState> {
   @override
   HostState init() => const HostState();
 
-  Uri _loopback(int port) => Uri.parse('ws://127.0.0.1:$port/v1/ws');
+  /// The host's own screen talks to its server like any guest. A server that is open to the
+  /// network is encrypted, so this is `wss://` pinned to the host's own certificate.
+  Uri _loopback(int port, String? fingerprint) =>
+      fingerprint == null ? Uri.parse('ws://127.0.0.1:$port/v1/ws') : withPin(Uri.parse('wss://127.0.0.1:$port/v1/ws'), fingerprint);
 
   /// Hosts a new game.
   Future<void> start({required String hostName, required RoomConfig config}) async {
@@ -51,7 +58,7 @@ class HostNotifier extends Notifier<HostState> {
           .read(tokenStoreProvider)
           .write(
             StoredSession(
-              serverUri: _loopback(room.port).toString(),
+              serverUri: _loopback(room.port, room.fingerprint).toString(),
               roomCode: room.roomCode,
               sessionToken: room.sessionToken,
               hostToken: room.hostToken,
@@ -83,6 +90,7 @@ class HostNotifier extends Notifier<HostState> {
         sessionToken: stored.sessionToken,
         hostToken: hostToken,
         port: port,
+        fingerprint: ref.read(hostServerProvider).fingerprint,
       );
       _connect(room);
       unawaited(ref.read(hostKeepAliveProvider).start(room.roomCode));
@@ -120,7 +128,7 @@ class HostNotifier extends Notifier<HostState> {
     ref
         .notifier(sessionProvider)
         .attach(
-          uri: _loopback(room.port),
+          uri: _loopback(room.port, room.fingerprint),
           first: Resume(
             roomCode: room.roomCode,
             sessionToken: room.sessionToken,

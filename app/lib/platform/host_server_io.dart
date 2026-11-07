@@ -40,6 +40,9 @@ final class NativeHostServer implements HostServer {
   int? get port => _controller.port;
 
   @override
+  String? get fingerprint => _controller.fingerprint;
+
+  @override
   Future<int> startServer() async {
     return _guard(() async {
       await _init();
@@ -74,6 +77,7 @@ final class NativeHostServer implements HostServer {
         sessionToken: created.sessionToken,
         hostToken: created.hostToken,
         port: port,
+        fingerprint: _controller.fingerprint,
       );
     });
   }
@@ -173,7 +177,7 @@ final class NativeHostServer implements HostServer {
     } on BridgeException catch (error) {
       throw switch (error.kind) {
         BridgeFailureKind.bind => HostException(HostFailure.portBusy, error.message),
-        BridgeFailureKind.dataDir => HostException(HostFailure.storage, error.message),
+        BridgeFailureKind.dataDir || BridgeFailureKind.tls => HostException(HostFailure.storage, error.message),
         BridgeFailureKind.room => HostException(HostFailure.refused, error.message, code: error.code),
         BridgeFailureKind.panic => HostException(HostFailure.crashed, error.message),
         BridgeFailureKind.unknown => HostException(HostFailure.unavailable, error.message),

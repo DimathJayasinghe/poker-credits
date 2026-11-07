@@ -8,9 +8,13 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 /// Bordered block with the join QR, the typed address(es) and the room code in large type.
 /// The QR sits beside the text on a wide panel and above it on a narrow one.
 class QrPanel extends StatelessWidget {
-  const QrPanel({super.key, required this.roomCode, required this.addresses, this.qrSize = 180, this.compact = false});
+  const QrPanel({super.key, required this.roomCode, required this.addresses, this.fingerprint, this.qrSize = 180, this.compact = false});
 
   final String roomCode;
+
+  /// Pin of the host's certificate. It goes into the QR code, so a scanned code can only reach
+  /// this device (ADR-019). Typed addresses and codes cannot carry it.
+  final String? fingerprint;
 
   /// `address:port` strings; the first one goes into the QR code.
   final List<String> addresses;
@@ -26,7 +30,7 @@ class QrPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
-    final link = addresses.isEmpty ? null : JoinLink(hostAndPort: addresses.first, roomCode: roomCode);
+    final link = addresses.isEmpty ? null : JoinLink(hostAndPort: addresses.first, roomCode: roomCode, fingerprint: fingerprint);
 
     final qr = link == null
         ? null
@@ -41,6 +45,9 @@ class QrPanel extends StatelessWidget {
                 height: qrSize,
                 child: PrettyQrView.data(
                   data: link.toString(),
+                  // The code is read from a screen, so it needs no repair data; the fingerprint
+                  // makes the text long and the lowest level keeps the squares large.
+                  errorCorrectLevel: QrErrorCorrectLevel.L,
                   decoration: PrettyQrDecoration(shape: PrettyQrSquaresSymbol(color: BrutalColors.light.ink)),
                 ),
               ),

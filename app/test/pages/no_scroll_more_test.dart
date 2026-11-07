@@ -45,7 +45,7 @@ void main() {
         await tester.pumpWidget(const SizedBox());
 
         final playing = MemoryTokenStore();
-        await playing.write(const StoredSession(serverUri: 'ws://10.0.0.2:7878/v1/ws', roomCode: 'KQ7M', sessionToken: 's'));
+        await playing.write(const StoredSession(serverUri: 'wss://10.0.0.2:7878/v1/ws#pin=$testPin', roomCode: 'KQ7M', sessionToken: 's'));
         await launchOn(tester, TestHarness(tokens: playing), d, scale: scale);
         await tester.pump();
         misfits.check(tester, 'home with a game to rejoin', find.text('HOST A GAME'), d, scale);

@@ -16,7 +16,7 @@ class TermsSection {
 const List<TermsSection> termsSections = <TermsSection>[
   TermsSection(
     'Use a Wi-Fi you trust',
-    'Games run over your local network and the connection is not encrypted. On a shared or public Wi-Fi (a cafe, hotel, school or office) other people on that network could watch the traffic or try to join with the room code. Host on your own home Wi-Fi, or on your phone hotspot with a password. Give the room code only to the people at your table.',
+    'Games run over your local network and the connection is encrypted. Even so, on a shared or public Wi-Fi (a cafe, hotel, school or office) other people on that network can see that a game is running, try to join with the room code, or block it. Joining by scanning the host\'s QR code is the safest way: it also checks you reached the right phone. When you join by room code or by typing an address, the app trusts the phone that answers the first time. Host on your own home Wi-Fi, or on your phone hotspot with a password. Give the room code only to the people at your table.',
   ),
   TermsSection(
     'The host holds the cards',

@@ -53,7 +53,7 @@ void main() {
 
   testWidgets('a stored player session is not offered as hosting', (tester) async {
     final tokens = MemoryTokenStore();
-    await tokens.write(const StoredSession(serverUri: 'ws://10.0.0.2:7878/v1/ws', roomCode: 'KQ7M', sessionToken: 's'));
+    await tokens.write(const StoredSession(serverUri: 'wss://10.0.0.2:7878/v1/ws#pin=$testPin', roomCode: 'KQ7M', sessionToken: 's'));
     await tester.pumpWidget(_app(TestHarness(tokens: tokens)));
     await tester.pump();
     await tester.pump();

@@ -17,6 +17,10 @@ abstract interface class HostServer {
   /// Port of the running server, or `null` when none runs.
   int? get port;
 
+  /// The certificate fingerprint guests pin, or `null` when no server runs or it is not on the
+  /// network (ADR-019).
+  String? get fingerprint;
+
   /// Starts the embedded server (rooms found on disk come back) and returns its port. Does
   /// nothing when it already runs. Used to re-attach to a room after the app was killed.
   ///
