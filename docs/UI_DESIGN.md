@@ -44,6 +44,17 @@ Fonts are **bundled** (SIL OFL, licences beside the files), never fetched.
 
 Scale (logical px, scaled by the OS text setting): 12 label, 14 body, 18 lead, 28 heading, 44 title, 64 stack, 96 pot, 120 hero. Layouts must hold at text scale 2.0 (tested).
 
+### Type scale (`BrutalType` in `tokens.dart`)
+| Role | Size |
+| :--- | ---: |
+| Page headline (Anton) | 34 |
+| Section heading (Anton) | 26 |
+| Row label: primary (Home) / dense (lists of settings and links) | 26 / 21 |
+| Reading text (Space Mono), line height 1.5 | 14 (15 in walkthroughs) |
+| Captions and small uppercase labels | 12 |
+
+New screens use these and never a size of their own. Lists of settings and links use `BrutalRow(dense: true)`; only the two Home actions keep the large row. A section of reading text is one cell (`GuideBlock`: heading then paragraph), not two.
+
 ### Shape, line, space
 | Token | Value |
 | :--- | :--- |

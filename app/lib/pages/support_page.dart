@@ -55,13 +55,18 @@ class _SupportPageState extends State<SupportPage> with Refena {
                               header: true,
                               child: Text(
                                 Strings.supportHeadline.toUpperCase(),
-                                style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 40, height: 1.05, color: c.ink),
+                                style: TextStyle(fontFamily: BrutalFonts.display, fontSize: BrutalType.headline, height: 1.05, color: c.ink),
                               ),
                             ),
                             const SizedBox(height: BrutalMetrics.gapM),
                             Text(
                               Strings.supportBody,
-                              style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: 14, height: 1.5, color: c.muted),
+                              style: TextStyle(
+                                fontFamily: BrutalFonts.mono,
+                                fontSize: BrutalType.body,
+                                height: BrutalType.bodyHeight,
+                                color: c.muted,
+                              ),
                             ),
                           ],
                         ),
@@ -70,13 +75,24 @@ class _SupportPageState extends State<SupportPage> with Refena {
                       if (_last == LinkResult.failed) const BrutalBanner(message: Strings.linkFailed, kind: BrutalBannerKind.error),
                       _Hairline(c.line),
                       BrutalRow(
+                        dense: true,
                         label: Strings.supportStar,
                         caption: Strings.supportStarCaption,
                         emphasis: true,
                         onTap: () => _open(ProjectLinks.repository),
                       ),
-                      BrutalRow(label: Strings.supportFollow, caption: Strings.supportFollowCaption, onTap: () => _open(ProjectLinks.profile)),
-                      BrutalRow(label: Strings.supportIssues, caption: Strings.supportIssuesCaption, onTap: () => _open(ProjectLinks.issues)),
+                      BrutalRow(
+                        dense: true,
+                        label: Strings.supportFollow,
+                        caption: Strings.supportFollowCaption,
+                        onTap: () => _open(ProjectLinks.profile),
+                      ),
+                      BrutalRow(
+                        dense: true,
+                        label: Strings.supportIssues,
+                        caption: Strings.supportIssuesCaption,
+                        onTap: () => _open(ProjectLinks.issues),
+                      ),
                       Padding(
                         padding: const EdgeInsets.all(BrutalMetrics.gapL),
                         child: _RepoCode(url: ProjectLinks.repository),

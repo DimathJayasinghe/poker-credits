@@ -57,11 +57,49 @@ class GuideHeading extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(title.toUpperCase(), style: _title(context, 34)),
+            Text(title.toUpperCase(), style: _title(context, BrutalType.section)),
             if (intro != null) ...<Widget>[
               const SizedBox(height: BrutalMetrics.gapS),
               Text(intro!, style: _body(context, color: c.muted)),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One section of reading text as a single cell: the heading, then the paragraph, under a heavy rule.
+class GuideBlock extends StatelessWidget {
+  const GuideBlock({super.key, required this.title, required this.body});
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = BrutalTheme.of(context).colors;
+    return Semantics(
+      container: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapL, BrutalMetrics.gapL, BrutalMetrics.gapL, BrutalMetrics.gapL),
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: c.line, width: BrutalMetrics.borderHeavy),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Semantics(
+              header: true,
+              child: Text(title.toUpperCase(), style: _title(context, BrutalType.section)),
+            ),
+            const SizedBox(height: BrutalMetrics.gapS + 2),
+            Text(
+              body,
+              style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: BrutalType.body, height: BrutalType.bodyHeight, color: c.ink),
+            ),
           ],
         ),
       ),

@@ -179,15 +179,17 @@ class _SettingsViewState extends State<SettingsView> with Refena {
                     ),
                     const _Section(Strings.sectionData),
                     BrutalRow(
+                      dense: true,
                       label: Strings.forgetGame,
                       caption: _notice ?? (_hasSavedGame ? Strings.forgetGameCaption : Strings.forgetGameNothing),
                       onTap: _hasSavedGame ? _forget : null,
                     ),
                     const _Section(Strings.sectionHelp),
-                    BrutalRow(label: Strings.helpTourRow, caption: Strings.helpTourCaption, onTap: () => openAppTour(context)),
-                    BrutalRow(label: Strings.helpLearnRow, caption: Strings.helpLearnCaption, onTap: () => openLesson(context)),
+                    BrutalRow(dense: true, label: Strings.helpTourRow, caption: Strings.helpTourCaption, onTap: () => openAppTour(context)),
+                    BrutalRow(dense: true, label: Strings.helpLearnRow, caption: Strings.helpLearnCaption, onTap: () => openLesson(context)),
                     const _Section(Strings.sectionAbout),
                     BrutalRow(
+                      dense: true,
                       label: Strings.supportRow,
                       caption: Strings.supportRowCaption,
                       onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SupportPage())),
@@ -195,11 +197,13 @@ class _SettingsViewState extends State<SettingsView> with Refena {
                     _Fact(Strings.versionLabel, _version.isEmpty ? '-' : _version),
                     const _Fact(Strings.protocolLabel, 'v$protocolVersion'),
                     BrutalRow(
+                      dense: true,
                       label: Strings.termsRow,
                       caption: Strings.termsRowCaption,
                       onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TermsPage.readOnly())),
                     ),
                     BrutalRow(
+                      dense: true,
                       label: Strings.licences,
                       onTap: () => showLicensePage(context: context, applicationName: Strings.appName, applicationVersion: _version),
                     ),

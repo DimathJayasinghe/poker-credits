@@ -182,6 +182,35 @@ abstract final class BrutalMetrics {
   static const Duration max = Duration(milliseconds: 280);
 }
 
+/// The type scale. Screens use these instead of sizes of their own, so a headline on one page is the
+/// same size as on every other (docs/UI_DESIGN.md section 2). The Home hero and the game numerals
+/// are display pieces with sizes of their own.
+abstract final class BrutalType {
+  /// A page's headline (Anton).
+  static const double headline = 34;
+
+  /// A section heading inside a long page (Anton).
+  static const double section = 26;
+
+  /// The label of a primary row, such as the two Home actions (Anton).
+  static const double rowLabel = 26;
+
+  /// The label of a row in a list of settings or links (Anton).
+  static const double rowLabelDense = 21;
+
+  /// Reading text (Space Mono).
+  static const double body = 14;
+
+  /// Reading text in a walkthrough, where a screen holds one idea (Space Mono).
+  static const double bodyLarge = 15;
+
+  /// Line height of reading text.
+  static const double bodyHeight = 1.5;
+
+  /// Captions under a label, and small uppercase labels (Space Mono).
+  static const double caption = 12;
+}
+
 /// Bundled font families (declared in pubspec.yaml). Never downloaded at runtime.
 abstract final class BrutalFonts {
   /// Condensed heavy face for titles and numerals.

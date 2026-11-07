@@ -347,12 +347,12 @@ abstract final class Strings {
   static const String supportHeadline = 'Free, open source, made by one person';
   static const String supportBody =
       'Poker Credits is built and maintained by Dimath Jayasinghe. It has no ads, no accounts and no tracking, and it never sends anything outside your own Wi-Fi. If it made your game night better, these three taps help more than you think.';
-  static const String supportStar = 'Star the project on GitHub';
-  static const String supportStarCaption = 'A star helps other people find the app';
-  static const String supportFollow = 'Follow Dimath on GitHub';
+  static const String supportStar = 'Star on GitHub';
+  static const String supportStarCaption = 'Helps other people find the app';
+  static const String supportFollow = 'Follow on GitHub';
   static const String supportFollowCaption = 'Get updates and see what comes next';
-  static const String supportIssues = 'Report a bug or suggest something';
-  static const String supportIssuesCaption = 'Open an issue; every one is read';
+  static const String supportIssues = 'Report a bug';
+  static const String supportIssuesCaption = 'Suggestions are welcome too';
   static const String supportScan = 'Or scan with another phone';
   static const String supportThanks = 'Thank you for playing.';
   static const String linkCopied = 'Link copied. Paste it into your browser.';
@@ -379,7 +379,8 @@ abstract final class Strings {
   static const String walkSkip = 'Skip';
   static String walkStep(int step, int total) => 'Step $step of $total';
   static const String introTitle = 'Welcome';
-  static const String introBody = 'Want a quick look around before the first hand? Both are optional and you can find them again in the Guide.';
+  static const String introBody =
+      'Want a quick look around before the first hand? Both are optional. You can open them again later from Settings or the Guide.';
   static const String introTour = 'Take the app tour';
   static const String introTourCaption = 'How hosting, joining and playing work. About 2 minutes.';
   static const String introLearn = 'Learn poker';

@@ -53,16 +53,10 @@ class _TermsPageState extends State<TermsPage> {
                         padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapL, BrutalMetrics.gapXl, BrutalMetrics.gapL, BrutalMetrics.gapL),
                         child: Text(
                           Strings.termsIntro,
-                          style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: 14, height: 1.5, color: c.muted),
+                          style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: BrutalType.body, height: BrutalType.bodyHeight, color: c.muted),
                         ),
                       ),
-                      for (final section in termsSections) ...<Widget>[
-                        GuideHeading(section.title),
-                        Padding(
-                          padding: const EdgeInsets.all(BrutalMetrics.gapL),
-                          child: Text(section.body, style: TextStyle(fontSize: 15, height: 1.5, color: c.ink)),
-                        ),
-                      ],
+                      for (final section in termsSections) GuideBlock(title: section.title, body: section.body),
                       if (!widget.readOnly) ...<Widget>[
                         Container(height: BrutalMetrics.borderHeavy, color: c.line),
                         BrutalSwitchRow(

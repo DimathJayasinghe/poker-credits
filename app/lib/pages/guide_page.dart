@@ -72,25 +72,26 @@ class _GuideViewState extends State<GuideView> {
                             header: true,
                             child: Text(
                               Strings.guideIntro.toUpperCase(),
-                              style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 44, height: 1, color: c.ink),
+                              style: TextStyle(fontFamily: BrutalFonts.display, fontSize: BrutalType.headline, height: 1.05, color: c.ink),
                             ),
                           ),
                           const SizedBox(height: BrutalMetrics.gapM),
                           Text(
                             Strings.guideIntroBody,
-                            style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: 14, height: 1.5, color: c.muted),
+                            style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: BrutalType.body, height: BrutalType.bodyHeight, color: c.muted),
                           ),
                         ],
                       ),
                     ),
                     // The two walkthroughs come straight after the headline that promises them.
                     BrutalRow(
+                      dense: true,
                       label: Strings.guideLearnRow,
                       caption: Strings.guideLearnRowCaption,
                       emphasis: true,
                       onTap: () => openLesson(context),
                     ),
-                    BrutalRow(label: Strings.guideTourRow, caption: Strings.guideTourRowCaption, onTap: () => openAppTour(context)),
+                    BrutalRow(dense: true, label: Strings.guideTourRow, caption: Strings.guideTourRowCaption, onTap: () => openAppTour(context)),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapL, BrutalMetrics.gapL, BrutalMetrics.gapL, BrutalMetrics.gapL),
                       child: Column(
@@ -142,6 +143,7 @@ class _GuideViewState extends State<GuideView> {
                     const GuideHeading(Strings.guideSectionManners),
                     const GuideBullets(guideManners),
                     BrutalRow(
+                      dense: true,
                       label: Strings.guideSupportRow,
                       caption: Strings.guideSupportCaption,
                       onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SupportPage())),

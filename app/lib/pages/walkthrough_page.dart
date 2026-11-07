@@ -157,11 +157,14 @@ class _StepPage extends StatelessWidget {
                       header: true,
                       child: Text(
                         step.title.toUpperCase(),
-                        style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 36, height: 1.05, color: c.ink),
+                        style: TextStyle(fontFamily: BrutalFonts.display, fontSize: BrutalType.headline, height: 1.05, color: c.ink),
                       ),
                     ),
                     const SizedBox(height: BrutalMetrics.gapM),
-                    Text(step.body, style: TextStyle(fontSize: 16, height: 1.5, color: c.ink)),
+                    Text(
+                      step.body,
+                      style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: BrutalType.bodyLarge, height: BrutalType.bodyHeight, color: c.ink),
+                    ),
                   ],
                 ),
               ),

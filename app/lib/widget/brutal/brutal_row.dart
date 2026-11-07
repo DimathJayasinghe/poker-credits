@@ -44,12 +44,16 @@ class _ArrowPainter extends CustomPainter {
 /// Home actions and Settings navigation use it. [emphasis] fills it with the accent (use for the
 /// one thing the screen is for).
 class BrutalRow extends StatelessWidget {
-  const BrutalRow({super.key, required this.label, required this.onTap, this.caption, this.emphasis = false});
+  const BrutalRow({super.key, required this.label, required this.onTap, this.caption, this.emphasis = false, this.dense = false});
 
   final String label;
   final String? caption;
   final VoidCallback? onTap;
   final bool emphasis;
+
+  /// A tighter row for lists of settings and links: a smaller label and a shorter cell. The two
+  /// Home actions keep the full size.
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +75,7 @@ class BrutalRow extends StatelessWidget {
           return AnimatedContainer(
             duration: duration,
             curve: Curves.easeOut,
-            constraints: const BoxConstraints(minHeight: 76),
+            constraints: BoxConstraints(minHeight: dense ? 64 : 76),
             decoration: BoxDecoration(
               color: fill,
               border: Border(
@@ -84,7 +88,7 @@ class BrutalRow extends StatelessWidget {
                 children: <Widget>[
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapL, vertical: BrutalMetrics.gapM),
+                      padding: EdgeInsets.symmetric(horizontal: BrutalMetrics.gapL, vertical: dense ? BrutalMetrics.gapS + 4 : BrutalMetrics.gapM),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -93,7 +97,7 @@ class BrutalRow extends StatelessWidget {
                             duration: duration,
                             style: TextStyle(
                               fontFamily: BrutalFonts.display,
-                              fontSize: 26,
+                              fontSize: dense ? BrutalType.rowLabelDense : BrutalType.rowLabel,
                               height: 1.05,
                               letterSpacing: 0.8,
                               color: enabled ? text : c.muted,
@@ -104,7 +108,7 @@ class BrutalRow extends StatelessWidget {
                             const SizedBox(height: BrutalMetrics.gapXs),
                             AnimatedDefaultTextStyle(
                               duration: duration,
-                              style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: 12, height: 1.3, color: muted),
+                              style: TextStyle(fontFamily: BrutalFonts.mono, fontSize: BrutalType.caption, height: 1.3, color: muted),
                               child: Text(caption!),
                             ),
                           ],
@@ -113,7 +117,7 @@ class BrutalRow extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    width: 76,
+                    width: dense ? 64 : 76,
                     decoration: BoxDecoration(
                       border: Border(
                         left: BorderSide(color: c.line, width: BrutalMetrics.border),
