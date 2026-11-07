@@ -39,6 +39,42 @@ class _ShowdownSheetState extends State<ShowdownSheet> {
     });
   }
 
+  Widget _pot(BuildContext context, PotView pot, {required bool short}) {
+    final c = BrutalTheme.of(context).colors;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          '${Strings.potLabel.toUpperCase()} ${pot.tierIndex + 1}: ${pot.amount}',
+          style: TextStyle(fontFamily: BrutalFonts.display, fontSize: short ? 20 : 24, color: c.ink),
+        ),
+        SizedBox(height: short ? BrutalMetrics.gapXs : BrutalMetrics.gapS),
+        if (pot.eligiblePlayerIds.isEmpty)
+          Text(
+            Strings.noEligible.toUpperCase(),
+            style: TextStyle(color: c.ink, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
+          )
+        else
+          Wrap(
+            spacing: BrutalMetrics.gapS,
+            runSpacing: BrutalMetrics.gapS,
+            children: <Widget>[
+              for (final id in pot.eligiblePlayerIds)
+                _WinnerChip(
+                  short: short,
+                  label: _name(id),
+                  selected: (_winners[pot.tierIndex] ?? const <String>{}).contains(id),
+                  onTap: () => _toggle(pot.tierIndex, id),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  /// The list of pots scrolls when there are more players and pots than the screen has room for;
+  /// the confirm button under it never does.
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
@@ -46,42 +82,47 @@ class _ShowdownSheetState extends State<ShowdownSheet> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text(
-          Strings.chooseWinners.toUpperCase(),
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: c.muted),
-        ),
-        const SizedBox(height: BrutalMetrics.gapM),
-        for (final pot in widget.pots) ...<Widget>[
-          Text(
-            '${Strings.potLabel.toUpperCase()} ${pot.tierIndex + 1}: ${pot.amount}',
-            style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 24, color: c.ink),
-          ),
-          const SizedBox(height: BrutalMetrics.gapS),
-          if (pot.eligiblePlayerIds.isEmpty)
-            Text(
-              Strings.noEligible.toUpperCase(),
-              style: TextStyle(color: c.ink, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
-            )
-          else
-            Wrap(
-              spacing: BrutalMetrics.gapS,
-              runSpacing: BrutalMetrics.gapS,
+        Flexible(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                for (final id in pot.eligiblePlayerIds)
-                  _WinnerChip(
-                    label: _name(id),
-                    selected: (_winners[pot.tierIndex] ?? const <String>{}).contains(id),
-                    onTap: () => _toggle(pot.tierIndex, id),
-                  ),
+                Text(
+                  Strings.chooseWinners.toUpperCase(),
+                  style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: c.muted),
+                ),
+                const SizedBox(height: BrutalMetrics.gapS),
+                // Two pots side by side where the sheet is wide (a phone on its side).
+                LayoutBuilder(
+                  builder: (context, box) {
+                    final short = MediaQuery.sizeOf(context).height < 460;
+                    const gap = BrutalMetrics.gapM;
+                    final columns = box.maxWidth >= 640 && widget.pots.length > 1 ? 2 : 1;
+                    final width = (box.maxWidth - gap * (columns - 1)) / columns;
+                    return Wrap(
+                      spacing: gap,
+                      runSpacing: gap,
+                      children: <Widget>[
+                        for (final pot in widget.pots)
+                          SizedBox(
+                            width: width,
+                            child: _pot(context, pot, short: short),
+                          ),
+                      ],
+                    );
+                  },
+                ),
               ],
             ),
-          const SizedBox(height: BrutalMetrics.gapM),
-        ],
+          ),
+        ),
+        const SizedBox(height: BrutalMetrics.gapS),
         BrutalButton(
           label: Strings.confirmWinners,
           kind: BrutalButtonKind.primary,
           heavy: true,
-          minHeight: BrutalMetrics.tapPlayer,
+          minHeight: MediaQuery.sizeOf(context).height < 460 ? 48 : BrutalMetrics.tapPlayer,
           onPressed: _complete
               ? () => widget.onConfirm(<WireAllocation>[
                   for (final pot in widget.pots)
@@ -98,8 +139,10 @@ class _ShowdownSheetState extends State<ShowdownSheet> {
 }
 
 class _WinnerChip extends StatelessWidget {
-  const _WinnerChip({required this.label, required this.selected, required this.onTap});
+  const _WinnerChip({required this.short, required this.label, required this.selected, required this.onTap});
 
+  /// A short screen: a slightly lower chip.
+  final bool short;
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -121,7 +164,7 @@ class _WinnerChip extends StatelessWidget {
           final Color text = pressed ? c.paper : (selected ? c.onAccent : c.ink);
           return AnimatedContainer(
             duration: duration,
-            constraints: const BoxConstraints(minHeight: BrutalMetrics.tap, minWidth: BrutalMetrics.tap),
+            constraints: BoxConstraints(minHeight: short ? 44 : BrutalMetrics.tap, minWidth: BrutalMetrics.tap),
             padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM),
             decoration: BoxDecoration(
               color: fill,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:poker_credits/model/room_state.dart';
@@ -34,6 +35,7 @@ import 'package:poker_credits/widget/table/pot_display.dart';
 import 'package:poker_credits/widget/table/pot_results.dart';
 import 'package:poker_credits/widget/table/qr_panel.dart';
 import 'package:poker_credits/widget/table/seat_plate.dart';
+import 'package:poker_credits/widget/table/table_fit.dart';
 import 'package:poker_credits/widget/table/seat_order_sheet.dart';
 import 'package:poker_credits/widget/table/showdown_sheet.dart';
 import 'package:poker_protocol/poker_protocol.dart';
@@ -42,7 +44,7 @@ import 'package:refena_flutter/refena_flutter.dart';
 /// Slots around the table; the engine seats at most 10 players.
 const int tableSeats = 10;
 
-/// Largest text scale the host table honours (see [TablePage.build]).
+/// Largest text scale the host table honours, however much height there is (see [TablePage.build]).
 const double _maxTextScale = 2;
 
 /// The Table display: follows the app theme, landscape or tablet, readable from across the room.
@@ -192,6 +194,8 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
     showBrutalSheet<void>(
       context: context,
       title: Strings.resolveShowdown,
+      maxWidth: wideSheetWidth(context),
+      scrolls: false,
       builder: (sheetContext) => ShowdownSheet(
         pots: view.pots,
         seats: view.seats,
@@ -225,17 +229,28 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _onBack();
       },
-      // The table is a shared display with fixed geometry (an oval of seats around the pot), so its
-      // text stops growing at 200 %. Every other screen scales to 300 %, and dialogs and sheets
-      // opened from here are outside this clamp.
-      child: MediaQuery.withClampedTextScaling(
-        maxScaleFactor: _maxTextScale,
-        child: PaperScaffold(body: Builder(builder: (context) => _body(context, session, host))),
+      // The table is a game and never scrolls: its text grows only as far as the height allows
+      // (see [TableFit.maxTextScale]), and never past 200 %. Every other screen scales to 300 %,
+      // and dialogs and sheets opened from here are outside this clamp.
+      child: Builder(
+        builder: (context) {
+          final size = MediaQuery.sizeOf(context);
+          final usable = size.height - MediaQuery.paddingOf(context).vertical;
+          final wide = TableFit.isWide(Size(size.width, usable));
+          final cap = math.min(_maxTextScale, TableFit.maxTextScale(usable, wide: wide));
+          final scale = math.min(cap, MediaQuery.textScalerOf(context).scale(14) / 14);
+          // Worked out here, outside the safe area: inside it the system bars are already gone.
+          final fit = wide ? TableFit.forWide(usable, textScale: scale) : TableFit.forHeight(usable, textScale: scale, width: size.width);
+          return MediaQuery.withClampedTextScaling(
+            maxScaleFactor: cap,
+            child: PaperScaffold(body: Builder(builder: (context) => _body(context, session, host, fit))),
+          );
+        },
       ),
     );
   }
 
-  Widget _body(BuildContext context, SessionState session, HostState host) {
+  Widget _body(BuildContext context, SessionState session, HostState host, TableFit fit) {
     final c = BrutalTheme.of(context).colors;
     final failure = session.link.failure;
     final ended = session.room.ended;
@@ -305,20 +320,53 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
       _faceUp = settings.cardsFaceUp;
     }
     final sharedScreen = MediaQuery.sizeOf(context).width >= FeltLayout.narrowWidth;
-    final dock = showCards && mySeat != null
-        ? HoleCardsDock(
-            cards: mySeat.hasFolded ? null : room.visibleHoleCards,
-            faceUp: _faceUp,
-            pressToPeek: sharedScreen,
-            fourColour: settings.fourColourDeck,
-            onToggle: () => setState(() => _faceUp = !_faceUp),
-          )
-        : null;
-    Widget felt({required bool shrink}) => FeltLayout(
-      shrinkWrap: shrink,
+    final hasDock = showCards && mySeat != null;
+    final lobby = view.phase == WirePhase.lobby;
+    final onItsSide = MediaQuery.sizeOf(context).width >= 600 && MediaQuery.sizeOf(context).height < 460;
+    final fourColour = settings.fourColourDeck;
+
+    Widget actingLine({required double fontSize}) => FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        '> ${Strings.acting.toUpperCase()}: ${acting!.name.toUpperCase()}${remaining == null ? '' : '  ${clock(remaining)}'}',
+        style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: fontSize, color: c.onFelt),
+      ),
+    );
+    // The middle of the felt when the table has to be small: the pot with the board beside it, and
+    // under them who is to act or who won.
+    final compactCenter = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              PotDisplay(total: view.totalPot, pots: view.pots, fontSize: fit.pot, compact: true),
+              if (showCards) ...<Widget>[
+                const SizedBox(width: BrutalMetrics.gapM),
+                BoardView(shown: board, size: fit.boardCard, fourColour: fourColour, slotColor: c.onFelt, animate: true),
+              ],
+            ],
+          ),
+        ),
+        if (result != null) ...<Widget>[
+          const SizedBox(height: BrutalMetrics.gapXs),
+          PotResults(result: result, color: c.onFelt),
+        ] else if (acting != null && mine == null) ...<Widget>[
+          // On my own turn the "your turn" line under the table says it, with the clock.
+          const SizedBox(height: BrutalMetrics.gapXs),
+          actingLine(fontSize: 14),
+        ],
+      ],
+    );
+    FeltLayout felt({bool showCenter = true}) => FeltLayout(
+      fit: fit,
+      showCenter: showCenter,
       seatCount: tableSeats,
       occupied: seatsByIndex.keys.toSet(),
-      center: view.phase == WirePhase.lobby
+      center: lobby
           ? QrPanel(roomCode: view.roomCode, addresses: host.joinAddresses)
           : Column(
               mainAxisSize: MainAxisSize.min,
@@ -326,20 +374,21 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
                 PotDisplay(total: view.totalPot, pots: view.pots),
                 if (showCards) ...<Widget>[
                   const SizedBox(height: BrutalMetrics.gapS),
-                  BoardView(shown: board, fourColour: settings.fourColourDeck, slotColor: c.onFelt, animate: true),
+                  BoardView(shown: board, fourColour: fourColour, slotColor: c.onFelt, animate: true),
                 ],
                 if (result != null) ...<Widget>[
                   const SizedBox(height: BrutalMetrics.gapS),
                   PotResults(result: result, color: c.onFelt),
                 ] else if (acting != null) ...<Widget>[
                   const SizedBox(height: BrutalMetrics.gapM),
-                  Text(
-                    '> ${Strings.acting.toUpperCase()}: ${acting.name.toUpperCase()}${remaining == null ? '' : '  ${clock(remaining)}'}',
-                    style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 20, color: c.onFelt),
-                  ),
+                  actingLine(fontSize: 20),
                 ],
               ],
             ),
+      compactCenter: lobby
+          ? QrPanel(roomCode: view.roomCode, addresses: host.joinAddresses, qrSize: onItsSide ? 96 : fit.qr, compact: true)
+          : compactCenter,
+      framed: !lobby,
       seatBuilder: (context, index, width) {
         final seat = seatsByIndex[index]!;
         final isActive = view.activeSeat == index;
@@ -358,78 +407,129 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
         );
       },
     );
-    final actionBlock = <Widget>[
-      if (dock != null)
-        Center(
-          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: dock),
-        ),
-      if (mine != null)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Text(
-                    '${Strings.yourTurn}${remaining == null ? '' : '  ${clock(remaining)}'}'.toUpperCase(),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 24, color: c.accent),
-                  ),
-                  const SizedBox(height: BrutalMetrics.gapS),
-                  ActionButtons(
-                    legal: mine.legal,
-                    enabled: session.link.isLive && !inFlight,
-                    onFold: () => _act(const FoldAction()),
-                    onCheck: () => _act(const CheckAction()),
-                    onCall: () => _act(const CallAction()),
-                    onRaise: () => _raise(mine.legal),
-                  ),
-                ],
+    EdgeInsets blockPad() =>
+        EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: fit.isRoomy ? BrutalMetrics.gapS : (fit.isTight ? 2 : BrutalMetrics.gapXs));
+    // What sits under the table (or in the pane beside it): the seated host's cards and buttons,
+    // then the host's own controls. [width] is the room they get.
+    // The seated host's own cards and turn buttons, each on its own (null when not shown).
+    ({Widget? hand, Widget? turn}) playerParts() {
+      final turn = mine == null
+          ? null
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  '${Strings.yourTurn}${remaining == null ? '' : '  ${clock(remaining)}'}'.toUpperCase(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: BrutalFonts.display, fontSize: fit.isRoomy ? 24 : 18, color: c.accent),
+                ),
+                SizedBox(height: fit.isRoomy ? BrutalMetrics.gapS : BrutalMetrics.gapXs),
+                ActionButtons(
+                  legal: mine.legal,
+                  enabled: session.link.isLive && !inFlight,
+                  onFold: () => _act(const FoldAction()),
+                  onCheck: () => _act(const CheckAction()),
+                  onCall: () => _act(const CallAction()),
+                  onRaise: () => _raise(mine.legal),
+                  buttonHeight: fit.button,
+                  gap: fit.gap,
+                  oneRow: !fit.isRoomy,
+                  compact: !fit.isRoomy,
+                ),
+              ],
+            );
+      final hand = showCards && mySeat != null
+          ? HoleCardsDock(
+              cards: mySeat.hasFolded ? null : room.visibleHoleCards,
+              faceUp: _faceUp,
+              pressToPeek: sharedScreen,
+              fourColour: fourColour,
+              size: fit.dockCard,
+              showHint: fit.isRoomy,
+              verticalPadding: fit.isRoomy ? BrutalMetrics.gapS : 2,
+              onToggle: () => setState(() => _faceUp = !_faceUp),
+            )
+          : null;
+      return (hand: hand, turn: turn);
+    }
+
+    List<Widget> player(double width) {
+      final (:hand, :turn) = playerParts();
+      // The cards beside the buttons when the width allows, so the two together take one row of height.
+      final sideBySide = !fit.isRoomy && hand != null && turn != null && width >= 300;
+      return <Widget>[
+        if (sideBySide)
+          Padding(
+            padding: blockPad(),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                SizedBox(width: fit.dockCard.width * 2 + BrutalMetrics.gapS, child: hand),
+                const SizedBox(width: BrutalMetrics.gapM),
+                Expanded(child: turn),
+              ],
+            ),
+          )
+        else ...<Widget>[
+          if (hand != null)
+            Center(
+              child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: hand),
+            ),
+          if (turn != null)
+            Padding(
+              padding: blockPad(),
+              child: Center(
+                child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: turn),
               ),
             ),
-          ),
-        ),
-    ];
-    final hostBlock = <Widget>[
-      if (session.isHost) ...<Widget>[
-        for (final rebuy in view.pendingRebuys.where((r) => !r.approved)) _rebuyStrip(view, rebuy),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  if (view.phase == WirePhase.lobby) ...<Widget>[
-                    Text(
-                      Strings.lobbyHint,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, height: 1.35, color: c.muted),
+        ],
+      ];
+    }
+
+    List<Widget> hostPart() {
+      return <Widget>[
+        if (session.isHost) ...<Widget>[
+          for (final rebuy in view.pendingRebuys.where((r) => !r.approved)) _rebuyStrip(view, rebuy),
+          Padding(
+            padding: blockPad(),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    if (lobby && !fit.isTight) ...<Widget>[
+                      Text(
+                        Strings.lobbyHint,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, height: 1.35, color: c.muted),
+                      ),
+                      const SizedBox(height: BrutalMetrics.gapS),
+                    ],
+                    HostControls(
+                      view: view,
+                      enabled: session.link.isLive,
+                      onSend: _send,
+                      onPickWinners: () => _pickWinners(view),
+                      onSeats: () => showSeatOrderSheet(context, isHost: true),
+                      onEndGame: _endGame,
+                      virtual: showCards,
+                      holdStart: !settled,
+                      fit: fit,
                     ),
-                    const SizedBox(height: BrutalMetrics.gapS),
                   ],
-                  HostControls(
-                    view: view,
-                    enabled: session.link.isLive,
-                    onSend: _send,
-                    onPickWinners: () => _pickWinners(view),
-                    onSeats: () => showSeatOrderSheet(context, isHost: true),
-                    onEndGame: _endGame,
-                    virtual: showCards,
-                    holdStart: !settled,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
-    ];
+        ],
+      ];
+    }
+
+    final hasControls = session.isHost || mine != null || (showCards && mySeat != null);
+    final seated = mySeat != null && !widget.watching;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -440,91 +540,119 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
         Expanded(
           child: LayoutBuilder(
             builder: (context, box) {
-              // Roomy: the oval fills what the controls leave. Cramped: the whole middle scrolls
-              // and the controls come first, so nothing is ever drawn over anything else.
-              if (_cramped(
-                context,
-                box,
-                myTurn: mine != null,
-                host: session.isHost,
-                lobby: view.phase == WirePhase.lobby,
-                dock: dock != null,
-                note: HostControls.showsUndoNote(phase: view.phase, virtual: showCards),
-              )) {
-                // Short content sits with the controls at the bottom edge; long content scrolls.
-                return SingleChildScrollView(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: box.maxHeight),
-                    // A phone keeps the controls at the bottom edge, in thumb reach. A wide screen
-                    // centres the whole block so a short table does not leave a hole in the middle.
-                    child: Column(
-                      mainAxisAlignment: box.maxWidth >= FeltLayout.narrowWidth ? MainAxisAlignment.center : MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: <Widget>[
-                            ...actionBlock,
-                            Padding(padding: const EdgeInsets.all(BrutalMetrics.gapM), child: felt(shrink: true)),
-                          ],
-                        ),
-                        if (box.maxWidth >= FeltLayout.narrowWidth) const SizedBox(height: BrutalMetrics.gapM),
-                        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: hostBlock),
-                      ],
-                    ),
+              final around = EdgeInsets.all(fit.isRoomy ? BrutalMetrics.gapM : (fit.isTight ? 6 : BrutalMetrics.gapS));
+              // Wide but short (a phone on its side, a window): the controls take a pane at the
+              // right, so the table keeps the whole height.
+              if (hasControls &&
+                  box.maxWidth >= FeltLayout.narrowWidth &&
+                  _needsPane(context, box, myTurn: mine != null, host: session.isHost, lobby: lobby, dock: hasDock)) {
+                // A seated host has two stacks of controls and gets a wider pane.
+                final pane = seated ? (box.maxWidth * 0.46).clamp(360.0, 460.0) : (box.maxWidth * 0.3).clamp(232.0, 380.0);
+                final line = BorderSide(color: c.line, width: BrutalMetrics.border);
+                // Where the oval cannot fit beside the pane, the seats are a grid and the pot and
+                // the board move into the pane (the join code stays above the seats), so the seats
+                // get the whole height.
+                final seatsBox = Size(box.maxWidth - pane - 2 * around.left, box.maxHeight - 2 * around.top);
+                final middleInPane = !lobby && !FeltLayout.ovalFits(seatsBox, FeltLayout.plateHeightFor(context));
+                final middle = DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: c.felt,
+                    border: Border.all(color: c.line, width: BrutalMetrics.border),
                   ),
+                  child: Padding(
+                    padding: EdgeInsets.all(fit.isRoomy ? fit.gap : BrutalMetrics.gapXs),
+                    child: Center(child: compactCenter),
+                  ),
+                );
+                final (:hand, :turn) = playerParts();
+                // The pot and the board with the seated host's cards beside them, the turn buttons
+                // under, then the host's controls: three short rows in place of five.
+                final top = middleInPane && hand != null
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: <Widget>[
+                          Expanded(child: middle),
+                          const SizedBox(width: BrutalMetrics.gapS),
+                          SizedBox(width: fit.dockCard.width * 2 + BrutalMetrics.gapS, child: hand),
+                        ],
+                      )
+                    : (middleInPane ? middle : hand);
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Expanded(
+                      child: Padding(
+                        padding: around,
+                        child: felt(showCenter: !middleInPane),
+                      ),
+                    ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(border: Border(left: line)),
+                      child: SizedBox(
+                        width: pane,
+                        child: LayoutBuilder(
+                          // The pane is the last place that scrolls: only when a seated host with
+                          // cards, buttons and controls has less height than they need together.
+                          builder: (context, paneBox) => SingleChildScrollView(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(minHeight: paneBox.maxHeight),
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: <Widget>[
+                                    if (top != null) Padding(padding: blockPad(), child: top),
+                                    if (turn != null) Padding(padding: blockPad(), child: turn),
+                                    ...hostPart(),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               }
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   Expanded(
-                    child: Padding(padding: const EdgeInsets.all(BrutalMetrics.gapM), child: felt(shrink: false)),
+                    child: Padding(padding: around, child: felt()),
                   ),
-                  ...actionBlock,
-                  ...hostBlock,
+                  ...player(box.maxWidth),
+                  ...hostPart(),
                 ],
               );
             },
           ),
         ),
-        ActionTicker(actions: room.ticker),
+        ActionTicker(actions: room.ticker, compact: !fit.isRoomy),
       ],
     );
   }
 
   /// Rough height of what sits under the table while it is shown: the turn buttons and the host
-  /// controls. Only used to decide when the oval no longer fits next to them. The host controls
-  /// are the hint (lobby only), the full-width main button and one row of buttons, or two rows on
-  /// a phone.
+  /// controls. Only used to decide whether the oval still fits above them on a wide screen; if not,
+  /// the controls move to a pane at the side.
   static const double _turnBlockHeight = 150;
 
   /// The seated host's cards and their caption.
-  static const double _dockHeight = 170;
+  static const double _dockHeight = 150;
 
-  /// The note under the host controls in a virtual room: up to three lines of small text and its gap.
-  static const double _undoNoteHeight = BrutalMetrics.gapS + 3 * 17;
+  static double _hostBlockHeight({required bool lobby}) => 16 + (lobby ? 44 : 0) + 56 + BrutalMetrics.gapS + 48 + 2 * BrutalMetrics.gapS + 60;
 
-  static double _hostBlockHeight({required double width, required bool lobby, required bool note}) {
-    final rows = width < 480 ? 2 : 1;
-    return 16 + (lobby ? 44 : 0) + 56 + BrutalMetrics.gapS + rows * 48 + (rows - 1) * BrutalMetrics.gapS + (note ? _undoNoteHeight : 0);
-  }
-
-  bool _cramped(
+  bool _needsPane(
     BuildContext context,
     BoxConstraints box, {
     required bool myTurn,
     required bool host,
     required bool lobby,
     required bool dock,
-    required bool note,
   }) {
-    final chrome =
-        (dock ? _dockHeight : 0) +
-        (myTurn ? _turnBlockHeight : 0) +
-        (host ? _hostBlockHeight(width: box.maxWidth, lobby: lobby, note: note) : 0) +
-        2 * BrutalMetrics.gapM;
-    if (box.maxWidth < FeltLayout.narrowWidth) return box.maxHeight < 420 + chrome;
+    if (box.maxHeight < 460) return true;
+    final chrome = (dock ? _dockHeight : 0) + (myTurn ? _turnBlockHeight : 0) + (host ? _hostBlockHeight(lobby: lobby) : 0) + 2 * BrutalMetrics.gapM;
     return box.maxHeight < FeltLayout.minOvalHeight(context) + chrome;
   }
 

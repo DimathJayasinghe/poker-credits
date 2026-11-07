@@ -118,12 +118,21 @@ void main() {
     expect(tester.getSize(find.text('HOST A GAME')).height, greaterThan(normal * 2));
   });
 
-  testWidgets('the host table stops growing the text at 200 %', (tester) async {
+  testWidgets('the host table stops growing the text at 200 % when it is tall enough', (tester) async {
+    final harness = TestHarness();
+    await _pump(tester, const Size(1280, 1200), 3, harness);
+    await _hostAs(tester, harness, _betting());
+    final scaler = MediaQuery.textScalerOf(tester.element(find.byType(SeatPlate).first));
+    expect(scaler.scale(10), 20);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('the host table grows the text only as far as its height allows: a game does not scroll', (tester) async {
     final harness = TestHarness();
     await _pump(tester, const Size(1280, 800), 3, harness);
     await _hostAs(tester, harness, _betting());
     final scaler = MediaQuery.textScalerOf(tester.element(find.byType(SeatPlate).first));
-    expect(scaler.scale(10), 20);
+    expect(scaler.scale(10), closeTo(10 * 800 / 560, 0.01));
     await tester.pumpWidget(const SizedBox());
   });
 

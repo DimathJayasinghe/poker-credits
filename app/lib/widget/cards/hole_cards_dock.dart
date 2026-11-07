@@ -18,6 +18,7 @@ class HoleCardsDock extends StatefulWidget {
     this.size = CardSize.hero,
     this.fourColour = false,
     this.showHint = true,
+    this.verticalPadding = BrutalMetrics.gapS,
   });
 
   /// Null = no cards (folded, between hands, or not yet dealt).
@@ -31,6 +32,9 @@ class HoleCardsDock extends StatefulWidget {
   /// The "tap to show" line under the cards; left out where the screen is short (the semantics
   /// hint stays).
   final bool showHint;
+
+  /// Space above and below the cards; a short screen asks for less.
+  final double verticalPadding;
 
   @override
   State<HoleCardsDock> createState() => _HoleCardsDockState();
@@ -85,7 +89,7 @@ class _HoleCardsDockState extends State<HoleCardsDock> {
           behavior: HitTestBehavior.opaque,
           onTap: cards == null || widget.pressToPeek ? null : widget.onToggle,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapS),
+            padding: EdgeInsets.symmetric(vertical: widget.verticalPadding),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[

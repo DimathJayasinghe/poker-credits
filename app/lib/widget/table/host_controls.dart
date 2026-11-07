@@ -4,6 +4,7 @@ import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/seat_order.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/brutal_button.dart';
+import 'package:poker_credits/widget/table/table_fit.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
 /// What the host presses. Every button only sends a command and waits for the server's answer
@@ -19,6 +20,7 @@ class HostControls extends StatelessWidget {
     required this.onEndGame,
     this.virtual = false,
     this.holdStart = false,
+    this.fit = TableFit.roomy,
   });
 
   final RoomView view;
@@ -37,6 +39,9 @@ class HostControls extends StatelessWidget {
   /// The run-out is still being dealt on screen; the next hand waits for its last card.
   final bool holdStart;
 
+  /// How tightly the buttons are drawn.
+  final TableFit fit;
+
   static bool _betting(WirePhase phase) =>
       phase == WirePhase.preFlop || phase == WirePhase.flop || phase == WirePhase.turn || phase == WirePhase.river;
 
@@ -54,7 +59,7 @@ class HostControls extends StatelessWidget {
         label: Strings.startHand,
         kind: BrutalButtonKind.primary,
         heavy: true,
-        minHeight: BrutalMetrics.tapPlayer,
+        minHeight: fit.button,
         onPressed: holdStart ? null : send(const StartHand()),
       ),
       WirePhase.allInRunout when virtual => null,
@@ -63,14 +68,14 @@ class HostControls extends StatelessWidget {
         label: Strings.beginShowdown,
         kind: BrutalButtonKind.primary,
         heavy: true,
-        minHeight: BrutalMetrics.tapPlayer,
+        minHeight: fit.button,
         onPressed: send(const BeginShowdown()),
       ),
       WirePhase.showdown => BrutalButton(
         label: Strings.resolveShowdown,
         kind: BrutalButtonKind.primary,
         heavy: true,
-        minHeight: BrutalMetrics.tapPlayer,
+        minHeight: fit.button,
         onPressed: enabled ? onPickWinners : null,
       ),
       _ => null,
@@ -78,13 +83,27 @@ class HostControls extends StatelessWidget {
     final betweenHands = !seatsLocked(phase);
     // Secondary actions share one grid of equal cells, so their widths never depend on their labels.
     final secondary = <Widget>[
-      if (betweenHands) BrutalButton(label: Strings.seatsButton, onPressed: enabled ? onSeats : null),
+      if (betweenHands)
+        BrutalButton(label: Strings.seatsButton, minHeight: fit.secondary, compact: !fit.isRoomy, onPressed: enabled ? onSeats : null),
       if (view.paused)
-        BrutalButton(label: Strings.resume, kind: BrutalButtonKind.info, onPressed: send(const ResumeGame()))
+        BrutalButton(
+          label: Strings.resume,
+          kind: BrutalButtonKind.info,
+          minHeight: fit.secondary,
+          compact: !fit.isRoomy,
+          onPressed: send(const ResumeGame()),
+        )
       else if (inHand)
-        BrutalButton(label: Strings.pause, onPressed: send(const Pause())),
-      if (inHand || phase == WirePhase.allInRunout || phase == WirePhase.showdown) BrutalButton(label: Strings.undo, onPressed: send(const Undo())),
-      BrutalButton(label: Strings.endGame, kind: BrutalButtonKind.danger, onPressed: enabled ? onEndGame : null),
+        BrutalButton(label: Strings.pause, minHeight: fit.secondary, compact: !fit.isRoomy, onPressed: send(const Pause())),
+      if (inHand || phase == WirePhase.allInRunout || phase == WirePhase.showdown)
+        BrutalButton(label: Strings.undo, minHeight: fit.secondary, compact: !fit.isRoomy, onPressed: send(const Undo())),
+      BrutalButton(
+        label: Strings.endGame,
+        kind: BrutalButtonKind.danger,
+        minHeight: fit.secondary,
+        compact: !fit.isRoomy,
+        onPressed: enabled ? onEndGame : null,
+      ),
     ];
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -92,11 +111,11 @@ class HostControls extends StatelessWidget {
       children: <Widget>[
         // The one thing to do next gets a row of its own, the full width of the controls.
         if (primary != null) ...<Widget>[primary, const SizedBox(height: BrutalMetrics.gapS)],
-        _ButtonGrid(children: secondary),
+        _ButtonGrid(minCellWidth: fit.isRoomy ? 104 : 90, children: secondary),
         if (showsUndoNote(phase: phase, virtual: virtual)) ...<Widget>[
           const SizedBox(height: BrutalMetrics.gapS),
           Text(
-            Strings.undoVirtualNote,
+            fit.note == 0 ? Strings.undoVirtualNote : Strings.undoVirtualShort,
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, height: 1.35, color: BrutalTheme.of(context).colors.muted),
           ),
@@ -109,11 +128,10 @@ class HostControls extends StatelessWidget {
 /// Lays buttons out in rows of equal cells. As many columns as keep a cell at least
 /// [minCellWidth] wide, then the rows are balanced (four buttons make 2 + 2, not 3 + 1).
 class _ButtonGrid extends StatelessWidget {
-  const _ButtonGrid({required this.children});
+  const _ButtonGrid({required this.children, required this.minCellWidth});
 
   final List<Widget> children;
-
-  static const double minCellWidth = 104;
+  final double minCellWidth;
 
   @override
   Widget build(BuildContext context) {

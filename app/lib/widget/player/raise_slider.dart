@@ -29,6 +29,8 @@ class _RaiseSliderState extends State<RaiseSlider> {
   @override
   Widget build(BuildContext context) {
     final step = _step(_max - _min);
+    // On a phone held on its side the sheet has little height: a tighter slider and button.
+    final short = MediaQuery.sizeOf(context).height < 460;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -40,15 +42,16 @@ class _RaiseSliderState extends State<RaiseSlider> {
           step: step,
           semanticLabel: Strings.raiseTo,
           stepButtons: true,
+          compact: short,
           ticks: <BrutalTick>[BrutalTick(Strings.min, _min), BrutalTick(Strings.max, _max)],
           onChanged: (v) => setState(() => _value = v),
         ),
-        const SizedBox(height: BrutalMetrics.gapL),
+        SizedBox(height: short ? BrutalMetrics.gapS : BrutalMetrics.gapL),
         BrutalButton(
           label: _allIn ? '${Strings.allInAction} $_max' : '${Strings.raiseTo} $_value',
           kind: BrutalButtonKind.primary,
           heavy: true,
-          minHeight: BrutalMetrics.tapPlayer,
+          minHeight: short ? 48 : BrutalMetrics.tapPlayer,
           onPressed: () => widget.onConfirm(_allIn ? const AllInAction() : RaiseAction(toAmount: _value)),
         ),
       ],

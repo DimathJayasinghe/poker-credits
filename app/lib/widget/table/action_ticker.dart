@@ -7,12 +7,15 @@ import 'package:poker_protocol/poker_protocol.dart';
 
 /// Strip with the latest actions, newest first.
 class ActionTicker extends StatelessWidget {
-  const ActionTicker({super.key, required this.actions, this.visible = 4});
+  const ActionTicker({super.key, required this.actions, this.visible = 4, this.compact = false});
 
   final List<ActionPerformed> actions;
 
   /// How many recent actions to show.
   final int visible;
+
+  /// Smaller type and padding, for a short screen.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +28,7 @@ class ActionTicker extends StatelessWidget {
       excludeSemantics: true,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: BrutalMetrics.gapS),
+        padding: EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: compact ? BrutalMetrics.gapXs : BrutalMetrics.gapS),
         decoration: BoxDecoration(
           color: c.paper,
           border: Border(
@@ -36,7 +39,7 @@ class ActionTicker extends StatelessWidget {
           text.toUpperCase(),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5, color: c.ink),
+          style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: compact ? 14 : 16, letterSpacing: 0.5, color: c.ink),
         ),
       ),
     );

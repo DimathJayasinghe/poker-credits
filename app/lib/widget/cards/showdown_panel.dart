@@ -4,6 +4,7 @@ import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/describe.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/brutal/brutal_card.dart';
+import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
 import 'package:poker_credits/widget/brutal/brutal_tag.dart';
 import 'package:poker_credits/widget/cards/board_view.dart';
 import 'package:poker_credits/widget/cards/card_row.dart';
@@ -101,19 +102,22 @@ class ShowdownPanel extends StatelessWidget {
               label: Strings.showdownMore(hidden),
               excludeSemantics: true,
               onTap: onMore,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
+              child: BrutalPressable(
                 onTap: onMore,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapXs),
-                  child: Text(
-                    Strings.showdownMore(hidden).toUpperCase(),
-                    style: TextStyle(
-                      fontFamily: BrutalFonts.mono,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      decoration: TextDecoration.underline,
-                      color: c.ink,
+                builder: (context, pressed) => ConstrainedBox(
+                  // A real tap target, not only the words.
+                  constraints: const BoxConstraints(minHeight: 44),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      Strings.showdownMore(hidden).toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: BrutalFonts.mono,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        decoration: TextDecoration.underline,
+                        color: pressed ? c.muted : c.ink,
+                      ),
                     ),
                   ),
                 ),

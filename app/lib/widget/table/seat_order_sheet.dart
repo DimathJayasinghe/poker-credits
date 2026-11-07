@@ -17,6 +17,7 @@ Future<void> showSeatOrderSheet(BuildContext context, {required bool isHost}) {
   return showBrutalSheet<void>(
     context: context,
     title: Strings.seatsTitle,
+    maxWidth: wideSheetWidth(context),
     builder: (_) => SeatOrderPicker(isHost: isHost),
   );
 }
@@ -80,12 +81,16 @@ class _SeatOrderPickerState extends State<SeatOrderPicker> with Refena {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text(hint, style: TextStyle(fontSize: 14, height: 1.4, color: c.muted)),
-        const SizedBox(height: BrutalMetrics.gapM),
+        Text(hint, style: TextStyle(fontSize: 14, height: 1.35, color: c.muted)),
+        const SizedBox(height: BrutalMetrics.gapS),
         LayoutBuilder(
           builder: (context, constraints) {
             const gap = BrutalMetrics.gapS;
-            final width = (constraints.maxWidth - gap) / 2;
+            // Two columns on a phone upright, five where the sheet is wide (ten seats, two rows).
+            final columns = constraints.maxWidth >= 600 ? 5 : (constraints.maxWidth >= 520 ? 3 : 2);
+            final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+            // A short screen gets cells a little less tall.
+            final cell = MediaQuery.sizeOf(context).height < 700 ? 44.0 : BrutalMetrics.tapPlayer;
             return Wrap(
               spacing: gap,
               runSpacing: gap,
@@ -94,6 +99,7 @@ class _SeatOrderPickerState extends State<SeatOrderPicker> with Refena {
                   SizedBox(
                     width: width,
                     child: _SeatCell(
+                      height: cell,
                       index: i,
                       seat: seats[i],
                       isMine: seats[i]?.playerId == mine,
@@ -107,12 +113,12 @@ class _SeatOrderPickerState extends State<SeatOrderPicker> with Refena {
           },
         ),
         if (view.seats.length > 1) ...<Widget>[
-          const SizedBox(height: BrutalMetrics.gapM),
+          const SizedBox(height: BrutalMetrics.gapS),
           Text(Strings.seatsClockwise.toUpperCase(), style: TextStyle(fontSize: 12, letterSpacing: 1, color: c.muted)),
-          const SizedBox(height: BrutalMetrics.gapXs),
+          const SizedBox(height: 2),
           Text(
             Strings.seatsOrderLine(clockwiseNames(view.seats)),
-            style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 14, height: 1.4, color: c.ink),
+            style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 14, height: 1.3, color: c.ink),
           ),
         ],
       ],
@@ -127,8 +133,17 @@ class _SeatOrderPickerState extends State<SeatOrderPicker> with Refena {
 }
 
 class _SeatCell extends StatelessWidget {
-  const _SeatCell({required this.index, required this.seat, required this.isMine, required this.picked, required this.enabled, required this.onTap});
+  const _SeatCell({
+    required this.height,
+    required this.index,
+    required this.seat,
+    required this.isMine,
+    required this.picked,
+    required this.enabled,
+    required this.onTap,
+  });
 
+  final double height;
   final int index;
   final SeatView? seat;
   final bool isMine;
@@ -162,9 +177,9 @@ class _SeatCell extends StatelessWidget {
                   border: Border.all(color: c.line, width: isMine ? BrutalMetrics.borderHeavy : BrutalMetrics.border),
                 ),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: BrutalMetrics.tapPlayer),
+                  constraints: BoxConstraints(minHeight: height),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS, vertical: BrutalMetrics.gapS),
+                    padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS, vertical: BrutalMetrics.gapXs),
                     child: Row(
                       children: <Widget>[
                         BrutalNumber(number, size: 28, color: text),

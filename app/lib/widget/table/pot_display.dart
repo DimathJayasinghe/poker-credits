@@ -7,7 +7,7 @@ import 'package:poker_protocol/poker_protocol.dart';
 
 /// The pot: the biggest block on the table. Side pots are listed below the total.
 class PotDisplay extends StatelessWidget {
-  const PotDisplay({super.key, required this.total, required this.pots, this.fontSize = 72});
+  const PotDisplay({super.key, required this.total, required this.pots, this.fontSize = 72, this.compact = false});
 
   final int total;
 
@@ -15,11 +15,18 @@ class PotDisplay extends StatelessWidget {
   final List<PotView> pots;
   final double fontSize;
 
+  /// The label beside the figure instead of above it, for a short screen.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     final c = BrutalTheme.of(context).colors;
     final ink = c.onChip;
     final sides = pots.where((p) => p.tierIndex > 0).toList();
+    Widget label(Color ink, double size, double spacing) => Text(
+      Strings.pot.toUpperCase(),
+      style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: size, letterSpacing: spacing, color: ink),
+    );
     return Semantics(
       container: true,
       label: '${Strings.pot} $total',
@@ -30,18 +37,29 @@ class PotDisplay extends StatelessWidget {
           border: Border.all(color: c.line, width: BrutalMetrics.borderHeavy),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapL, vertical: BrutalMetrics.gapM),
+          padding: compact
+              ? const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapM, vertical: 2)
+              : const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapL, vertical: BrutalMetrics.gapM),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(
-                Strings.pot.toUpperCase(),
-                style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 2, color: ink),
-              ),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: BrutalNumber(total, size: fontSize, color: ink),
-              ),
+              if (compact)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: <Widget>[
+                    label(ink, 12, 1.5),
+                    const SizedBox(width: BrutalMetrics.gapS),
+                    BrutalNumber(total, size: fontSize, color: ink),
+                  ],
+                )
+              else ...<Widget>[
+                label(ink, 13, 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: BrutalNumber(total, size: fontSize, color: ink),
+                ),
+              ],
               if (sides.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: BrutalMetrics.gapXs),
@@ -51,7 +69,7 @@ class PotDisplay extends StatelessWidget {
                       for (final side in sides)
                         Text(
                           '${Strings.sidePot.toUpperCase()} ${side.amount}',
-                          style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 16, color: ink),
+                          style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: compact ? 12 : 16, color: ink),
                         ),
                     ],
                   ),

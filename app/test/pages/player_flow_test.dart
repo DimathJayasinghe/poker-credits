@@ -480,7 +480,8 @@ void main() {
     expect(find.textContaining('NO GAME WITH THAT CODE FOUND ON THIS WI-FI'), findsOneWidget);
     expect(find.byType(TextField), findsNWidgets(3), reason: 'the address field appears');
 
-    await tester.enterText(find.byType(TextField).at(1), '192.168.1.9');
+    // Code and name share a line; the address field comes after them.
+    await tester.enterText(find.byType(TextField).at(2), '192.168.1.9');
     await tester.ensureVisible(find.text('JOIN'));
     await tester.tap(find.text('JOIN'));
     await tester.pump();

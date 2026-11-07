@@ -559,13 +559,16 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
 
         // Hosted games keep room for a two-line label on the three small buttons.
         final secondary = solo ? fit.secondary : fit.secondary + 12;
+        // On a phone on its side the showdown takes the right-hand side, so my cards move to the
+        // left, under my chips, where there is room.
+        final showdownSide = wide && result != null;
         final bottom = Padding(
           padding: EdgeInsets.fromLTRB(BrutalMetrics.gapM, 0, BrutalMetrics.gapM, fit.gap),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              if (showCards) _dock(room, seat, settings.fourColourDeck, fit),
+              if (showCards && !showdownSide) _dock(room, seat, settings.fourColourDeck, fit),
               if (myPrompt != null) ...<Widget>[
                 ActionButtons(
                   legal: myPrompt.legal,
@@ -653,21 +656,32 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
                     Expanded(
-                      flex: 11,
+                      flex: showdownSide ? 8 : 11,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
                           stack,
-                          Expanded(child: infoFit),
+                          if (showdownSide) ...<Widget>[
+                            const Spacer(),
+                            if (showCards)
+                              Padding(
+                                padding: EdgeInsets.fromLTRB(BrutalMetrics.gapM, 0, BrutalMetrics.gapM, fit.gap),
+                                child: _dock(room, seat, settings.fourColourDeck, fit),
+                              ),
+                          ] else
+                            Expanded(child: infoFit),
                         ],
                       ),
                     ),
                     Expanded(
-                      flex: 9,
+                      flex: showdownSide ? 12 : 9,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisAlignment: MainAxisAlignment.end,
-                        children: <Widget>[bottom],
+                        children: <Widget>[
+                          if (showdownSide) Expanded(child: infoFit),
+                          bottom,
+                        ],
                       ),
                     ),
                   ],

@@ -14,6 +14,7 @@ import 'package:poker_credits/widget/player/opponent_strip.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
 import '../support/fakes.dart';
+import '../support/no_scroll.dart';
 
 /// The human is Dimath at seat 1 (the fake host answers `p_1`); the others are the table.
 List<SeatView> _seats({int others = 4, bool cards = true}) => <SeatView>[
@@ -601,6 +602,52 @@ void main() {
         expect(panel.bottom, lessThanOrEqualTo(limit), reason: 'the showdown is fully on screen');
         await _close(tester);
       });
+    }
+
+    // The end-of-game page: the place, the numbers, the deciding hand and the two ways on.
+    const out = <Finish>[
+      Finish(playerId: 'p_2', name: 'Liam', place: 5),
+      Finish(playerId: 'p_3', name: 'Zoe', place: 4),
+      Finish(playerId: 'p_1', name: 'Dimath', place: 3),
+    ];
+    for (final d in devices) {
+      for (final scale in <double>[1.0, 1.3]) {
+        for (final hands in <int>[2, 6]) {
+          testWidgets('${d.$1}, text x$scale: the result page with $hands hands does not scroll', (tester) async {
+            final size = Size(d.$2, d.$3);
+            final insets = EdgeInsets.only(top: d.$4, bottom: d.$5);
+            final h = await _playing(tester, size: size, scale: scale, insets: insets);
+            final seats = _seats(others: 6);
+            final reveals = <Reveal>[
+              for (var i = 0; i < hands; i++)
+                Reveal(
+                  playerId: 'p_$i',
+                  name: seats[i].name,
+                  cards: <PokerCard>[card('As'), card('Kd')],
+                  category: HandCategory.pair,
+                  bestFive: <PokerCard>[card('As'), card('Ad'), card('Kd'), card('9c'), card('4h')],
+                ),
+            ];
+            await _update(
+              tester,
+              h,
+              _view(active: null, finish: out, seats: seats, result: _iWon, reveals: reveals).copyWith(
+                board: <PokerCard>[card('9c'), card('Td'), card('2h'), card('Jc'), card('3s')],
+              ),
+            );
+            await _tap(tester, 'SEE RESULT');
+            await tester.pumpAndSettle();
+            expect(find.byType(SoloResultPage), findsOneWidget);
+            expect(tester.takeException(), isNull, reason: 'no overflow');
+            expect(extentAround(tester, find.text('HANDS PLAYED')), lessThan(0.5), reason: 'the result page does not scroll');
+            final limit = size.height - insets.bottom + 0.5;
+            for (final label in <String>['PLAY AGAIN', 'HOME']) {
+              expect(rectOf(tester, label).bottom, lessThanOrEqualTo(limit), reason: '$label runs off the bottom');
+            }
+            await _close(tester);
+          });
+        }
+      }
     }
 
     testWidgets('the buttons do not move when my turn starts', (tester) async {
