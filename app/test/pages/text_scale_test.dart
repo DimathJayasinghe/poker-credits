@@ -45,7 +45,7 @@ const LegalActions _legal = LegalActions(
 
 void _noOverflow(WidgetTester tester, [String where = '']) {
   final error = tester.takeException();
-  if (error != null) fail('$where: $error');
+  if (error != null) fail('$where: ${error is FlutterError ? error.toStringDeep() : error}');
 }
 
 Future<void> _pump(WidgetTester tester, Size size, double scale, TestHarness harness) async {
@@ -107,6 +107,9 @@ Future<void> _hostAs(WidgetTester tester, TestHarness harness, RoomView view) as
 
 void main() {
   setUpAll(loadFonts);
+  // A tap that lands outside its widget is a test that proves nothing: fail instead of warning.
+  setUp(() => WidgetController.hitTestWarningShouldBeFatal = true);
+  tearDown(() => WidgetController.hitTestWarningShouldBeFatal = false);
 
   testWidgets('sanity: the sweep really scales the text', (tester) async {
     await _pump(tester, const Size(390, 844), 1, TestHarness());
@@ -245,9 +248,11 @@ void main() {
         );
         _noOverflow(tester, 'your turn');
         await tester.ensureVisible(find.text('RAISE'));
+        await tester.pump();
         await tester.tap(find.text('RAISE'));
         await tester.pumpAndSettle();
         _noOverflow(tester, 'raise sheet');
+        expect(find.text('RAISE TO 40'), findsOneWidget, reason: 'the tap reached RAISE and opened the sheet');
         await tester.pumpWidget(const SizedBox());
       });
 

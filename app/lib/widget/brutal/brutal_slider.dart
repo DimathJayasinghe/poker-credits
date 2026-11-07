@@ -88,7 +88,8 @@ class BrutalSlider extends StatelessWidget {
                     color: c.surface,
                     border: Border.all(color: c.line, width: BrutalMetrics.border),
                   ),
-                  child: BrutalNumber(_clamped, size: 56),
+                  // A big text size makes the digits wider than the box between the step buttons.
+                  child: FittedBox(fit: BoxFit.scaleDown, child: BrutalNumber(_clamped, size: 56)),
                 ),
               ),
               if (stepButtons) ...<Widget>[
