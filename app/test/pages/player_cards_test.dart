@@ -180,6 +180,7 @@ void main() {
     harness.network.last.serverSends(StateUpdate(stateVersion: 2, view: _hand(board: <PokerCard>[card('9c'), card('Jh'), card('2d')])));
     await tester.pump();
     await tester.pump();
+    await tester.pump(const Duration(seconds: 3)); // the flop turns over card by card
     expect(find.descendant(of: find.byType(BoardView), matching: find.byType(PlayingCard)), findsNWidgets(3));
     expect(find.bySemanticsLabel('Nine of clubs'), findsOneWidget);
     await _close(tester);
@@ -244,11 +245,12 @@ void main() {
     await tester.pump();
     expect(find.byType(ShowdownPanel), findsNothing, reason: 'the board is dealt street by street first; no spoiler');
     for (var street = 0; street < 2; street++) {
-      harness.clock = harness.clock.add(const Duration(milliseconds: 800));
+      harness.clock = harness.clock.add(const Duration(milliseconds: 1400));
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump(const Duration(milliseconds: 300));
     }
+    await tester.pump(const Duration(seconds: 6)); // the hands turn over one player after the other
     final panel = find.byType(ShowdownPanel);
     await tester.ensureVisible(panel);
     expect(panel, findsOneWidget);

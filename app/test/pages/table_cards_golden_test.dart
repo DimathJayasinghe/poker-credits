@@ -53,6 +53,7 @@ void main() {
       ).copyWith(dealerSeat: 0, currentHighBet: 60, minRaiseTo: 120);
       await _open(tester, entry.value, view);
       expect(tester.takeException(), isNull, reason: 'no layout overflow');
+      await tester.pump(const Duration(seconds: 2)); // the cards finish turning over
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/table_virtual_betting_${entry.key}.png'));
       await tester.pumpWidget(const SizedBox());
     });
@@ -91,6 +92,7 @@ void main() {
       ).copyWith(dealerSeat: 0);
       await _open(tester, entry.value, view);
       expect(tester.takeException(), isNull, reason: 'no layout overflow');
+      await tester.pump(const Duration(seconds: 4)); // the cards finish turning over
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/table_virtual_showdown_${entry.key}.png'));
       await tester.pumpWidget(const SizedBox());
     });

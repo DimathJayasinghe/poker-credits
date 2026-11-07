@@ -326,7 +326,7 @@ class _TablePageState extends State<TablePage> with Refena, WidgetsBindingObserv
                 PotDisplay(total: view.totalPot, pots: view.pots),
                 if (showCards) ...<Widget>[
                   const SizedBox(height: BrutalMetrics.gapS),
-                  BoardView(shown: board, fourColour: settings.fourColourDeck, slotColor: c.onFelt),
+                  BoardView(shown: board, fourColour: settings.fourColourDeck, slotColor: c.onFelt, animate: true),
                 ],
                 if (result != null) ...<Widget>[
                   const SizedBox(height: BrutalMetrics.gapS),

@@ -179,6 +179,7 @@ abstract final class Strings {
   static const String bigBlindTag = 'BB';
   static const String allIn = 'All-in';
   static const String folded = 'Folded';
+  static const String thinking = 'Thinking';
   static const String sittingOut = 'Away';
   static const String offline = 'Offline';
   static const String autoTag = 'Auto';

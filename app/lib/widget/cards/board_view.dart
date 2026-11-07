@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
+import 'package:poker_credits/theme/tokens.dart';
+import 'package:poker_credits/widget/cards/flip_in.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/widget/cards/playing_card.dart';
 import 'package:poker_protocol/poker_protocol.dart';
@@ -15,12 +17,16 @@ class BoardView extends StatelessWidget {
     this.fourColour = false,
     this.highlight,
     this.slotColor,
+    this.animate = false,
   });
 
   final List<PokerCard> shown;
   final int slots;
   final CardSize size;
   final bool fourColour;
+
+  /// New cards turn over as they arrive, the three of a flop one after the other.
+  final bool animate;
 
   /// Outline of the empty slots; the muted text colour by default. On the felt use its own text colour.
   final Color? slotColor;
@@ -37,8 +43,12 @@ class BoardView extends StatelessWidget {
         final card = shown[i];
         final marked = highlight;
         children.add(
-          PlayingCard(
+          FlipIn(
+            key: ValueKey<PokerCard>(card),
             card: card,
+            animate: animate,
+            // The flop's three cards turn one after the other; a turn or a river comes alone.
+            delay: i < 3 ? BrutalMetrics.dealGap * i : Duration.zero,
             size: size,
             fourColour: fourColour,
             lifted: marked?.contains(card) ?? false,

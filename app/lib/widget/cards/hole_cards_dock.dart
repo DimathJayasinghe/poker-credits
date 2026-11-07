@@ -129,7 +129,8 @@ class FlipCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(end: faceUp ? 1 : 0),
-      duration: BrutalTheme.duration(context, BrutalMetrics.base),
+      duration: BrutalTheme.duration(context, BrutalMetrics.flip),
+      curve: Curves.easeInOut,
       builder: (context, t, _) {
         final showFace = t > 0.5;
         final squash = (2 * t - 1).abs().clamp(0.02, 1.0);

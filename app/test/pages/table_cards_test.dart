@@ -223,10 +223,11 @@ void main() {
       isTrue,
     );
 
-    harness.clock = harness.clock.add(const Duration(milliseconds: 800));
+    harness.clock = harness.clock.add(const Duration(milliseconds: 1400));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(seconds: 3));
     expect(boardCards(), 5);
     expect(findNumber(1320), findsOneWidget, reason: 'paid once the last card is down');
     expect(find.byType(PotResults), findsOneWidget);
@@ -247,10 +248,11 @@ void main() {
     await tester.tap(find.text('START HAND'), warnIfMissed: false);
     await tester.pump();
     expect(harness.network.last.sent.whereType<StartHand>(), isEmpty, reason: 'the river is not down yet');
-    harness.clock = harness.clock.add(const Duration(milliseconds: 800));
+    harness.clock = harness.clock.add(const Duration(milliseconds: 1400));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(seconds: 3));
     await tester.tap(find.text('START HAND'));
     await tester.pump();
     expect(harness.network.last.sent.whereType<StartHand>(), hasLength(1));

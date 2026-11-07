@@ -6,7 +6,7 @@ import 'package:poker_protocol/poker_protocol.dart';
 /// following ones [step] apart. It is pure: the caller passes the time and asks again on each
 /// repaint, so nothing here owns a timer.
 class RunoutPacer {
-  RunoutPacer({this.step = const Duration(milliseconds: 700)});
+  RunoutPacer({this.step = const Duration(milliseconds: 1300)});
 
   /// Time between the streets of a run-out.
   final Duration step;

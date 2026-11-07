@@ -7,6 +7,7 @@ import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_tag.dart';
 import 'package:poker_credits/widget/cards/board_view.dart';
 import 'package:poker_credits/widget/cards/card_row.dart';
+import 'package:poker_credits/widget/cards/flip_in.dart';
 import 'package:poker_credits/widget/cards/playing_card.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
@@ -20,7 +21,11 @@ class ShowdownPanel extends StatelessWidget {
     this.board = const <PokerCard>[],
     this.fourColour = false,
     this.myPlayerId,
+    this.animate = false,
   });
+
+  /// The hands turn over one player after the other.
+  final bool animate;
 
   final List<Reveal> reveals;
   final HandResult result;
@@ -53,8 +58,15 @@ class ShowdownPanel extends StatelessWidget {
           if (result.uncontested)
             Text(Strings.wonUncontested, style: TextStyle(fontSize: 14, height: 1.4, color: c.muted))
           else
-            for (final reveal in reveals) ...<Widget>[
-              _RevealLine(reveal: reveal, won: winners.contains(reveal.playerId), mine: reveal.playerId == myPlayerId, fourColour: fourColour),
+            for (var i = 0; i < reveals.length; i++) ...<Widget>[
+              _RevealLine(
+                reveal: reveals[i],
+                won: winners.contains(reveals[i].playerId),
+                mine: reveals[i].playerId == myPlayerId,
+                fourColour: fourColour,
+                // Players turn their cards over one after the other, about half a second apart.
+                delay: animate ? (BrutalMetrics.flip + BrutalMetrics.dealGap) * i : null,
+              ),
               const SizedBox(height: BrutalMetrics.gapM),
             ],
           for (var i = 0; i < result.pots.length; i++) _PotLine(pot: result.pots[i], main: i == 0, number: i, myPlayerId: myPlayerId),
@@ -65,7 +77,10 @@ class ShowdownPanel extends StatelessWidget {
 }
 
 class _RevealLine extends StatelessWidget {
-  const _RevealLine({required this.reveal, required this.won, required this.mine, required this.fourColour});
+  const _RevealLine({required this.reveal, required this.won, required this.mine, required this.fourColour, this.delay});
+
+  /// Null = no animation.
+  final Duration? delay;
 
   final Reveal reveal;
   final bool won;
@@ -103,17 +118,61 @@ class _RevealLine extends StatelessWidget {
           ),
           const SizedBox(height: BrutalMetrics.gapXs),
           ExcludeSemantics(
-            child: CardRow(
-              cards: reveal.cards,
-              fourColour: fourColour,
-              dimmed: dimmed,
-            ),
+            child: delay == null
+                ? CardRow(cards: reveal.cards, fourColour: fourColour, dimmed: dimmed)
+                : _FlipRow(cards: reveal.cards, delay: delay!, fourColour: fourColour, dimmed: dimmed),
           ),
           const SizedBox(height: BrutalMetrics.gapXs),
           ExcludeSemantics(
-            child: CardRow(cards: reveal.bestFive, fourColour: fourColour, liftedIndexes: <int>{for (var i = 0; i < reveal.bestFive.length; i++) i}),
+            child: delay == null
+                ? CardRow(cards: reveal.bestFive, fourColour: fourColour, liftedIndexes: <int>{for (var i = 0; i < reveal.bestFive.length; i++) i})
+                : _FlipRow(
+                    cards: reveal.bestFive,
+                    delay: delay! + BrutalMetrics.flip,
+                    fourColour: fourColour,
+                    lifted: <int>{for (var i = 0; i < reveal.bestFive.length; i++) i},
+                  ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A row of mini cards that turn over one after the other, starting after [delay].
+class _FlipRow extends StatelessWidget {
+  const _FlipRow({required this.cards, required this.delay, required this.fourColour, this.dimmed = const <int>{}, this.lifted = const <int>{}});
+
+  final List<PokerCard> cards;
+  final Duration delay;
+  final bool fourColour;
+  final Set<int> dimmed;
+  final Set<int> lifted;
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(top: PlayingCard.liftBy),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (var i = 0; i < cards.length; i++) ...<Widget>[
+              if (i > 0) const SizedBox(width: 4),
+              FlipIn(
+                key: ValueKey<String>('${cards[i]}-$i-${delay.inMilliseconds}'),
+                card: cards[i],
+                delay: delay + BrutalMetrics.dealGap * i ~/ 2,
+                size: CardSize.mini,
+                fourColour: fourColour,
+                dim: dimmed.contains(i),
+                lifted: lifted.contains(i),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

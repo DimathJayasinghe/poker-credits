@@ -29,20 +29,20 @@ void main() {
     expect(pacer.settled(river), isTrue);
   });
 
-  test('a run-out from the flop shows the turn at once and the river 700 ms later', () {
+  test('a run-out from the flop shows the turn at once and the river 1300 ms later', () {
     final pacer = RunoutPacer()..shown(4, flop, at(0));
     expect(pacer.shown(4, river, at(100)), turn);
     expect(pacer.settled(river), isFalse);
-    expect(pacer.shown(4, river, at(799)), turn, reason: 'not yet');
-    expect(pacer.shown(4, river, at(800)), river);
+    expect(pacer.shown(4, river, at(1399)), turn, reason: 'not yet');
+    expect(pacer.shown(4, river, at(1400)), river);
     expect(pacer.settled(river), isTrue);
   });
 
-  test('a run-out from nothing deals flop, turn and river 700 ms apart', () {
+  test('a run-out from nothing deals flop, turn and river 1300 ms apart', () {
     final pacer = RunoutPacer()..shown(4, const <PokerCard>[], at(0));
     expect(pacer.shown(4, river, at(1000)), flop);
-    expect(pacer.shown(4, river, at(1700)), turn);
-    expect(pacer.shown(4, river, at(2400)), river);
+    expect(pacer.shown(4, river, at(2300)), turn);
+    expect(pacer.shown(4, river, at(3600)), river);
   });
 
   test('a slow frame never skips a street', () {
@@ -50,7 +50,7 @@ void main() {
     pacer.shown(4, river, at(1000));
     expect(pacer.shown(4, river, at(9000)), turn, reason: 'one street per call');
     expect(pacer.shown(4, river, at(9100)), turn);
-    expect(pacer.shown(4, river, at(9700)), river);
+    expect(pacer.shown(4, river, at(10300)), river);
   });
 
   test('a new hand starts from its own board with no pacing', () {
@@ -117,7 +117,7 @@ void main() {
       expect(mid.seats[1].streetBet, 100);
       expect(mid.result, isNull);
       expect(mid.reveals, isEmpty);
-      final done = pacer.paced(after(), at(900));
+      final done = pacer.paced(after(), at(1500));
       expect(done.board, river);
       expect(done.totalPot, 0);
       expect(done.seats[1].chips, 200);

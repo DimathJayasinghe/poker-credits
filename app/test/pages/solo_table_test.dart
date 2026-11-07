@@ -472,6 +472,7 @@ void main() {
           ],
         ).copyWith(board: <PokerCard>[card('9c'), card('Td'), card('2h')], currentHighBet: 50, minRaiseTo: 100);
         await _playing(tester, view: view, dark: dark);
+        await tester.pump(const Duration(seconds: 2)); // the cards finish turning over
         await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/solo_table_five_phone_$mode.png'));
         await _close(tester);
       });

@@ -180,6 +180,12 @@ abstract final class BrutalMetrics {
   static const Duration fast = Duration(milliseconds: 90);
   static const Duration base = Duration(milliseconds: 160);
   static const Duration max = Duration(milliseconds: 280);
+
+  /// A card turning over: slow enough to see it happen.
+  static const Duration flip = Duration(milliseconds: 460);
+
+  /// Gap between cards that arrive one after the other (the flop, the hands at a showdown).
+  static const Duration dealGap = Duration(milliseconds: 260);
 }
 
 /// The type scale. Screens use these instead of sizes of their own, so a headline on one page is the

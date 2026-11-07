@@ -427,7 +427,15 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
                 child: _StackBlock(seat: seat),
               ),
               if (showCards) ...<Widget>[
-                OpponentStrip(seats: view.seats, myPlayerId: seat.playerId, showStacks: solo, activeSeat: solo ? view.activeSeat : null),
+                OpponentStrip(
+                  seats: view.seats,
+                  myPlayerId: seat.playerId,
+                  showStacks: solo,
+                  activeSeat: solo ? view.activeSeat : null,
+                  // A new turn (hand, street or bet) starts the thinking bar again.
+                  turnKey: '${view.handNumber}:${view.phase.name}:${view.activeSeat}:${view.totalPot}',
+                  paused: view.paused,
+                ),
                 const SizedBox(height: BrutalMetrics.gapS),
               ],
               if (!solo && guestMayChooseSeat(view.phase))
@@ -457,12 +465,13 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
                         if (showCards) ...<Widget>[
                           const SizedBox(height: BrutalMetrics.gapM),
                           Center(
-                            child: BoardView(shown: board, fourColour: settings.fourColourDeck),
+                            child: BoardView(shown: board, fourColour: settings.fourColourDeck, animate: true),
                           ),
                         ],
                         if (result != null) ...<Widget>[
                           const SizedBox(height: BrutalMetrics.gapM),
                           ShowdownPanel(
+                            animate: true,
                             reveals: view.reveals,
                             result: result,
                             fourColour: settings.fourColourDeck,
