@@ -1,0 +1,8 @@
+# Keeps the commit-pinned GitHub Actions current (docs/SECURITY_AUDIT_2026-11-08.md, F5). Each
+# update arrives as a pull request that shows the new commit, so a person looks at it.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
