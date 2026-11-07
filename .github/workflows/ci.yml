@@ -22,6 +22,8 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: No room data in logs (virtual cards stay secret)
+        run: bash tool/check_no_state_logging.sh
       - run: cargo test --workspace
 
   dart:

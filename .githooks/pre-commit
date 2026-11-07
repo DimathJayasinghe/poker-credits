@@ -14,6 +14,8 @@ if staged | grep -qE '\.rs$|Cargo\.(toml|lock)$' && [ -f Cargo.toml ]; then
     cargo fmt --all --check
     echo "pre-commit: cargo clippy"
     cargo clippy --workspace --all-targets -- -D warnings
+    echo "pre-commit: no room data in logs"
+    bash tool/check_no_state_logging.sh
   else
     echo "pre-commit: cargo not found, skipping Rust checks (run tool/setup_dev.sh)"
   fi
