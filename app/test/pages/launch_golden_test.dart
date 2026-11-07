@@ -59,6 +59,21 @@ void main() {
         });
       }
 
+      testWidgets('guide, hand ranking open, $name', (tester) async {
+        final harness = TestHarness();
+        harness.settings.value = harness.settings.value.copyWith(theme: dark ? ThemeChoice.dark : ThemeChoice.light);
+        await _launch(tester, harness, entry.value);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(Strings.navGuide.toUpperCase()).first);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text(Strings.guideTabHands.toUpperCase()));
+        await tester.pump();
+        await tester.tap(find.text(Strings.guideTabHands.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/guide_hands_$name.png'));
+      });
+
       testWidgets('support, $name', (tester) async {
         final harness = TestHarness();
         harness.settings.value = harness.settings.value.copyWith(theme: dark ? ThemeChoice.dark : ThemeChoice.light);

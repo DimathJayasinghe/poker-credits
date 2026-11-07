@@ -34,19 +34,31 @@ class GuideView extends StatefulWidget {
 }
 
 class _GuideViewState extends State<GuideView> {
-  final GlobalKey _hands = GlobalKey();
-  final GlobalKey _flow = GlobalKey();
-  final GlobalKey _cards = GlobalKey();
-  final GlobalKey _words = GlobalKey();
-  final GlobalKey _rules = GlobalKey();
-  final GlobalKey _drops = GlobalKey();
-  final GlobalKey _safety = GlobalKey();
+  /// One entry per section: its id, a key for scrolling to it, and its content.
+  static const List<_Id> _ids = _Id.values;
+  final Map<_Id, GlobalKey> _keys = <_Id, GlobalKey>{for (final id in _Id.values) id: GlobalKey()};
 
-  void _jump(GlobalKey key) {
-    final target = key.currentContext;
-    if (target == null) return;
-    Scrollable.ensureVisible(target, duration: BrutalTheme.duration(context, BrutalMetrics.max), curve: Curves.easeOut);
+  /// Only the first section is open at the start; the rest are one tap away.
+  final Set<_Id> _open = <_Id>{_Id.night};
+
+  bool get _allOpen => _open.length == _ids.length;
+
+  void _toggle(_Id id) => setState(() => _open.contains(id) ? _open.remove(id) : _open.add(id));
+
+  void _toggleAll() => setState(() => _allOpen ? _open.clear() : _open.addAll(_ids));
+
+  /// Opens a section and scrolls its heading into view once it has been laid out.
+  void _jump(_Id id) {
+    setState(() => _open.add(id));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _keys[id]!.currentContext;
+      if (!mounted || target == null) return;
+      Scrollable.ensureVisible(target, duration: BrutalTheme.duration(context, BrutalMetrics.max), curve: Curves.easeOut);
+    });
   }
+
+  Widget _section(_Id id, String title, String summary, Widget child) =>
+      GuideSection(key: _keys[id], title: title, summary: summary, open: _open.contains(id), onToggle: () => _toggle(id), child: child);
 
   @override
   Widget build(BuildContext context) {
@@ -112,36 +124,28 @@ class _GuideViewState extends State<GuideView> {
                             spacing: BrutalMetrics.gapS,
                             runSpacing: BrutalMetrics.gapS,
                             children: <Widget>[
-                              _Jump(Strings.guideTabHands, () => _jump(_hands)),
-                              _Jump(Strings.guideTabHand, () => _jump(_flow)),
-                              _Jump(Strings.guideTabCards, () => _jump(_cards)),
-                              _Jump(Strings.guideTabWords, () => _jump(_words)),
-                              _Jump(Strings.guideTabRules, () => _jump(_rules)),
-                              _Jump(Strings.guideTabDrops, () => _jump(_drops)),
-                              _Jump(Strings.guideTabSafety, () => _jump(_safety)),
+                              _Jump(Strings.guideTabHands, () => _jump(_Id.hands)),
+                              _Jump(Strings.guideTabHand, () => _jump(_Id.flow)),
+                              _Jump(Strings.guideTabCards, () => _jump(_Id.cards)),
+                              _Jump(Strings.guideTabWords, () => _jump(_Id.words)),
+                              _Jump(Strings.guideTabRules, () => _jump(_Id.rules)),
+                              _Jump(Strings.guideTabDrops, () => _jump(_Id.drops)),
+                              _Jump(Strings.guideTabSafety, () => _jump(_Id.safety)),
+                              _Jump(_allOpen ? Strings.guideCloseAll : Strings.guideOpenAll, _toggleAll),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    const GuideHeading(Strings.guideSectionNight),
-                    const GuideSteps(guideNight),
-                    GuideHeading(Strings.guideSectionHands, key: _hands, intro: Strings.guideHandsIntro),
-                    const GuideHands(),
-                    GuideHeading(Strings.guideSectionFlow, key: _flow),
-                    const GuideSteps(guideHandFlow),
-                    GuideHeading(Strings.guideSectionCards, key: _cards),
-                    const GuideSteps(guideCards),
-                    GuideHeading(Strings.guideSectionWords, key: _words),
-                    const GuideTerms(),
-                    GuideHeading(Strings.guideSectionRules, key: _rules),
-                    const GuideBullets(guideRules),
-                    GuideHeading(Strings.guideSectionDrops, key: _drops),
-                    const GuideSteps(guideDrops),
-                    GuideHeading(Strings.guideSectionSafety, key: _safety),
-                    const GuideBullets(guideSafety),
-                    const GuideHeading(Strings.guideSectionManners),
-                    const GuideBullets(guideManners),
+                    _section(_Id.night, Strings.guideSectionNight, Strings.guideSumNight, const GuideSteps(guideNight)),
+                    _section(_Id.hands, Strings.guideSectionHands, Strings.guideSumHands, const GuideHands()),
+                    _section(_Id.flow, Strings.guideSectionFlow, Strings.guideSumFlow, const GuideSteps(guideHandFlow)),
+                    _section(_Id.cards, Strings.guideSectionCards, Strings.guideSumCards, const GuideSteps(guideCards)),
+                    _section(_Id.words, Strings.guideSectionWords, Strings.guideSumWords, const GuideTerms()),
+                    _section(_Id.rules, Strings.guideSectionRules, Strings.guideSumRules, const GuideBullets(guideRules)),
+                    _section(_Id.drops, Strings.guideSectionDrops, Strings.guideSumDrops, const GuideSteps(guideDrops)),
+                    _section(_Id.safety, Strings.guideSectionSafety, Strings.guideSumSafety, const GuideBullets(guideSafety)),
+                    _section(_Id.manners, Strings.guideSectionManners, Strings.guideSumManners, const GuideBullets(guideManners)),
                     BrutalRow(
                       dense: true,
                       label: Strings.guideSupportRow,
@@ -160,7 +164,10 @@ class _GuideViewState extends State<GuideView> {
   }
 }
 
-/// A small cell that scrolls to a section.
+/// The sections of the Guide, in page order.
+enum _Id { night, hands, flow, cards, words, rules, drops, safety, manners }
+
+/// A small cell that opens and scrolls to a section.
 class _Jump extends StatelessWidget {
   const _Jump(this.label, this.onTap);
 

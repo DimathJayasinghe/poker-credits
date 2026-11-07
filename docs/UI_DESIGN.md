@@ -142,7 +142,9 @@ The table view without controls, with a WATCHING tag in the top bar.
 Join: top bar title, then stacked cells: code, name (prefilled from Settings), find-or-type-address as today; one primary action. Host: room code in Anton 120, the QR beside it in a hairline cell, typed addresses in mono, START below.
 
 ### Guide
-Cells separated by hairlines: a four-step strip, ten ranked hand cards (rank number, name in Anton, one plain line, example in mono such as `A K Q J 10 same suit`), betting words as a two-column grid, "If it drops" with the reconnect story.
+Cells separated by hairlines: a four-step strip, ten ranked hand cards (rank number, name in Anton, one plain line, the five example cards drawn as real mini playing cards), betting words as a two-column grid, "If it drops" with the reconnect story.
+
+**Folding (1.2.1).** Each section is a `GuideSection`: a heading cell with a one-line summary and a plus/minus cell. Only "How a night works" starts open; the jump chips open a section and scroll to it; an Open all / Close all chip toggles every section. The body is built only while open, so a closed Guide is short and light. Copy per section stays under about five short items.
 
 ### Settings
 After the sections below, ABOUT also holds a Terms and safety row and a Support the developer row (section 9). Rows grouped by a caption cell:

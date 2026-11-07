@@ -3,7 +3,11 @@ import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/guide_content.dart';
 import 'package:poker_credits/util/strings.dart';
+import 'package:poker_credits/util/lesson_content.dart';
 import 'package:poker_credits/widget/brutal/brutal_number.dart';
+import 'package:poker_credits/widget/brutal/brutal_pressable.dart';
+import 'package:poker_credits/widget/cards/card_row.dart';
+import 'package:poker_protocol/poker_protocol.dart';
 
 /// Building blocks for the Guide tab and the quick guide sheet. Plain reading material: every
 /// block is built from the static lists in `util/guide_content.dart`.
@@ -67,6 +71,129 @@ class GuideHeading extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A section of the Guide that folds away: a heading cell with a one-line summary and a plus or
+/// minus, and the content under it only while it is open. A page of ten sections reads as a list of
+/// headings first and a chapter on demand, instead of one long wall of text.
+class GuideSection extends StatelessWidget {
+  const GuideSection({super.key, required this.title, required this.summary, required this.open, required this.onToggle, required this.child});
+
+  final String title;
+
+  /// One line that says what is inside, so a closed section is still worth reading.
+  final String summary;
+  final bool open;
+  final VoidCallback onToggle;
+
+  /// The content, built only while the section is open.
+  final Widget child;
+
+  static const double signCell = 64;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = BrutalTheme.of(context).colors;
+    final duration = BrutalTheme.duration(context, BrutalMetrics.base);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Semantics(
+          button: true,
+          header: true,
+          expanded: open,
+          label: '$title. $summary',
+          excludeSemantics: true,
+          onTap: onToggle,
+          child: BrutalPressable(
+            onTap: onToggle,
+            builder: (context, pressed) {
+              final text = pressed ? c.paper : c.ink;
+              return AnimatedContainer(
+                duration: BrutalTheme.duration(context, BrutalMetrics.fast),
+                constraints: const BoxConstraints(minHeight: 72),
+                decoration: BoxDecoration(
+                  color: pressed ? c.ink : null,
+                  border: Border(
+                    top: BorderSide(color: c.line, width: BrutalMetrics.borderHeavy),
+                    bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
+                  ),
+                ),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapL, BrutalMetrics.gapM, BrutalMetrics.gapM, BrutalMetrics.gapM),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(title.toUpperCase(), style: _title(context, BrutalType.section).copyWith(color: text)),
+                              const SizedBox(height: BrutalMetrics.gapXs),
+                              Text(
+                                summary,
+                                style: TextStyle(
+                                  fontFamily: BrutalFonts.mono,
+                                  fontSize: BrutalType.caption,
+                                  height: 1.3,
+                                  color: pressed ? c.paper : c.muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: signCell,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          border: Border(
+                            left: BorderSide(color: c.line, width: BrutalMetrics.border),
+                          ),
+                        ),
+                        child: CustomPaint(
+                          size: const Size(20, 20),
+                          painter: _PlusMinusPainter(plus: !open, color: text),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        // Folds smoothly; with reduced motion the duration is zero.
+        AnimatedSize(
+          duration: duration,
+          curve: Curves.easeOut,
+          alignment: Alignment.topCenter,
+          child: open ? child : const SizedBox(width: double.infinity),
+        ),
+      ],
+    );
+  }
+}
+
+/// A plus (closed) or minus (open) drawn as flat bars, so it never depends on a font.
+class _PlusMinusPainter extends CustomPainter {
+  const _PlusMinusPainter({required this.plus, required this.color});
+
+  final bool plus;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    const bar = 3.0;
+    canvas.drawRect(Rect.fromLTWH(0, (size.height - bar) / 2, size.width, bar), paint);
+    if (plus) canvas.drawRect(Rect.fromLTWH((size.width - bar) / 2, 0, bar, size.height), paint);
+  }
+
+  @override
+  bool shouldRepaint(_PlusMinusPainter old) => old.plus != plus || old.color != color;
 }
 
 /// One section of reading text as a single cell: the heading, then the paragraph, under a heavy rule.
@@ -211,13 +338,8 @@ class GuideHands extends StatelessWidget {
                               const SizedBox(height: BrutalMetrics.gapXs),
                               Text(hand.line, style: _body(context)),
                               const SizedBox(height: BrutalMetrics.gapS),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: BrutalMetrics.gapS, vertical: BrutalMetrics.gapXs),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: c.line, width: BrutalMetrics.border),
-                                ),
-                                child: Text(hand.example, style: _body(context, bold: true).copyWith(fontSize: 12.5, height: 1.3)),
-                              ),
+                              // The hand itself, five real cards, instead of a line of letters.
+                              CardRow(cards: <PokerCard?>[for (final card in handExamples[hand.rank - 1].$2) PokerCard.parse(card)], gap: 3),
                             ],
                           ),
                         ),

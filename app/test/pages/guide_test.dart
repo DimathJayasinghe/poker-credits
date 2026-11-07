@@ -7,6 +7,7 @@ import 'package:poker_credits/pages/walkthrough_page.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/util/guide_content.dart';
 import 'package:poker_credits/widget/brutal/app_shell.dart';
+import 'package:poker_credits/widget/cards/playing_card.dart';
 import 'package:poker_credits/widget/guide/guide_sheet.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
@@ -89,6 +90,11 @@ void main() {
       final nav = <String>['PLAY', 'GUIDE', 'SETTINGS'].map((l) => tester.getTopLeft(find.text(l).last).dx).toList();
       expect(nav[0], lessThan(nav[1]));
       expect(nav[1], lessThan(nav[2]));
+      expect(find.text('ROYAL FLUSH'), findsNothing, reason: 'the ranking is folded until asked for');
+      await tester.ensureVisible(find.text('HANDS'));
+      await tester.pump();
+      await tester.tap(find.text('HANDS'));
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.text('ROYAL FLUSH'), 400, scrollable: find.byType(Scrollable).first);
       final royal = tester.getTopLeft(find.text('ROYAL FLUSH')).dy;
       await tester.scrollUntilVisible(find.text('STRAIGHT FLUSH'), 400, scrollable: find.byType(Scrollable).first);
@@ -98,6 +104,8 @@ void main() {
 
     testWidgets('every hand, every section heading and the beginner entry points are there', (tester) async {
       await _openGuideTab(tester, size: const Size(1280, 4000));
+      await tester.tap(find.text('OPEN ALL'));
+      await tester.pumpAndSettle();
       for (final hand in guideHands) {
         expect(find.text(hand.name.toUpperCase()), findsOneWidget, reason: hand.name);
       }
@@ -138,6 +146,54 @@ void main() {
       expect(tops.length, lessThanOrEqualTo(3), reason: 'seven cells fit in three rows or fewer on a phone: $tops');
     });
 
+    testWidgets('only the first section is open; tapping a heading opens and folds it', (tester) async {
+      await _openGuideTab(tester, size: const Size(390, 844));
+      expect(find.text(guideNight.first.title.toUpperCase()), findsOneWidget, reason: 'How a night works is open');
+      expect(find.text(guideHandFlow.first.title.toUpperCase()), findsNothing, reason: 'the others are folded');
+      final heading = find.text('HOW A HAND PLAYS');
+      await tester.ensureVisible(heading);
+      await tester.pump();
+      await tester.tap(heading);
+      await tester.pumpAndSettle();
+      expect(find.text(guideHandFlow.first.title.toUpperCase()), findsOneWidget);
+      await tester.tap(heading);
+      await tester.pumpAndSettle();
+      expect(find.text(guideHandFlow.first.title.toUpperCase()), findsNothing);
+    });
+
+    testWidgets('every section says in one line what is inside, even when folded', (tester) async {
+      await _openGuideTab(tester, size: const Size(390, 844));
+      for (final summary in <String>[
+        Strings.guideSumHands,
+        Strings.guideSumFlow,
+        Strings.guideSumCards,
+        Strings.guideSumWords,
+        Strings.guideSumRules,
+        Strings.guideSumDrops,
+        Strings.guideSumSafety,
+        Strings.guideSumManners,
+      ]) {
+        expect(find.text(summary, skipOffstage: false), findsOneWidget, reason: summary);
+      }
+    });
+
+    testWidgets('Open all and Close all work, and each hand shows five real cards', (tester) async {
+      await _openGuideTab(tester, size: const Size(390, 844));
+      await tester.ensureVisible(find.text('OPEN ALL'));
+      await tester.pump();
+      await tester.tap(find.text('OPEN ALL'));
+      await tester.pumpAndSettle();
+      expect(find.text('CLOSE ALL'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('HIGH CARD'), 400, scrollable: find.byType(Scrollable).first);
+      final handRows = find.ancestor(of: find.text('HIGH CARD'), matching: find.byType(MergeSemantics));
+      expect(find.descendant(of: handRows.first, matching: find.byType(PlayingCard)), findsNWidgets(5));
+      await tester.ensureVisible(find.text('CLOSE ALL'));
+      await tester.pump();
+      await tester.tap(find.text('CLOSE ALL'));
+      await tester.pumpAndSettle();
+      expect(find.text('HIGH CARD'), findsNothing);
+    });
+
     testWidgets('a jump cell scrolls to its section', (tester) async {
       await _openGuideTab(tester);
       expect(find.text('IF THE CONNECTION DROPS').hitTestable(), findsNothing, reason: 'far below the fold at first');
@@ -150,6 +206,8 @@ void main() {
 
     testWidgets('the safety section tells people to use a trusted Wi-Fi', (tester) async {
       await _openGuideTab(tester, size: const Size(1280, 4000));
+      await tester.tap(find.text('OPEN ALL'));
+      await tester.pumpAndSettle();
       expect(guideSafety.first, contains('your own Wi-Fi'));
       expect(find.textContaining('your own Wi-Fi'), findsWidgets);
       expect(find.textContaining('host phone holds the deck'), findsOneWidget);

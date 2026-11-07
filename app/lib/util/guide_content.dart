@@ -35,19 +35,19 @@ class GuideTerm {
 
 /// What the app does and what you do, in the order a night goes.
 const List<GuideStep> guideNight = <GuideStep>[
-  GuideStep('One phone hosts', 'Tap Host a game. The screen shows a room code and a QR code. Everyone must be on the same Wi-Fi.'),
-  GuideStep('Everyone joins', 'Friends tap Join a game, type the code and a name, and sit down with the same number of chips.'),
+  GuideStep('One phone hosts', 'Tap Host a game. The screen shows a room code and a QR code. Everyone needs the same Wi-Fi.'),
+  GuideStep('Everyone joins', 'Friends tap Join a game, then type the code and a name. Everyone starts with the same chips.'),
   GuideStep(
     'Real cards, or cards in the app',
-    'The host picks when starting. With real cards the app never sees a card: shuffle and deal a normal deck. With cards in the app it shuffles and deals for you: your two cards sit face down on your phone until you tap them.',
+    'The host picks. Real cards: you deal a normal deck, and the app never sees a card. Cards in the app: it deals for you. Your two cards wait face down on your phone.',
   ),
   GuideStep(
     'Play on your phone',
-    'When it is your turn a big YOUR TURN block appears. Tap Fold, Check, Call or Raise. The app keeps every chip count.',
+    'A big YOUR TURN block appears. Tap Fold, Check, Call or Raise. The app counts every chip.',
   ),
   GuideStep(
     'Show cards, then the pot is paid',
-    'At the end, players still in show their cards. With real cards the host taps the winner. With cards in the app everyone sees every hand and the app pays the pots itself. Then the next hand starts.',
+    'Players still in show their cards. Real cards: the host taps the winner. Cards in the app: the app shows every hand and pays the pots. Then the next hand starts.',
   ),
 ];
 
@@ -78,15 +78,15 @@ const List<String> guideHandNotes = <String>[
 const List<GuideStep> guideHandFlow = <GuideStep>[
   GuideStep(
     'Blinds',
-    'Two players left of the dealer button put in a small and a big forced bet, so there is always something to win. The button moves one seat every hand. The app posts the blinds for you.',
+    'Two players next to the dealer button post forced bets, so there is always something to win. The button moves one seat each hand. The app posts them for you.',
   ),
-  GuideStep('Pre-flop', 'Everyone gets two private cards. Betting starts with the player left of the big blind and goes clockwise.'),
+  GuideStep('Pre-flop', 'Everyone gets two private cards. Betting starts left of the big blind and goes clockwise.'),
   GuideStep('Flop', 'Three shared cards are turned face up. Another round of betting.'),
   GuideStep('Turn', 'A fourth shared card. Another round of betting.'),
   GuideStep('River', 'The fifth and last shared card. The final round of betting.'),
   GuideStep(
     'Showdown',
-    'Players still in show their cards and the best five-card hand wins the pot. If everyone else folds, the last player wins without showing.',
+    'Players still in show their cards. The best five-card hand wins. If everyone else folds, the last player wins without showing.',
   ),
 ];
 
@@ -101,7 +101,7 @@ const List<GuideTerm> guideTerms = <GuideTerm>[
   ),
   GuideTerm('All-in', 'Bet every chip you have. You can still win the part of the pot you covered.'),
   GuideTerm('Pot', 'All the chips bet so far this hand. The winner takes it.'),
-  GuideTerm('Side pot', 'When someone is all-in for less, the others keep betting into a separate pot. The short player cannot win that one.'),
+  GuideTerm('Side pot', 'When someone is all-in for less, the others bet into a separate pot. The short player cannot win it.'),
   GuideTerm('Blinds', 'The forced bets before the cards are dealt: the small blind, then the big blind (usually double).'),
   GuideTerm('Dealer button', 'The D marker. It shows who deals and moves one seat clockwise every hand. The blinds sit to its left.'),
   GuideTerm('Stack', 'The chips one player has.'),
@@ -109,7 +109,7 @@ const List<GuideTerm> guideTerms = <GuideTerm>[
   GuideTerm('Community cards', 'The five shared cards turned face up in the middle: three on the flop, one on the turn, one on the river.'),
   GuideTerm(
     'Run-out',
-    'When everyone left is all-in, there is no more betting and the rest of the shared cards are simply turned over, one street at a time.',
+    'When everyone left is all-in, betting stops. The rest of the shared cards are turned over one street at a time.',
   ),
   GuideTerm('Kicker', 'The extra card that breaks a tie between two equal hands.'),
   GuideTerm('Showdown', 'Turning your cards over at the end of the hand.'),
@@ -118,17 +118,17 @@ const List<GuideTerm> guideTerms = <GuideTerm>[
 /// What the app enforces for you, so nobody argues at the table.
 const List<String> guideRules = <String>[
   'You may check only when nobody has bet this round. Otherwise the button says Call.',
-  'A bet must be at least the big blind. A raise must be at least as big as the last bet or raise. The only exception is going all-in with less.',
+  'A bet is at least the big blind. A raise is at least as big as the last one. The one exception: going all-in with less.',
   'You can raise up to all of your chips, never more.',
-  'If someone goes all-in for less than a full raise, players who already acted may only call or fold. They cannot raise again.',
+  'After an all-in for less than a full raise, players who already acted can only call or fold.',
   'Chips nobody could match go straight back to the player who bet them.',
   'Side pots are worked out for you. The pots are paid from the last side pot back to the main pot.',
   'If players tie, the pot is split. A leftover chip goes to the tied player sitting first to the left of the dealer button.',
   'With two players, the dealer posts the small blind and acts first before the flop and last after it.',
-  'If the host set a turn timer, the server keeps it. When it ends, you check if it costs nothing, otherwise you fold. Two timeouts in a row sit you out.',
+  'With a turn timer, you check when time runs out if it costs nothing. Otherwise you fold. Two timeouts in a row sit you out.',
   'Sit out, leave or top up between hands. A new player or a returning one is dealt in from the next hand.',
-  'The host can pause the game and undo up to the last five steps. With cards in the app, undo only works inside one betting round: once a new card is turned it cannot be taken back.',
-  'With cards in the app the app decides the winners and pays every pot itself. Nobody has to pick a winner or total up a hand.',
+  'The host can pause and undo up to five steps. With cards in the app, undo stays inside one betting round. A turned card cannot be taken back.',
+  'With cards in the app, the app decides the winners and pays every pot.',
 ];
 
 /// What to do when the connection drops.
@@ -154,19 +154,19 @@ const List<String> guideManners = <String>[
 const List<GuideStep> guideCards = <GuideStep>[
   GuideStep(
     'Your two cards',
-    'They wait face down on your phone. Tap them to look and tap again to hide them. On a screen everyone can see, hold your finger on them to peek and let go to hide. If you fold, the dock says No cards.',
+    'They wait face down on your phone. Tap to look, tap again to hide. On a shared screen, hold your finger on them to peek. Fold, and the dock says No cards.',
   ),
   GuideStep(
     'The shared cards',
-    'The flop, turn and river appear on the table screen and on every phone. When everyone left is all-in the app turns the rest over one street at a time, so nobody misses a card.',
+    'The flop, turn and river appear on the table and on every phone. After an all-in the app turns them over one street at a time, so nobody misses a card.',
   ),
   GuideStep(
     'The showdown',
-    'Everyone still in shows both cards to everybody. Each winning hand is named, and every pot lists who won it and how much. The app pays the pots; the host has nothing to pick.',
+    'Everyone still in shows both cards. Each winning hand is named, and every pot lists who won how much. The app pays out; the host picks nothing.',
   ),
   GuideStep(
     'Card settings',
-    'In Settings you can turn your cards face up as soon as they are dealt, and switch to a four-colour deck where clubs are green and diamonds are blue.',
+    'In Settings you can show your cards as soon as they are dealt. You can also switch to a four-colour deck: clubs green, diamonds blue.',
   ),
 ];
 
