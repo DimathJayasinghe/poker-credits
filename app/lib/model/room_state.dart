@@ -141,19 +141,21 @@ class RoomState {
         return _copy(presenceCheck: message);
       case PresenceResolved():
         return _copy(clearPresence: true);
+      case PlayerConnection():
+        // Presence is not part of the state version: the server tells it on its own, so a guest
+        // who joined (or dropped) after the last state update shows up (or goes) at once.
+        final current = view;
+        if (current == null) return this;
+        final index = current.seats.indexWhere((seat) => seat.seatIndex == message.seatIndex && seat.playerId == message.playerId);
+        if (index < 0 || current.seats[index].isConnected == message.isConnected) return this;
+        final seats = List<SeatView>.of(current.seats);
+        seats[index] = seats[index].copyWith(isConnected: message.isConnected);
+        return _copy(view: current.copyWith(seats: seats));
       case RoomCrashed():
         return _copy(ended: RoomEnd.crashed);
       case RoomExpired():
         return _copy(ended: RoomEnd.expired);
-      case RoomCreated() ||
-          Joined() ||
-          PlayerConnection() ||
-          GamePaused() ||
-          GameResumed() ||
-          RoomRecovered() ||
-          Pong() ||
-          PlayerAway() ||
-          UnknownServerMessage():
+      case RoomCreated() || Joined() || GamePaused() || GameResumed() || RoomRecovered() || Pong() || PlayerAway() || UnknownServerMessage():
         // Carried by the next STATE_UPDATE / SNAPSHOT, or handled by the connection layer.
         return this;
     }

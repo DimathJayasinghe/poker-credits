@@ -70,6 +70,24 @@ void main() {
       await eventually('the host sees Ana', () => host.view!.seats.any((s) => s.name == 'Ana'));
       expect(ana.view!.seats.map((s) => s.name), containsAll(<String>['Dimath', 'Ana']));
       expect((await ana.stored)?.serverUri, ana.session.serverUri);
+      // Found on the emulator: the host showed every new guest as offline until the next state update.
+      await eventually('the host sees Ana as connected', () => host.view!.seats.any((s) => s.name == 'Ana' && s.isConnected));
+    }, skip: skip);
+
+    test('the host sees a guest go offline when the guest leaves the app, and come back', () async {
+      final host = phone('host');
+      final room = await host.host();
+      final ana = phone('ana');
+      await ana.joinSeated(Device.qrOf(room), 'Ana');
+      bool anaOnline() => host.view!.seats.any((s) => s.name == 'Ana' && s.isConnected);
+      await eventually('Ana shows online', anaOnline);
+
+      ana.kill();
+      await eventually('Ana shows offline once her socket is gone', () => !anaOnline(), timeout: const Duration(seconds: 15));
+
+      final back = phone('ana2', tokens: ana.tokens);
+      expect(await back.container.read(joinProvider).restore(), isTrue);
+      await eventually('Ana shows online again', anaOnline);
     }, skip: skip);
 
     test('a guest joins by a typed address: the first certificate is taken and kept', () async {

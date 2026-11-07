@@ -32,6 +32,40 @@ void main() {
     expect(state.needsResync, isFalse);
   });
 
+  group('who is connected', () {
+    SeatView seat(int index, String id, {required bool connected}) => SeatView(
+      seatIndex: index,
+      playerId: id,
+      name: 'P$index',
+      chips: 1000,
+      streetBet: 0,
+      hasFolded: false,
+      isAllIn: false,
+      isSittingOut: false,
+      isConnected: connected,
+    );
+
+    test('a connection notice flips that seat and nothing else, without a new snapshot', () {
+      var state = apply(
+        const RoomState(),
+        snapshot(version: 3, view: roomView(seats: <SeatView>[seat(0, 'host', connected: true), seat(1, 'ana', connected: false)])),
+      );
+      state = apply(state, const PlayerConnection(seatIndex: 1, playerId: 'ana', isConnected: true));
+      expect(state.view!.seats.map((s) => s.isConnected), <bool>[true, true], reason: 'the host sees a guest who just joined');
+      expect(state.stateVersion, 3, reason: 'a presence notice does not move the state version');
+
+      state = apply(state, const PlayerConnection(seatIndex: 1, playerId: 'ana', isConnected: false));
+      expect(state.view!.seats.map((s) => s.isConnected), <bool>[true, false], reason: 'and sees her go');
+    });
+
+    test('a notice for a seat held by someone else, or for no view, changes nothing', () {
+      final before = apply(const RoomState(), snapshot(version: 3, view: roomView(seats: <SeatView>[seat(1, 'ana', connected: false)])));
+      final after = apply(before, const PlayerConnection(seatIndex: 1, playerId: 'bob', isConnected: true));
+      expect(after.view!.seats.single.isConnected, isFalse, reason: 'the seat belongs to another player now');
+      expect(apply(const RoomState(), const PlayerConnection(seatIndex: 1, playerId: 'ana', isConnected: true)).view, isNull);
+    });
+  });
+
   test('a gap in versions asks for a resync and keeps the old view', () {
     var state = apply(const RoomState(), snapshot(version: 5));
     state = apply(state, StateUpdate(stateVersion: 7, view: roomView(pot: 10)));

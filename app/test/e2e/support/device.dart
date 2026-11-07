@@ -115,11 +115,11 @@ class Device {
        tokens = tokens ?? MemoryTokenStore() {
     server = NativeHostServer(
       dataDir: () async => this.dir.path,
-      init: () => initBridge(libraryPath: nativeLibraryPath),
+      init: () => initBridge(libraryPath: nativeLibraryPath, rustLogFilter: Platform.environment['E2E_RUST_LOG'] ?? 'info'),
     );
     final real = LanHostFinder(candidates: () async => searchAddresses);
     finder = wrapFinder == null ? real : wrapFinder(real);
-    final settings = MemorySettingsStore(const AppSettings(acceptedTerms: currentTermsVersion, introDone: true));
+    final settings = MemorySettingsStore(const AppSettings(acceptedTerms: currentTermsVersion, introDone: true, nameAsked: true));
     container = RefenaContainer(
       overrides: [
         hostServerProvider.overrideWithValue(server),
