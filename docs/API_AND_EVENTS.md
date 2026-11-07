@@ -346,3 +346,20 @@ When `POKER_WEB_DIR` is set (cloud) or web assets are embedded (host mode), the 
 - The `/v1/` path prefix is for HTTP and WebSocket route versioning; the `v` field is for message semantics. They move together at major changes.
 - Every `v` has fixtures in `protocol/fixtures/v1/`. CI fails if a fixture no longer round-trips in Rust or Dart.
 - Protocol version is also in the QR payload (`v=1`) so an old app can say "update" before connecting.
+
+---
+
+## 9. Virtual cards additions (ADR-016)
+
+All additive, `v` stays 1: a client or server that does not know them ignores them, and every default is omitted on the wire, so a physical room's frames are byte-for-byte what they were. Rationale: `docs/superpowers/specs/2026-11-07-virtual-cards-design.md` section 5.4. The same example frames are asserted on both sides: `crates/poker_server_core/tests/protocol_fixtures.rs` and `packages/poker_protocol/test/fixtures_test.dart`.
+
+* **Card wire format:** a 2-character string, rank `2-9 T J Q K A` then suit `c d h s` (`"As"`, `"Td"`, `"2c"`). Dart: `PokerCard` (named so it never clashes with Flutter's `Card`).
+* **`RoomConfig.cardMode`:** `"PHYSICAL"` (default when absent) or `"VIRTUAL"`. Fixed at creation; `CONFIGURE` cannot change it. An unknown value decodes to `PHYSICAL` in Dart.
+* **`RoomView` additions:** `board` (revealed board cards, omitted when empty), `reveals` (`[{ playerId, name, cards, category, bestFive }]`, omitted until a reveal; there is deliberately no seat index and no card of anyone who has not been revealed), `SeatView.hasCards` (a hand was dealt to this seat; omitted when false) and `result` (`{ uncontested, pots:[{ potIndex, amount, winnerPlayerIds, shares:[{ playerId, name, amount }] }] }`, absent until the hand is paid; it stays with `board` and `reveals` until the next hand starts so every client can show who won each pot and look at the revealed hands). `name` is the player's name when the hand was paid, so a player who left since is still named. `category` is one of `HIGH_CARD, PAIR, TWO_PAIR, THREE_OF_A_KIND, STRAIGHT, FLUSH, FULL_HOUSE, FOUR_OF_A_KIND, STRAIGHT_FLUSH`.
+* **No room-wide card mode in the view.** A client that needs to know whether the hand on the table is a virtual one reads the signs it leaves (a seat with `hasCards`, a `board`, a `result`, `reveals`, or its own `HOLE_CARDS`); the app does this in `RoomState.showsCards`. The mode is in `GET /v1/room/{code}` and the lobby list (below) for the Join page.
+* **`HOLE_CARDS` (server to one player only):** `{ "type":"HOLE_CARDS", "handNumber":4, "cards":["As","Kd"] }`. Sent right after the deal and again after every `SNAPSHOT` on join, resume and supersede, to that connection alone. Never broadcast, never sent to spectators. The client keeps it across `SNAPSHOT` and replaces it when a higher `handNumber` arrives; duplicates are harmless. It drops it on a lobby phase or a newer hand number, and shows it only while its `handNumber` equals the view's.
+* **`JOIN_ROOM` / `RESUME`:** optional `features: ["VIRTUAL_CARDS"]`. A virtual room refuses a client without it with `UPDATE_REQUIRED` and closes the socket. The app sends it on every join and resume, the host's own loopback `RESUME` included.
+* **New error code:** `UPDATE_REQUIRED` (this app version cannot play this room; update the app). Old Dart clients map unknown codes to `unknown` safely. The app treats it as a final failure that keeps the stored session (the session is fine, the app is old).
+* **Host showdown messages:** `BEGIN_SHOWDOWN` and `RESOLVE_SHOWDOWN` return `ILLEGAL_STATE` in virtual rooms; the server resolves the showdown itself (journaled as `Op::AutoShowdown`). `UNDO` is accepted only within the current betting street: once a card has been turned it is refused with `ILLEGAL_STATE`.
+* **`START_HAND` has no deck field.** The server shuffles from its own entropy; a client cannot choose the deck.
+* **HTTP:** `cardMode` is added to `GET /v1/room/{code}` and to each entry of `GET /v1/lobbies` so the Join page can tag virtual games. A host that does not say it means real cards.

@@ -173,6 +173,9 @@ Each phase is one branch and one review. Details and file lists: `docs/AGENT_COD
 ### Phase 7 (later): Web Player
 Server static serving + same-origin acceptance, `*_web.dart` platform implementations, bundled CanvasKit and fonts, browser quirks (audio unlock, no iOS vibration, camera needs HTTPS). No refactor expected.
 
+### Phase 8 (proposed): Virtual cards
+Owner request 2026-11-07: a second room mode where the server shuffles, deals private hole cards, reveals the board and ranks hands at showdown, for friends without a deck; LAN host mode first, cloud-ready by design. Physical mode unchanged and default. Design `docs/superpowers/specs/2026-11-07-virtual-cards-design.md`, ADR-016, plan `docs/superpowers/plans/2026-11-07-virtual-cards-plan.md`. Awaiting owner approval.
+
 ### Later / Optional
 - Phase 7, Web Player: Flutter-web Player/Spectator served by the server (LocalSend embeds web assets from `packages/core/assets/web/`). Owner decision 2026-11-01: later, but the codebase must stay ready (ADR-014).
 - Phase 7: Web Player (see below).

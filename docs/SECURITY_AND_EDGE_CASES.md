@@ -226,9 +226,21 @@ flowchart LR
 > * The same application-layer security controls (session tokens, message validation, turn verification) still apply in LAN mode.
 
 ### 6.5. Sensitive State Isolation (Player Hand Privacy)
-* The `STATE_UPDATE` broadcast sent to **all** room members must **never** include private player hole cards (in future card-input mode).
-* Each player's private state (e.g. any future hole card input) must be sent only via a `PRIVATE_STATE` message addressed to that player's connection only. `RoomView` is built per recipient class (public vs private) in `room/view.rs`.
-* The table host display receives only public information: chip counts, bets, actions, and pot totals.
+* The `STATE_UPDATE` broadcast sent to **all** room members must **never** include private player hole cards.
+* In physical-card rooms there are no cards in the system. In **virtual-card rooms (ADR-016)** each player's two cards are sent only in a `HOLE_CARDS` message addressed to that player's live connection (modelled on `TURN_PROMPT`), re-sent after every `SNAPSHOT`, and never to spectators. The public `RoomView` is built in `room/view.rs` from the revealed board and, after a showdown, the revealed hands only; it never reads the dealt hole cards.
+* The table host display receives only public information: chip counts, bets, actions, pot totals, and (virtual rooms) the revealed board and showdown hands.
+
+#### 6.5.1 Virtual cards: leak surfaces and controls
+Full list in `docs/superpowers/specs/2026-11-07-virtual-cards-design.md` section 9. Summary:
+* **Logs and panics:** `Deal`, `Card` and the deal-carrying `Op` have redacted `Debug`; no `tracing` of whole `Op` or `RoomState`. `tool/check_no_state_logging.sh` (CI and the pre-commit hook; `--self-test` proves it still bites) fails on a tracing macro that formats state, an op, a message, a view or cards with `?` or `%`. `cards_secrecy` formats the state and fails if a card token appears.
+* **Disk:** the snapshot and journal contain the current hand's deal (needed for exact restore). Files are created `0600`, the data folder `0700` on Unix (`store/private.rs`; a test checks the modes).
+* **Manual showdown lock:** `BEGIN_SHOWDOWN` and `RESOLVE_SHOWDOWN` from a host are `ILLEGAL_STATE` in virtual rooms, so a modified host client cannot award pots. The showdown is `Op::AutoShowdown`, created only by the room actor with engine-computed winners; no client message maps to it.
+* **Undo:** limited to the current street so nobody can re-bet after seeing a card.
+* **Hostile shapes:** `RevealView` carries the player id, name, two cards, category and best five of a hand that is being shown, and nothing else: no seat index and no card of a player who has not been revealed. `StartHand` has no deck field on the wire, so a client cannot choose the deal. `HOLE_CARDS` is `Broadcast::To(player)` only.
+* **Old clients:** a virtual room refuses a client without `features: ["VIRTUAL_CARDS"]` (`UPDATE_REQUIRED`), so an old app never sits at a table it cannot play.
+* **Fair shuffle:** OS entropy, unbiased Fisher-Yates, journaled as an input.
+* **No-leak oracle test (`cards_leak`):** audits every view and every message of 40 seeded games per connection and fails if any other player's card appears before its reveal; a planted leak must be caught. `fuzz` runs a hostile client against a virtual victim and fails if it ever hears one of the victim's hole cards.
+* **Accepted limit:** in host (LAN) mode the host's device runs the server and could be modified to read the deck. Documented to users; cloud mode removes it.
 
 ### 6.6. Room Code Guessing
 Room codes have 32^4 (about 1.05 million) values. In cloud mode:

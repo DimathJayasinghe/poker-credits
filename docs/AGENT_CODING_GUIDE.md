@@ -145,6 +145,30 @@ Android foreground service, optional multicast discovery, per-platform packaging
 ### Phase 7 (later, owner will schedule): Web Player
 Server: static serving of `POKER_WEB_DIR`, same-origin `Origin` acceptance, cache headers. App: `*_web.dart` implementations in `app/lib/platform/`, same-origin socket URL from `Uri.base`, bundled CanvasKit and fonts. Player and Spectator only. Because of ADR-014 this phase should need no refactor of existing code.
 
+### Phase 8 (ADR-016): Virtual cards, built
+Built on `feature/engine-cards` (see `docs/STATUS.md`). Read `docs/superpowers/specs/2026-11-07-virtual-cards-design.md` before changing it. The list below is the file map the work followed (no new crate, **no new dependency**); the wire fixtures are inline in `protocol_fixtures.rs` and `fixtures_test.dart`, and the hole-card oracle is `cards_leak.rs`:
+
+```text
+crates/poker_engine/src/{card.rs,deck.rs,hand_rank.rs,deal.rs,showdown.rs}   # new
+crates/poker_engine/src/{lib.rs,state.rs,command.rs,machine.rs,event.rs}     # Table.deal, StartHand.deck, board_shown, reveals
+crates/poker_engine/tests/{cards.rs,hand_rank.rs,deal.rs,showdown.rs}         # cards, exhaustive counts (runs in debug CI), wheel, ties, undo, replay
+crates/poker_server_core/src/cards.rs                                        # Entropy trait, OsEntropy, FixedEntropy, shuffle
+crates/poker_server_core/src/{protocol.rs,config.rs}                         # cardMode, features, HOLE_CARDS, UPDATE_REQUIRED, view fields
+crates/poker_server_core/src/room/{state.rs,ops.rs,view.rs,actor.rs}         # AutoShowdown, deck in StartHand, projection, resend on snapshot
+crates/poker_server_core/src/store/{snapshot.rs,journal.rs}                  # 0600 / 0700 permissions
+crates/poker_server_core/src/net/http.rs                                     # cardMode on room and lobbies
+crates/poker_server_core/tests/{cards_shuffle.rs,cards_flow.rs,cards_leak.rs,cards_replay.rs}
+tool/check_no_state_logging.sh                                               # grep lint, wired into pre-commit and CI
+protocol/fixtures/v1/*.json                                                  # one per new message, virtual RoomView
+packages/poker_protocol/lib/src/{card.dart,...}                              # models; regenerate mappers
+packages/poker_bridge/rust/src/api/server.rs                                 # cardMode in the bridge config
+app/lib/widget/cards/{playing_card.dart,card_row.dart,board_view.dart,hole_cards_dock.dart,showdown_panel.dart}
+app/lib/widget/player/opponent_strip.dart
+app/lib/{model/room_state.dart,model/app_settings.dart,theme/tokens.dart,util/strings.dart}
+app/lib/pages/{host_page.dart,join_page.dart,player_page.dart,table_page.dart}
+```
+Agent rules for this phase: all ranking and dealing in Rust; the shuffle is drawn in the actor and journaled, never in the reducer; no card text in logs or `Debug`; every new wire item gets a fixture on both sides first (principle 7); the no-leak oracle test must exist before the Player UI work starts.
+
 ## 4. Coding Principles for the Agent
 1. **No game logic in Dart.** The app renders `RoomView` and sends intents. It does not compute pots, turns or legality beyond using `TURN_PROMPT.legal`.
 2. **Idempotency.** Every `GAME_ACTION` carries `actionSeq`; the server enforces it.

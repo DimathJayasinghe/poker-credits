@@ -310,3 +310,44 @@ Server side for web: static file serving of the built player, same-origin `Origi
 
 Enforcement: `tool/check_web_safe.sh` fails CI if banned imports appear outside `app/lib/platform/*_io.dart`, and CI builds `fvm flutter build web` for the app.
 
+
+---
+
+## 10. Virtual cards mode (ADR-016)
+
+A room is `PHYSICAL` (the default) or `VIRTUAL`. Virtual rooms add cards without touching the dependency direction (`app` → `poker_bridge` → `poker_server_core` → `poker_engine`):
+
+```mermaid
+flowchart LR
+    Ent["Entropy (trait)\nOsEntropy / FixedEntropy"] --> Act
+    subgraph Core ["poker_server_core"]
+        Act["Room actor\nshuffle outside the reducer"]
+        Red["Reducer (pure)\nOp::Host StartHand{deck}\nOp::AutoShowdown{allocations}"]
+        Proj["Projection\nview(): board + reveals\nhole_cards_for(player)"]
+    end
+    subgraph Eng ["poker_engine (no RNG)"]
+        Cards["card / deck / hand_rank\ndeal / showdown"]
+        SM["machine: Table.deal"]
+    end
+    Act --> Red --> SM --> Cards
+    Red --> Proj
+    Proj -->|"HOLE_CARDS (owner only)"| Owner["Player app"]
+    Proj -->|"STATE_UPDATE (public)"| All["Table, Spectator, all players"]
+```
+Randomness is an input recorded in the journal, never re-derived on replay. The player phone shows board, pot and opponents itself, so the same room works over the internet with no shared screen.
+
+Where things live:
+
+| Piece | File |
+| :--- | :--- |
+| Cards, deck, ranking, `Table.deal`, `StartHand { deck }` | `crates/poker_engine` |
+| `Entropy` strategy (`OsEntropy`, `FixedEntropy`), `Deps { clock, entropy }`, shuffle in the actor | `crates/poker_server_core/src/cards.rs`, `room/actor.rs` |
+| Journaled ops (`HostCommand::StartHand { deck }`, `Op::AutoShowdown`), `hand_names` | `room/state.rs`, `room/ops.rs` |
+| Per-recipient projection (`hole_cards_for`, `view()` with board, reveals, result) | `room/cards.rs`, `room/view.rs` |
+| `UPDATE_REQUIRED` gate | `net/ws.rs` |
+| Files readable by the owner only (`0600` / `0700`) | `store/private.rs` |
+| Wire types | `protocol.rs`, `packages/poker_protocol` |
+| Card widgets, tokens, settings | `app/lib/widget/cards/`, `theme/tokens.dart`, `model/app_settings.dart` |
+| Hole cards in client state, `showsCards`, `RunoutPacer` | `app/lib/model/` |
+
+The Dart app holds no poker rule: it draws what the server sent (the cards, the categories and the winners all come from the engine). Details: `docs/superpowers/specs/2026-11-07-virtual-cards-design.md`.

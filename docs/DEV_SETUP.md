@@ -75,9 +75,10 @@ graphify turns the repo into a queryable graph (god nodes, communities, relation
 
 | File | Purpose |
 | :--- | :--- |
-| `.githooks/pre-commit` | Enable with `git config core.hooksPath .githooks` (already set in this clone). Runs `cargo fmt --check` and `cargo clippy` for staged Rust, `dart format` and `check_web_safe.sh` for staged Dart. Each part skips itself when the tool or project part does not exist yet. |
+| `.githooks/pre-commit` | Enable with `git config core.hooksPath .githooks` (already set in this clone). Runs `cargo fmt --check`, `cargo clippy` and `check_no_state_logging.sh` for staged Rust, `dart format` and `check_web_safe.sh` for staged Dart. Each part skips itself when the tool or project part does not exist yet. |
 | `.githooks/commit-msg` | Rejects commit messages containing AI/tool attribution (`Co-Authored-By: Claude`, "Generated with ...", robot emoji). Project rule; also applies to PR text, which no hook can check, so review it by hand. |
 | `tool/check_web_safe.sh` | ADR-014/013 guard: banned imports (`dart:io`, `dart:ffi`, `Platform.isX`, `poker_bridge`) in web-safe code, colour literals outside `theme/tokens.dart`, `google_fonts`, stray `kIsWeb`. CI runs it. |
+| `tool/check_no_state_logging.sh` | ADR-016 guard: fails on a `tracing` macro that formats state, an op, a message, a view or cards with `?` or `%` (the deck would end up in a log). `--self-test` shows it still catches a planted violation. CI (rust job) and the pre-commit hook run it. |
 | `tool/setup_dev.sh` | Toolchain checklist and optional installer. |
 | `tool/claude_post_edit.sh` | Formatter hook used by Claude Code (inert until the settings are applied). |
 | `rustfmt.toml`, `clippy.toml`, `.editorconfig` | Formatter and lint thresholds. Lint levels live in the root `Cargo.toml` `[workspace.lints]` (created in Phase 0). |

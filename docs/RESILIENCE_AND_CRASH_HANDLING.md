@@ -206,3 +206,13 @@ Detailed in `API_AND_EVENTS.md` section 5. Essence: client sends `RESUME { roomC
 | Init failure shows error app | Dart widget test |
 | Protocol fixtures | Rust and Dart tests read `protocol/fixtures/*.json` |
 | Listener death restart | Integration test: close listener, expect `ListenerFailed` then restart |
+
+---
+
+## 6. Virtual cards and recovery (ADR-016)
+
+- **Randomness is journaled.** The actor shuffles outside the reducer (`Deps { clock, entropy }`) and the resulting deck rides inside the journaled `HostCommand::StartHand { deck }`. Restore replays recorded inputs; it never draws new randomness, so a restored hand has the same cards (RC-007 extended). A journal line written before this feature has no `deck` and restores as a physical room.
+- **Showdown is two ops.** The street-ending op, then `Op::AutoShowdown { allocations, at_ms }` carrying engine-computed winners; only the actor creates it, so no client can inject one. A kill between them is repaired when the room starts: `spawn` settles a virtual room found in `AllInRunout` or `Showdown` before it serves anyone, and if a settle ever fails the actor retries on a 2 s floor rather than leaving the hand stuck. Replay needs no evaluator.
+- **Reconnect.** After `SNAPSHOT` (and `TURN_PROMPT` if due) the server re-sends `HOLE_CARDS` to that connection alone. The client keeps its cards across snapshots and treats duplicates as no-ops. A stale hand number never replaces a newer one.
+- **Supervisor.** A room restored after a panic keeps its deal; a frozen room keeps it on disk. Snapshot and journal files are created `0600` and their directory `0700` (`store/private.rs`), because from this feature on they hold the deck.
+- **Tests:** `cards_flow` (22 flows), `replay_property` (virtual proptest with forced all-in runouts and snapshots taken at arbitrary points, a payout deliberately left for later), `cards_secrecy` (permissions, the pre-feature fixture, `Debug` output has no card), `cards_leak` (an oracle audits every view and every message of 40 seeded games, and a planted leak must be caught), `fuzz` (a hostile client against a virtual victim learns none of the victim's cards).
