@@ -8,6 +8,7 @@ export 'src/bridge_exception.dart';
 export 'src/bridge_init.dart';
 export 'src/rust/api/server.dart'
     show
+        RsCardMode,
         RsCreatedRoom,
         RsRoomConfig,
         RsRoomError,

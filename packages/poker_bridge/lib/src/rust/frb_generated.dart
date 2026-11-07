@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -203656737;
+  int get rustContentHash => -1615424658;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -100,6 +100,8 @@ abstract class RustLibApi extends BaseApi {
   Future<void> crateApiLoggingInitApp();
 
   void crateApiLoggingInitLogging({required String filter});
+
+  Future<RsCardMode> crateApiServerRsCardModeDefault();
 
   Future<RsServerHandle> crateApiServerStartServer({
     required RsServerConfig config,
@@ -350,6 +352,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "init_logging", argNames: ["filter"]);
 
   @override
+  Future<RsCardMode> crateApiServerRsCardModeDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_rs_card_mode,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiServerRsCardModeDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiServerRsCardModeDefaultConstMeta =>
+      const TaskConstMeta(debugName: "rs_card_mode_default", argNames: []);
+
+  @override
   Future<RsServerHandle> crateApiServerStartServer({
     required RsServerConfig config,
   }) {
@@ -361,7 +390,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 9,
             port: port_,
           );
         },
@@ -472,6 +501,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RsCardMode dco_decode_rs_card_mode(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return RsCardMode.values[raw as int];
+  }
+
+  @protected
   RsCreatedRoom dco_decode_rs_created_room(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -489,8 +524,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RsRoomConfig dco_decode_rs_room_config(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return RsRoomConfig(
       startingChips: dco_decode_i_64(arr[0]),
       smallBlind: dco_decode_i_64(arr[1]),
@@ -499,6 +534,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       isTournament: dco_decode_bool(arr[4]),
       blindLevelMinutes: dco_decode_u_32(arr[5]),
       turnTimeLimitSeconds: dco_decode_u_32(arr[6]),
+      cardMode: dco_decode_rs_card_mode(arr[7]),
     );
   }
 
@@ -695,6 +731,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RsCardMode sse_decode_rs_card_mode(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return RsCardMode.values[inner];
+  }
+
+  @protected
   RsCreatedRoom sse_decode_rs_created_room(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_roomCode = sse_decode_String(deserializer);
@@ -719,6 +762,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_isTournament = sse_decode_bool(deserializer);
     var var_blindLevelMinutes = sse_decode_u_32(deserializer);
     var var_turnTimeLimitSeconds = sse_decode_u_32(deserializer);
+    var var_cardMode = sse_decode_rs_card_mode(deserializer);
     return RsRoomConfig(
       startingChips: var_startingChips,
       smallBlind: var_smallBlind,
@@ -727,6 +771,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       isTournament: var_isTournament,
       blindLevelMinutes: var_blindLevelMinutes,
       turnTimeLimitSeconds: var_turnTimeLimitSeconds,
+      cardMode: var_cardMode,
     );
   }
 
@@ -939,6 +984,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_rs_card_mode(RsCardMode self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_rs_created_room(
     RsCreatedRoom self,
     SseSerializer serializer,
@@ -960,6 +1011,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self.isTournament, serializer);
     sse_encode_u_32(self.blindLevelMinutes, serializer);
     sse_encode_u_32(self.turnTimeLimitSeconds, serializer);
+    sse_encode_rs_card_mode(self.cardMode, serializer);
   }
 
   @protected

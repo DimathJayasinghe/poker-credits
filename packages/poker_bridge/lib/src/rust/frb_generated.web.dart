@@ -73,6 +73,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  RsCardMode dco_decode_rs_card_mode(dynamic raw);
+
+  @protected
   RsCreatedRoom dco_decode_rs_created_room(dynamic raw);
 
   @protected
@@ -161,6 +164,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  RsCardMode sse_decode_rs_card_mode(SseDeserializer deserializer);
 
   @protected
   RsCreatedRoom sse_decode_rs_created_room(SseDeserializer deserializer);
@@ -267,6 +273,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     Uint8List self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_rs_card_mode(RsCardMode self, SseSerializer serializer);
 
   @protected
   void sse_encode_rs_created_room(RsCreatedRoom self, SseSerializer serializer);

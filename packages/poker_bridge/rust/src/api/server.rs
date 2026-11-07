@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use flutter_rust_bridge::frb;
 use poker_server_core::config::{Limits, Timings};
 use poker_server_core::event::ServerEvent;
-use poker_server_core::protocol::RoomConfig;
+use poker_server_core::protocol::{CardMode, RoomConfig};
 use poker_server_core::{ServerConfig, ServerHandle, ServerMode, StartError};
 use tokio::sync::{Mutex, mpsc};
 
@@ -118,6 +118,16 @@ impl From<StartError> for RsServerError {
     }
 }
 
+/// Real cards or cards dealt by the app. Fixed when the room is created.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum RsCardMode {
+    /// The players hold real cards (default).
+    #[default]
+    Physical,
+    /// The server shuffles and deals.
+    Virtual,
+}
+
 /// Table settings the host picks before the first hand.
 #[derive(Clone, Debug)]
 pub struct RsRoomConfig {
@@ -135,6 +145,8 @@ pub struct RsRoomConfig {
     pub blind_level_minutes: u32,
     /// Seconds a player has to act, zero for no timer.
     pub turn_time_limit_seconds: u32,
+    /// Real or virtual cards.
+    pub card_mode: RsCardMode,
 }
 
 /// A new room and the secrets of its host. The host UI connects with these like a reconnecting
@@ -292,6 +304,10 @@ impl TryFrom<RsRoomConfig> for RoomConfig {
             })
         };
         Ok(RoomConfig {
+            card_mode: match config.card_mode {
+                RsCardMode::Physical => CardMode::Physical,
+                RsCardMode::Virtual => CardMode::Virtual,
+            },
             starting_chips: chips(config.starting_chips)?,
             small_blind: chips(config.small_blind)?,
             big_blind: chips(config.big_blind)?,
@@ -358,6 +374,26 @@ mod tests {
         assert!(to_core(&config(false), tx).bind.ip().is_loopback());
     }
 
+    /// What crosses into Dart is a kind and one number. The hosted server's rooms (hands, cards,
+    /// names) stay inside Rust and reach the app only over the WebSocket like any other client,
+    /// so a card can never take the bridge shortcut. Adding a field here breaks this test.
+    #[test]
+    fn bridge_events_carry_no_room_data() {
+        let events = [
+            ServerEvent::Listening("127.0.0.1:8080".parse().unwrap()),
+            ServerEvent::RoomsRestored(3),
+            ServerEvent::Stopped,
+        ];
+        for event in &events {
+            // Exhaustive on purpose: no strings, no vectors, nothing room-shaped.
+            let RsServerEvent { kind, value } = to_wire(event);
+            let _: (RsServerEventKind, u32) = (kind, value);
+        }
+        match &events[0] {
+            ServerEvent::Listening(_) | ServerEvent::RoomsRestored(_) | ServerEvent::Stopped => {}
+        }
+    }
+
     #[test]
     fn empty_data_dir_means_memory_only() {
         let (tx, _rx) = mpsc::channel(1);
@@ -402,7 +438,21 @@ mod tests {
             is_tournament: false,
             blind_level_minutes: 10,
             turn_time_limit_seconds: 30,
+            card_mode: RsCardMode::Physical,
         }
+    }
+
+    #[test]
+    fn card_mode_crosses_the_bridge_and_defaults_to_real_cards() {
+        let physical = RoomConfig::try_from(room_config()).unwrap();
+        assert_eq!(physical.card_mode, CardMode::Physical);
+        let virtual_room = RoomConfig::try_from(RsRoomConfig {
+            card_mode: RsCardMode::Virtual,
+            ..room_config()
+        })
+        .unwrap();
+        assert_eq!(virtual_room.card_mode, CardMode::Virtual);
+        assert_eq!(RsCardMode::default(), RsCardMode::Physical);
     }
 
     #[tokio::test]

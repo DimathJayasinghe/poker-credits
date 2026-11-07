@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -203656737;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1615424658;
 
 // Section: executor
 
@@ -402,6 +402,38 @@ fn wire__crate__api__logging__init_logging_impl(
         },
     )
 }
+fn wire__crate__api__server__rs_card_mode_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "rs_card_mode_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::server::RsCardMode::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__server__start_server_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -526,6 +558,18 @@ impl SseDecode for Vec<u8> {
     }
 }
 
+impl SseDecode for crate::api::server::RsCardMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::server::RsCardMode::Physical,
+            1 => crate::api::server::RsCardMode::Virtual,
+            _ => unreachable!("Invalid variant for RsCardMode: {}", inner),
+        };
+    }
+}
+
 impl SseDecode for crate::api::server::RsCreatedRoom {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -552,6 +596,7 @@ impl SseDecode for crate::api::server::RsRoomConfig {
         let mut var_isTournament = <bool>::sse_decode(deserializer);
         let mut var_blindLevelMinutes = <u32>::sse_decode(deserializer);
         let mut var_turnTimeLimitSeconds = <u32>::sse_decode(deserializer);
+        let mut var_cardMode = <crate::api::server::RsCardMode>::sse_decode(deserializer);
         return crate::api::server::RsRoomConfig {
             starting_chips: var_startingChips,
             small_blind: var_smallBlind,
@@ -560,6 +605,7 @@ impl SseDecode for crate::api::server::RsRoomConfig {
             is_tournament: var_isTournament,
             blind_level_minutes: var_blindLevelMinutes,
             turn_time_limit_seconds: var_turnTimeLimitSeconds,
+            card_mode: var_cardMode,
         };
     }
 }
@@ -705,7 +751,8 @@ fn pde_ffi_dispatcher_primary_impl(
             data_len,
         ),
         6 => wire__crate__api__logging__init_app_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__server__start_server_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__server__rs_card_mode_default_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__server__start_server_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -742,6 +789,27 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<RsServerHandle>> for RsServerH
 }
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::server::RsCardMode {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Physical => 0.into_dart(),
+            Self::Virtual => 1.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::server::RsCardMode
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::server::RsCardMode>
+    for crate::api::server::RsCardMode
+{
+    fn into_into_dart(self) -> crate::api::server::RsCardMode {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::server::RsCreatedRoom {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -775,6 +843,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::server::RsRoomConfig {
             self.is_tournament.into_into_dart().into_dart(),
             self.blind_level_minutes.into_into_dart().into_dart(),
             self.turn_time_limit_seconds.into_into_dart().into_dart(),
+            self.card_mode.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -993,6 +1062,22 @@ impl SseEncode for Vec<u8> {
     }
 }
 
+impl SseEncode for crate::api::server::RsCardMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::server::RsCardMode::Physical => 0,
+                crate::api::server::RsCardMode::Virtual => 1,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
 impl SseEncode for crate::api::server::RsCreatedRoom {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1013,6 +1098,7 @@ impl SseEncode for crate::api::server::RsRoomConfig {
         <bool>::sse_encode(self.is_tournament, serializer);
         <u32>::sse_encode(self.blind_level_minutes, serializer);
         <u32>::sse_encode(self.turn_time_limit_seconds, serializer);
+        <crate::api::server::RsCardMode>::sse_encode(self.card_mode, serializer);
     }
 }
 

@@ -146,6 +146,7 @@ void main() {
         isTournament: false,
         blindLevelMinutes: 10,
         turnTimeLimitSeconds: 30,
+        cardMode: RsCardMode.physical,
       );
       await expectLater(
         controller.createRoom('Host', room),

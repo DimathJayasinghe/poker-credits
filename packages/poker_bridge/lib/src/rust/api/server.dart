@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `start_with_events`, `to_core`, `to_wire`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `try_from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `try_from`
 
 /// Starts the server and returns its handle. Call [`RsServerHandle::subscribe`] to watch it.
 ///
@@ -41,6 +41,18 @@ abstract class RsServerHandle implements RustOpaqueInterface {
   /// Streams [`RsServerEvent`]s into `events` until the server stops. Only the first call
   /// gets the stream; later calls end immediately.
   Stream<RsServerEvent> subscribe();
+}
+
+/// Real cards or cards dealt by the app. Fixed when the room is created.
+enum RsCardMode {
+  /// The players hold real cards (default).
+  physical,
+
+  /// The server shuffles and deals.
+  virtual;
+
+  static Future<RsCardMode> default_() =>
+      RustLib.instance.api.crateApiServerRsCardModeDefault();
 }
 
 /// A new room and the secrets of its host. The host UI connects with these like a reconnecting
@@ -106,6 +118,9 @@ class RsRoomConfig {
   /// Seconds a player has to act, zero for no timer.
   final int turnTimeLimitSeconds;
 
+  /// Real or virtual cards.
+  final RsCardMode cardMode;
+
   const RsRoomConfig({
     required this.startingChips,
     required this.smallBlind,
@@ -114,6 +129,7 @@ class RsRoomConfig {
     required this.isTournament,
     required this.blindLevelMinutes,
     required this.turnTimeLimitSeconds,
+    required this.cardMode,
   });
 
   @override
@@ -124,7 +140,8 @@ class RsRoomConfig {
       ante.hashCode ^
       isTournament.hashCode ^
       blindLevelMinutes.hashCode ^
-      turnTimeLimitSeconds.hashCode;
+      turnTimeLimitSeconds.hashCode ^
+      cardMode.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -137,7 +154,8 @@ class RsRoomConfig {
           ante == other.ante &&
           isTournament == other.isTournament &&
           blindLevelMinutes == other.blindLevelMinutes &&
-          turnTimeLimitSeconds == other.turnTimeLimitSeconds;
+          turnTimeLimitSeconds == other.turnTimeLimitSeconds &&
+          cardMode == other.cardMode;
 }
 
 /// The room was refused.
