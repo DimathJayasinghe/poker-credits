@@ -110,6 +110,8 @@ class StoredSession {
     required this.sessionToken,
     this.hostToken,
     this.playerId,
+    this.soloBots,
+    this.soloSkill,
   });
 
   /// `ws://host:port/v1/ws` of the server that holds the room.
@@ -119,6 +121,11 @@ class StoredSession {
   final String? hostToken;
   final String? playerId;
 
+  /// Single-player games: how many opponents the game started with and at which skill (the wire
+  /// name), so the record of the table kind can be kept after the app was closed.
+  final int? soloBots;
+  final String? soloSkill;
+
   bool get isHost => hostToken != null;
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -127,6 +134,8 @@ class StoredSession {
     'sessionToken': sessionToken,
     if (hostToken != null) 'hostToken': hostToken,
     if (playerId != null) 'playerId': playerId,
+    if (soloBots != null) 'soloBots': soloBots,
+    if (soloSkill != null) 'soloSkill': soloSkill,
   };
 
   static StoredSession? fromJson(Object? json) {
@@ -137,12 +146,16 @@ class StoredSession {
     if (serverUri is! String || roomCode is! String || sessionToken is! String) return null;
     final hostToken = json['hostToken'];
     final playerId = json['playerId'];
+    final soloBots = json['soloBots'];
+    final soloSkill = json['soloSkill'];
     return StoredSession(
       serverUri: serverUri,
       roomCode: roomCode,
       sessionToken: sessionToken,
       hostToken: hostToken is String ? hostToken : null,
       playerId: playerId is String ? playerId : null,
+      soloBots: soloBots is int ? soloBots : null,
+      soloSkill: soloSkill is String ? soloSkill : null,
     );
   }
 }

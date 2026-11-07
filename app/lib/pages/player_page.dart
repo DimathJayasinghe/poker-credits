@@ -2,12 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:poker_credits/model/room_state.dart';
+import 'package:poker_credits/model/solo_result.dart';
+import 'package:poker_credits/pages/solo_result_page.dart';
 import 'package:poker_credits/model/runout_pacer.dart';
 import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/join_provider.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_credits/provider/settings_provider.dart';
+import 'package:poker_credits/provider/solo_provider.dart';
 import 'package:poker_credits/theme/brutal_theme.dart';
 import 'package:poker_credits/theme/tokens.dart';
 import 'package:poker_credits/util/describe.dart';
@@ -23,6 +26,7 @@ import 'package:poker_credits/widget/brutal/brutal_card.dart';
 import 'package:poker_credits/widget/brutal/brutal_dialog.dart';
 import 'package:poker_credits/widget/brutal/brutal_sheet.dart';
 import 'package:poker_credits/widget/brutal/brutal_tag.dart';
+import 'package:poker_credits/widget/table/blind_status.dart';
 import 'package:poker_credits/widget/table/seat_order_sheet.dart';
 import 'package:poker_credits/widget/cards/board_view.dart';
 import 'package:poker_credits/widget/cards/card_row.dart';
@@ -39,8 +43,14 @@ import 'package:refena_flutter/refena_flutter.dart';
 
 /// The player's controller: portrait, one thumb. It shows your chips, whose turn it is and, on
 /// your turn, the buttons the server allows. It never decides a rule and never shows the table.
+///
+/// With [solo] it is the table of a single-player game: the same controller with the blinds in the
+/// top bar, every stack in view, and the controls of a game nobody else is waiting for (pause and
+/// end instead of top up, sit out and leave). The server decides all of it.
 class PlayerPage extends StatefulWidget {
-  const PlayerPage({super.key});
+  const PlayerPage({super.key, this.solo = false});
+
+  final bool solo;
 
   @override
   State<PlayerPage> createState() => _PlayerPageState();
@@ -64,6 +74,13 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
   /// Reveals a run-out one street at a time; the result waits until the last card is down.
   final RunoutPacer _pacer = RunoutPacer();
 
+  /// Single-player games: how many finishing places were already announced (`null` until the first
+  /// view, so places from before this screen opened are not announced), the lines still shown and
+  /// the hand they were announced in.
+  int? _seenFinishes;
+  final List<Finish> _outLines = <Finish>[];
+  int _outLinesHand = 0;
+
   @override
   void initState() {
     super.initState();
@@ -80,7 +97,8 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Back from the background: the socket is probably dead, so reconnect and let the server
     // send a fresh snapshot (a `RESUME`, never a second join).
-    if (state == AppLifecycleState.resumed) ref.notifier(sessionProvider).reconnect();
+    // A single-player game wakes its own server first (see `SoloTablePage`).
+    if (state == AppLifecycleState.resumed && !widget.solo) ref.notifier(sessionProvider).reconnect();
     // Leaving the app (switcher thumbnails, a notification pulled down) never leaves cards open.
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive || state == AppLifecycleState.hidden) {
       if (_faceUp) setState(() => _faceUp = false);
@@ -153,6 +171,10 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
   /// the seat up; leaves straight away when there is no game to lose.
   void _onBack() {
     final session = ref.read(sessionProvider);
+    if (widget.solo) {
+      _soloBack(session);
+      return;
+    }
     final inGame = session.link.failure == null && session.room.ended == null && session.room.view != null && session.mySeat != null;
     if (inGame) {
       _leaveTable();
@@ -161,9 +183,60 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
     }
   }
 
-  Future<void> _exit() async {
-    await ref.read(joinProvider).leave();
+  Future<void> _exit({bool keep = false}) async {
+    if (widget.solo) {
+      final solo = ref.notifier(soloProvider);
+      await (keep ? solo.suspend() : solo.leave());
+    } else {
+      await ref.read(joinProvider).leave();
+    }
     if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  /// Back in a single-player game: while it is on, the game is saved and can be resumed; when it is
+  /// over or gone there is nothing to keep.
+  Future<void> _soloBack(SessionState session) async {
+    final view = session.room.view;
+    final over = view != null && SoloResult.from(view, session.playerId, const SoloStats()) != null;
+    if (over || session.link.failure != null || session.room.ended != null || view == null) {
+      await _exit();
+      return;
+    }
+    final keep = await confirmBrutal(
+      context: context,
+      title: Strings.soloLeaveTitle,
+      message: Strings.soloLeaveBody,
+      confirmLabel: Strings.soloSaveExit,
+      cancelLabel: Strings.keepPlaying,
+    );
+    if (keep) await _exit(keep: true);
+  }
+
+  /// Ends a single-player game for good, after asking.
+  Future<void> _endSolo() async {
+    final yes = await confirmBrutal(
+      context: context,
+      title: Strings.soloEndTitle,
+      message: Strings.soloEndBody,
+      confirmLabel: Strings.soloEnd,
+      cancelLabel: Strings.cancel,
+      danger: true,
+    );
+    if (yes) await _exit();
+  }
+
+  void _seeResult() => Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => const SoloResultPage()));
+
+  /// Keeps the lines "Maya is out (6th)" of the last two hands.
+  void _syncOut(RoomView view) {
+    final seen = _seenFinishes ?? view.finishOrder.length;
+    final fresh = newlyOut(view.finishOrder, seen);
+    _seenFinishes = view.finishOrder.length;
+    if (fresh.isNotEmpty) {
+      _outLines.addAll(fresh);
+      _outLinesHand = view.handNumber;
+    }
+    if (_outLines.isNotEmpty && view.handNumber > _outLinesHand + 1) _outLines.clear();
   }
 
   /// Vibration and sound once per turn; see [TurnAlertGate].
@@ -291,7 +364,8 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
   Widget _controller(BuildContext context, SessionState session, RoomView rawView, SeatView rawSeat) {
     final c = BrutalTheme.of(context).colors;
     final settings = context.ref.watch(settingsProvider);
-    final showCards = session.room.showsCards;
+    // Cards of a single-player game are always virtual, even before the first hand.
+    final showCards = session.room.showsCards || widget.solo;
     _syncCards(rawView, settings.cardsFaceUp);
     // While a run-out is dealt the screen shows the table as it was: see RunoutPacer.paced.
     final view = _pacer.paced(rawView, ref.read(clockProvider)(), instant: MediaQuery.of(context).disableAnimations);
@@ -309,9 +383,18 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
     final pending = view.pendingRebuys.where((r) => r.playerId == seat.playerId).firstOrNull;
     final inFlight = _sentSeq == room.nextActionSeq && room.lastError == null;
 
+    final solo = widget.solo;
+    if (solo) _syncOut(rawView);
+    final finished = solo ? SoloResult.from(rawView, session.playerId, const SoloStats()) : null;
+    final over = finished != null;
+    final headsUp = solo && !over && view.seats.length == 2;
+
     final String title;
     String? detail;
-    if (myTurn) {
+    if (finished != null) {
+      title = finished.won ? Strings.soloWon : Strings.soloOut;
+      detail = '${Strings.ordinal(finished.place)} ${Strings.soloOutOf} ${finished.of}';
+    } else if (myTurn) {
       title = Strings.yourTurn;
       detail = remaining == null ? null : '${clock(remaining)} ${Strings.turnLeft}';
     } else if (acting != null) {
@@ -322,7 +405,7 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
       detail = seat.isSittingOut ? Strings.youAreOut : null;
     }
 
-    final check = room.presenceCheck;
+    final check = widget.solo ? null : room.presenceCheck;
     // At huge text sizes the whole controller scrolls, so the action buttons stay reachable; at
     // normal sizes it fills the screen and the buttons sit at the bottom.
     return CustomScrollView(
@@ -332,18 +415,22 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              _TopBar(roomCode: view.roomCode, link: session.link, onBack: _onBack),
+              if (solo) _SoloTopBar(blinds: view.blinds, onBack: _onBack) else _TopBar(roomCode: view.roomCode, link: session.link, onBack: _onBack),
               if (!live) _linkBanner(session.link),
               if (view.paused) const BrutalBanner(message: Strings.gamePaused, kind: BrutalBannerKind.warning),
               if (room.lastError != null) BrutalBanner(message: errorText(room.lastError!.code), kind: BrutalBannerKind.error),
-              if (pending != null) BrutalBanner(message: pending.approved ? Strings.topUpApproved : '${Strings.topUpPending}: ${pending.amount}'),
+              if (pending != null && !solo)
+                BrutalBanner(message: pending.approved ? Strings.topUpApproved : '${Strings.topUpPending}: ${pending.amount}'),
               if (check != null && check.subjectPlayerId != seat.playerId) _presenceStrip(check),
               Padding(
                 padding: const EdgeInsets.all(BrutalMetrics.gapM),
                 child: _StackBlock(seat: seat),
               ),
-              if (showCards) ...<Widget>[OpponentStrip(seats: view.seats, myPlayerId: seat.playerId), const SizedBox(height: BrutalMetrics.gapS)],
-              if (guestMayChooseSeat(view.phase))
+              if (showCards) ...<Widget>[
+                OpponentStrip(seats: view.seats, myPlayerId: seat.playerId, showStacks: solo, activeSeat: solo ? view.activeSeat : null),
+                const SizedBox(height: BrutalMetrics.gapS),
+              ],
+              if (!solo && guestMayChooseSeat(view.phase))
                 Padding(
                   padding: const EdgeInsets.fromLTRB(BrutalMetrics.gapM, 0, BrutalMetrics.gapM, BrutalMetrics.gapM),
                   child: BrutalButton(
@@ -360,6 +447,7 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
                         TurnBlock(myTurn: myTurn, title: title, detail: detail),
+                        if (solo && (headsUp || _outLines.isNotEmpty)) _SoloNotes(headsUp: headsUp, outLines: List<Finish>.of(_outLines)),
                         const SizedBox(height: BrutalMetrics.gapM),
                         Text(
                           '${Strings.pot.toUpperCase()} ${view.totalPot}',
@@ -413,30 +501,60 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
                       ),
                       const SizedBox(height: BrutalMetrics.gapM),
                     ],
-                    Row(
-                      children: <Widget>[
-                        Expanded(
-                          child: BrutalButton(label: Strings.topUp, minHeight: _secondaryHeight, onPressed: live ? () => _topUp(null) : null),
-                        ),
-                        const SizedBox(width: BrutalMetrics.gapS),
-                        Expanded(
-                          child: BrutalButton(
-                            label: seat.isSittingOut ? Strings.imBack : Strings.sitOut,
-                            minHeight: _secondaryHeight,
-                            onPressed: live ? () => _send(SetSittingOut(sittingOut: !seat.isSittingOut)) : null,
+                    if (over)
+                      BrutalButton(
+                        label: Strings.seeResult,
+                        kind: BrutalButtonKind.primary,
+                        heavy: true,
+                        minHeight: BrutalMetrics.tapPlayer,
+                        onPressed: _seeResult,
+                      )
+                    else if (solo)
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: BrutalButton(
+                              label: view.paused ? Strings.resume : Strings.pause,
+                              minHeight: _secondaryHeight,
+                              onPressed: live ? () => _send(view.paused ? const ResumeGame() : const Pause()) : null,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: BrutalMetrics.gapS),
-                        Expanded(
-                          child: BrutalButton(
-                            label: Strings.leave,
-                            kind: BrutalButtonKind.danger,
-                            minHeight: _secondaryHeight,
-                            onPressed: _leaveTable,
+                          const SizedBox(width: BrutalMetrics.gapS),
+                          Expanded(
+                            child: BrutalButton(
+                              label: Strings.soloEnd,
+                              kind: BrutalButtonKind.danger,
+                              minHeight: _secondaryHeight,
+                              onPressed: _endSolo,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      )
+                    else
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: BrutalButton(label: Strings.topUp, minHeight: _secondaryHeight, onPressed: live ? () => _topUp(null) : null),
+                          ),
+                          const SizedBox(width: BrutalMetrics.gapS),
+                          Expanded(
+                            child: BrutalButton(
+                              label: seat.isSittingOut ? Strings.imBack : Strings.sitOut,
+                              minHeight: _secondaryHeight,
+                              onPressed: live ? () => _send(SetSittingOut(sittingOut: !seat.isSittingOut)) : null,
+                            ),
+                          ),
+                          const SizedBox(width: BrutalMetrics.gapS),
+                          Expanded(
+                            child: BrutalButton(
+                              label: Strings.leave,
+                              kind: BrutalButtonKind.danger,
+                              minHeight: _secondaryHeight,
+                              onPressed: _leaveTable,
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -564,6 +682,65 @@ class _StackBlock extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// The top bar of a single-player game: the blinds and when they rise, where the room code and the
+/// connection are in an ordinary game.
+class _SoloTopBar extends StatelessWidget {
+  const _SoloTopBar({required this.blinds, required this.onBack});
+
+  final BlindsView? blinds;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = BrutalTheme.of(context).colors;
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: c.line, width: BrutalMetrics.border),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          BackCell(onTap: onBack),
+          Expanded(child: BlindStatusCells(blinds: blinds)),
+          const GuideCell(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Short lines under the turn block: the heads-up announcement and who went out.
+class _SoloNotes extends StatelessWidget {
+  const _SoloNotes({required this.headsUp, required this.outLines});
+
+  final bool headsUp;
+  final List<Finish> outLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = BrutalTheme.of(context).colors;
+    final style = TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 14, color: c.ink);
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      child: Padding(
+        padding: const EdgeInsets.only(top: BrutalMetrics.gapS),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            if (headsUp) Text('> ${Strings.headsUp}'.toUpperCase(), textAlign: TextAlign.center, style: style),
+            for (final out in outLines.reversed.take(2))
+              Text('> ${Strings.outLine(out.name, out.place)}'.toUpperCase(), textAlign: TextAlign.center, style: style),
+          ],
+        ),
+      ),
     );
   }
 }

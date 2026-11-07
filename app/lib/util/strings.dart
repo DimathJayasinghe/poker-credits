@@ -73,6 +73,31 @@ abstract final class Strings {
 
   /// "Best finish 2nd. Won 1 of 3." for the table kind chosen on the setup screen.
   static String soloRecordLine(int bestPlace, int wins, int played) => 'Best finish ${ordinal(bestPlace)}. Won $wins of $played.';
+  static const String blinds = 'Blinds';
+  static const String blindsRise = 'Rise in';
+  static const String blindsFinalLevel = 'Final level';
+  static String handsCount(int n) => n == 1 ? '1 hand' : '$n hands';
+  static String outLine(String name, int place) => '$name is out (${ordinal(place)})';
+  static const String headsUp = 'Heads-up';
+  static const String soloLeaveTitle = 'Leave the game?';
+  static const String soloLeaveBody = 'The game is saved. Resume it from the start screen.';
+  static const String soloSaveExit = 'Save and exit';
+  static const String keepPlaying = 'Keep playing';
+  static const String soloEndTitle = 'End this game?';
+  static const String soloEndBody = 'You will not be able to resume it.';
+  static const String soloEnd = 'End game';
+  static const String seeResult = 'See result';
+  static const String soloResultTitle = 'Result';
+  static const String soloWon = 'You won';
+  static const String soloOut = 'You are out';
+  static const String soloOutOf = 'of';
+  static const String soloStatHands = 'Hands played';
+  static const String soloStatWon = 'Hands won';
+  static const String soloStatBiggest = 'Biggest win';
+  static const String soloStatBest = 'Best hand';
+  static const String soloKnockout = 'The hand that decided it';
+  static const String playAgain = 'Play again';
+  static const String goHome = 'Home';
   static const String soloFailedUnavailable = 'Playing alone is not available on this device.';
   static const String soloFailedStorage = 'The game files cannot be saved on this device.';
   static const String soloFailedUnknown = 'The game could not start. Try again.';

@@ -40,5 +40,5 @@ class _SoloTablePageState extends State<SoloTablePage> with Refena, WidgetsBindi
   }
 
   @override
-  Widget build(BuildContext context) => const PlayerPage();
+  Widget build(BuildContext context) => const PlayerPage(solo: true);
 }

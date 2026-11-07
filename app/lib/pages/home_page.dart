@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/model/hosting.dart';
@@ -39,7 +41,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with Refena {
   StoredSession? _hosted;
   StoredSession? _playing;
-  StoredSession? _solo;
   bool _resuming = false;
   int _tab = 0;
   String? _resumeError;
@@ -49,10 +50,9 @@ class _HomePageState extends State<HomePage> with Refena {
     super.initState();
     ensureRef((ref) async {
       final stored = await ref.read(tokenStoreProvider).read();
-      final solo = await ref.notifier(soloProvider).saved();
+      unawaited(ref.notifier(soloProvider).refreshSaved());
       if (!mounted) return;
       setState(() {
-        _solo = solo;
         if (stored == null) return;
         if (stored.isHost) {
           _hosted = stored;
@@ -63,29 +63,17 @@ class _HomePageState extends State<HomePage> with Refena {
     });
   }
 
-  /// Opens a single-player page, then looks again for a saved game: it may have been started,
-  /// finished or left meanwhile.
-  Future<void> _pushSolo(Widget page) async {
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
-    if (!mounted) return;
-    final solo = await ref.notifier(soloProvider).saved();
-    if (mounted) setState(() => _solo = solo);
-  }
-
   Future<void> _resumeSolo() async {
     setState(() => _resumeError = null);
     final ok = await ref.notifier(soloProvider).restore();
     if (!mounted) return;
     if (!ok) {
-      setState(() {
-        _solo = null;
-        _resumeError = Strings.soloResumeFailed;
-      });
+      setState(() => _resumeError = Strings.soloResumeFailed);
       // A game the server no longer knows is of no use: forget it.
       await ref.notifier(soloProvider).leave();
       return;
     }
-    await _pushSolo(const SoloTablePage());
+    _push(const SoloTablePage());
   }
 
   Future<void> _resume() async {
@@ -135,6 +123,7 @@ class _HomePageState extends State<HomePage> with Refena {
   /// Title, tagline and the actions: the Play destination.
   Widget _actions(BuildContext context, {required bool supported}) {
     final c = BrutalTheme.of(context).colors;
+    final hasSolo = context.ref.watch(soloProvider.select((s) => s.hasSaved));
     final resume = (_hosted != null && supported) ? _hosted : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -171,14 +160,14 @@ class _HomePageState extends State<HomePage> with Refena {
             onTap: _resuming ? null : _resume,
           ),
         if (_playing != null) BrutalRow(label: '${Strings.resumeGame} ${_playing!.roomCode}', emphasis: resume == null, onTap: _resumePlaying),
-        if (_solo != null && supported) BrutalRow(label: Strings.resumeSolo, emphasis: resume == null && _playing == null, onTap: _resumeSolo),
+        if (hasSolo && supported) BrutalRow(label: Strings.resumeSolo, emphasis: resume == null && _playing == null, onTap: _resumeSolo),
         BrutalRow(
           label: Strings.hostGame,
           caption: supported ? Strings.hostRowCaption : Strings.hostUnsupported,
-          emphasis: resume == null && _playing == null && _solo == null && supported,
+          emphasis: resume == null && _playing == null && !hasSolo && supported,
           onTap: supported ? () => _push(const HostPage()) : null,
         ),
-        if (supported) BrutalRow(label: Strings.playAlone, caption: Strings.playAloneCaption, onTap: () => _pushSolo(const SoloSetupPage())),
+        if (supported) BrutalRow(label: Strings.playAlone, caption: Strings.playAloneCaption, onTap: () => _push(const SoloSetupPage())),
         BrutalRow(label: Strings.joinGame, caption: Strings.joinRowCaption, onTap: () => _push(const JoinPage())),
       ],
     );
@@ -237,9 +226,9 @@ class _HomePageState extends State<HomePage> with Refena {
             const GuideView(),
             SettingsView(
               onGameForgotten: () => setState(() {
+                unawaited(ref.notifier(soloProvider).refreshSaved());
                 _hosted = null;
                 _playing = null;
-                _solo = null;
               }),
             ),
           ],
