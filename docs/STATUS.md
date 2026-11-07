@@ -15,7 +15,7 @@ Owner bug reports and requests, all committed one change at a time on `feature/e
 
 **Not verified / open:**
 - The new screens were checked in widget tests and goldens only. The emulator on the machine still has the 1.1.0 APK: rebuild and reinstall to see the splash, terms, intro, tours and Support on a device.
-- **Support links copy the address, they do not open it:** `url_launcher` is not on the approved list. Needs the owner's yes; the change is one more `ExternalLinks` implementation.
+- Support links open in the system browser (`url_launcher`, approved 2026-11-07), and copy the address when nothing can open it. Not yet tried on a device.
 - **The terms text is plain language, not legal advice.** Have it reviewed before a store release.
 - On a 1280x800 tablet the seated host's table scrolls a little (cards dock + oval + host controls need about 830 px); the last line of the undo note sits under the fold until scrolled. Reachable, not clipped.
 - The raise sheet covers the lower part of the screen while open; the cards stay visible above it on a phone (behind the dimmed backdrop). Left as is.

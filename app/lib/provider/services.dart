@@ -22,7 +22,7 @@ final hapticsProvider = Provider<Haptics>((ref) => Haptics(enabled: () => ref.re
 final soundProvider = Provider<Sound>((ref) => Sound(enabled: () => ref.read(settingsProvider).sound));
 final hostKeepAliveProvider = Provider<HostKeepAlive>((ref) => createHostKeepAlive());
 final hostFinderProvider = Provider<HostFinder>((ref) => createHostFinder());
-final externalLinksProvider = Provider<ExternalLinks>((ref) => const ClipboardExternalLinks());
+final externalLinksProvider = Provider<ExternalLinks>((ref) => const BrowserExternalLinks());
 final localAddressesProvider = Provider<LocalAddressLister>((ref) => listLocalAddresses);
 
 /// The app version shown in Settings. A missing plugin (tests) or any failure shows a dash.
