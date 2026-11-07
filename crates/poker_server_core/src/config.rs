@@ -110,6 +110,15 @@ pub struct Timings {
     pub bot_think_scale: f32,
     /// Solo games: pause between the end of a hand and the next deal.
     pub bot_next_hand_ms: u64,
+    /// Solo games: extra pause before the next deal when the hand went to a showdown, so the
+    /// hands can be read.
+    pub bot_showdown_ms: u64,
+    /// Solo games: a computer player waits at least this long after a deal or a new street before
+    /// it acts, so the cards are on show first.
+    pub bot_look_ms: u64,
+    /// Solo games: how long the app takes between the streets of a run-out (the app's own pacing);
+    /// the next deal waits for every street after the first of a run-out.
+    pub bot_runout_step_ms: u64,
 }
 
 impl Default for Timings {
@@ -122,7 +131,10 @@ impl Default for Timings {
             disconnect_grace_ms: 30 * 1000,
             absent_sit_out_ms: 10 * 60 * 1000,
             bot_think_scale: 1.0,
-            bot_next_hand_ms: 3_000,
+            bot_next_hand_ms: 3_500,
+            bot_showdown_ms: 3_000,
+            bot_look_ms: 1_400,
+            bot_runout_step_ms: 1_600,
         }
     }
 }

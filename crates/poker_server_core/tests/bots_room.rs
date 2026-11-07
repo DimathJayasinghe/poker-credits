@@ -257,3 +257,85 @@ async fn the_solo_server_listens_on_loopback_only() {
     assert_ne!(addr.port(), 0);
     server.stop().await;
 }
+
+/// Virtual milliseconds since the first call, read from the paused clock.
+fn since(start: tokio::time::Instant) -> u64 {
+    u64::try_from(start.elapsed().as_millis()).unwrap()
+}
+
+#[tokio::test(start_paused = true)]
+async fn bots_take_a_human_amount_of_time() {
+    // Default pacing: after a hand is dealt no bot acts for at least the look time, and a bot's
+    // answer to the human takes at least the shortest thinking time.
+    let timings = Timings::default();
+    let room = room(4, Skill::Normal, 6, &timings, None);
+    let mut human = attach(&room, 1).await;
+    let start = tokio::time::Instant::now();
+    let mut dealt_at: Option<u64> = None;
+    let mut gaps_after_human: Vec<u64> = Vec::new();
+    let mut last_human_action: Option<u64> = None;
+    let mut seen = 0;
+    for _ in 0..4000 {
+        human.pump().await;
+        let now = since(start);
+        if dealt_at.is_none() && human.view().hand_number >= 1 {
+            dealt_at = Some(now);
+        }
+        for message in &human.log[seen..] {
+            if let ServerMessage::ActionPerformed { player_id, .. } = message {
+                if player_id == "p_1" {
+                    last_human_action = Some(now);
+                } else if let Some(dealt) = dealt_at {
+                    if last_human_action.is_none() {
+                        assert!(
+                            now >= dealt + timings.bot_look_ms,
+                            "a bot acted {} ms after the deal",
+                            now - dealt
+                        );
+                    }
+                    if let Some(at) = last_human_action.take() {
+                        gaps_after_human.push(now - at);
+                    }
+                }
+            }
+        }
+        seen = human.log.len();
+        if human.view().hand_number >= 3 {
+            break;
+        }
+        let prompt = human.log.iter().rev().find_map(|m| match m {
+            ServerMessage::TurnPrompt {
+                next_action_seq,
+                legal,
+                ..
+            } => Some((*next_action_seq, *legal)),
+            _ => None,
+        });
+        if let Some((action_seq, legal)) = prompt
+            && human.answered != Some(action_seq)
+        {
+            human.answered = Some(action_seq);
+            room.handle
+                .send(
+                    human.conn,
+                    None,
+                    ClientMessage::GameAction {
+                        action_seq,
+                        action: fold_or_check(&legal),
+                    },
+                )
+                .await
+                .unwrap();
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(human.view().hand_number >= 3, "the game did not advance");
+    assert!(
+        !gaps_after_human.is_empty(),
+        "no bot ever answered the human"
+    );
+    assert!(
+        gaps_after_human.iter().all(|gap| *gap >= 700),
+        "a bot answered too fast: {gaps_after_human:?}"
+    );
+}

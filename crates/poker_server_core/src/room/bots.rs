@@ -49,6 +49,22 @@ pub(super) struct BotDriver {
     history: Vec<PublicAction>,
     pending: Option<Pending>,
     next_hand_at_ms: Option<u64>,
+    /// The hand and the number of board cards the table last showed, and when the deal or the
+    /// latest street appeared: nobody acts before it has been on show for `bot_look_ms`.
+    seen: (u32, usize),
+    scene_at_ms: u64,
+    /// Time the app needs to show the streets of a run-out in this hand.
+    runout_extra_ms: u64,
+}
+
+/// Streets on show with this many board cards (0 before the flop).
+fn streets_shown(board_len: usize) -> u64 {
+    match board_len {
+        0..=2 => 0,
+        3 => 1,
+        4 => 2,
+        _ => 3,
+    }
 }
 
 fn to_ms(value: f32) -> u64 {
@@ -86,6 +102,9 @@ impl BotDriver {
             history: Vec::new(),
             pending: None,
             next_hand_at_ms: None,
+            seen: (0, 0),
+            scene_at_ms: 0,
+            runout_extra_ms: 0,
         }
     }
 
@@ -188,6 +207,7 @@ impl BotDriver {
         }
         let table = &state.game.table;
         let frozen = table.paused || state.ended;
+        self.watch_scene(state, now, timings);
         let to_act = table
             .phase
             .is_betting()
@@ -226,10 +246,44 @@ impl BotDriver {
             }
         }
         if human_here && state.solo_ready_for_hand() {
+            let showdown = if showdown::reveals(table).is_empty() {
+                0
+            } else {
+                timings.bot_showdown_ms
+            };
+            let wait = timings
+                .bot_next_hand_ms
+                .saturating_add(showdown)
+                .saturating_add(self.runout_extra_ms);
             self.next_hand_at_ms
-                .get_or_insert_with(|| now.saturating_add(timings.bot_next_hand_ms));
+                .get_or_insert_with(|| now.saturating_add(wait));
         } else {
             self.next_hand_at_ms = None;
+        }
+    }
+
+    /// Notes when a new hand was dealt or a street appeared, and how many streets arrived at once
+    /// (a run-out), which the app shows one after the other.
+    fn watch_scene(&mut self, state: &RoomState, now: u64, timings: &Timings) {
+        let table = &state.game.table;
+        let board_len = table
+            .deal
+            .as_ref()
+            .map_or(0, |deal| deal.visible_board().len());
+        if self.seen.0 != table.hand_number {
+            self.seen = (table.hand_number, 0);
+            self.scene_at_ms = now;
+            self.runout_extra_ms = 0;
+        }
+        if board_len > self.seen.1 {
+            let arrived = streets_shown(board_len).saturating_sub(streets_shown(self.seen.1));
+            self.runout_extra_ms = self.runout_extra_ms.saturating_add(
+                arrived
+                    .saturating_sub(1)
+                    .saturating_mul(timings.bot_runout_step_ms),
+            );
+            self.seen.1 = board_len;
+            self.scene_at_ms = now;
         }
     }
 
@@ -247,7 +301,13 @@ impl BotDriver {
             .or_else(|| safe_decision(state));
         let Decision { action, think_ms } = decision?;
         #[allow(clippy::cast_precision_loss, reason = "a few thousand milliseconds")]
-        let wait = to_ms(think_ms as f32 * timings.bot_think_scale);
+        let thought = to_ms(think_ms as f32 * timings.bot_think_scale);
+        // Never before the cards of this deal or street have been on show for a moment.
+        let on_show = self
+            .scene_at_ms
+            .saturating_add(timings.bot_look_ms)
+            .saturating_sub(now);
+        let wait = thought.max(on_show);
         Some(Pending {
             moment,
             player_id: id.to_owned(),

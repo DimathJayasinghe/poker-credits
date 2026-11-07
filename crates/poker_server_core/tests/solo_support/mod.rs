@@ -51,6 +51,9 @@ pub fn fast() -> Timings {
     Timings {
         bot_think_scale: 0.0,
         bot_next_hand_ms: 0,
+        bot_showdown_ms: 0,
+        bot_look_ms: 0,
+        bot_runout_step_ms: 0,
         ..Timings::default()
     }
 }

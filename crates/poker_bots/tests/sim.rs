@@ -244,3 +244,93 @@ fn hard_beats_easy_and_normal_sits_between() {
         group[1]
     );
 }
+
+/// Prints how often bots fold: preflop VPIP and PFR, postflop fold share of the decisions that
+/// face a bet. Run with `--nocapture` to read the numbers.
+#[test]
+fn measure_fold_rates() {
+    let kinds = [
+        Archetype::Rock,
+        Archetype::Tag,
+        Archetype::Lag,
+        Archetype::CallingStation,
+        Archetype::Maniac,
+        Archetype::NitTrapper,
+    ];
+    for (skill, players, hands) in [
+        (Skill::Easy, 6_usize, 2500_u32),
+        (Skill::Normal, 6, 2500),
+        (Skill::Hard, 6, 2000),
+        (Skill::Normal, 9, 2500),
+        (Skill::Normal, 3, 2500),
+    ] {
+        let mut bots: Vec<Bot> = (0..players)
+            .map(|i| bot(kinds[i % kinds.len()], skill, 300 + i as u64))
+            .collect();
+        let mut state = table(&vec![START; players], 10, 20);
+        let mut deck_rng = BotRng::from_seed(77);
+        let (mut folds, mut calls, mut raises) = (0.0_f64, 0.0_f64, 0.0_f64);
+        let (mut hands_seen, mut flops, mut vpip, mut pfr) = (0.0_f64, 0.0_f64, 0.0_f64, 0.0_f64);
+        for _ in 0..hands {
+            for i in 0..players {
+                let seat = state.table.seat_of(&support::pid(i)).unwrap();
+                if seat.chips.get() < 40 {
+                    let top = START - seat.chips.get();
+                    state = poker_engine::apply(
+                        &state,
+                        poker_engine::Command::Rebuy {
+                            player_id: support::pid(i),
+                            amount: support::chips(top),
+                        },
+                    )
+                    .map(|t| t.state)
+                    .unwrap_or(state);
+                }
+            }
+            let Some(log) = play_hand(&mut state, &mut bots, &mut deck_rng).unwrap() else {
+                break;
+            };
+            hands_seen += players as f64;
+            for i in 0..players {
+                if log.saw_flop[i] {
+                    flops += 1.0;
+                }
+                if log.raised_preflop[i] {
+                    pfr += 1.0;
+                }
+                if log.actions.iter().any(|a| {
+                    usize::from(a.seat.get()) == i
+                        && a.street == poker_engine::Phase::PreFlop
+                        && matches!(
+                            a.kind,
+                            poker_engine::ActionKind::Call
+                                | poker_engine::ActionKind::Raise
+                                | poker_engine::ActionKind::Bet
+                        )
+                }) {
+                    vpip += 1.0;
+                }
+            }
+            for a in &log.actions {
+                if a.street == poker_engine::Phase::PreFlop {
+                    continue;
+                }
+                match a.kind {
+                    poker_engine::ActionKind::Fold => folds += 1.0,
+                    poker_engine::ActionKind::Call => calls += 1.0,
+                    poker_engine::ActionKind::Raise => raises += 1.0,
+                    _ => {}
+                }
+            }
+        }
+        eprintln!(
+            "{skill:?} {players}p: vpip {:.0}% pfr {:.0}% flop {:.0}% | postflop facing a bet: fold {:.0}% call {:.0}% raise {:.0}%",
+            100.0 * vpip / hands_seen,
+            100.0 * pfr / hands_seen,
+            100.0 * flops / hands_seen,
+            100.0 * folds / (folds + calls + raises),
+            100.0 * calls / (folds + calls + raises),
+            100.0 * raises / (folds + calls + raises),
+        );
+    }
+}

@@ -3,16 +3,19 @@
     missing_docs,
     clippy::unwrap_used,
     clippy::expect_used,
-    clippy::indexing_slicing
+    clippy::indexing_slicing,
+    clippy::cast_precision_loss
 )]
 
 mod support;
 
+use poker_bots::decide::think_time;
 use poker_bots::names::{NAMES, pick_names};
 use poker_bots::personality::{Archetype, pick_archetypes};
 use poker_bots::{BotMind, BotRng, Personality, Skill, decide};
 use poker_engine::PlayerAction;
 use proptest::prelude::*;
+use support::chips;
 use support::sim::{Bot, play_hand, table};
 
 fn bots_for(n: usize, skill: Skill, seed: u64) -> Vec<Bot> {
@@ -149,26 +152,110 @@ fn names_are_valid_and_distinct() {
     );
 }
 
-#[test]
-fn think_time_ranges() {
-    // Neutral speed: every thinking time sits inside the documented bounds, and clear spots are quick.
+fn a_view() -> (poker_bots::BotView, Personality) {
     let mut rng = BotRng::from_seed(5);
     let mut p = Personality::sample(Archetype::Tag, &mut rng);
     p.think_speed = 0.5;
-    let mut mind = BotMind::new(p, Skill::Normal);
-    let mut times = Vec::new();
-    for seed in 0..200 {
-        let state = support::dealt(4, 1000, seed);
-        let active = state.table.active.unwrap();
-        let view = poker_bots::view_for_seat(&state.table, active, &[]).unwrap();
-        times.push(decide(&view, &mut mind, &mut rng).think_ms);
+    let state = support::dealt(4, 1000, 3);
+    let active = state.table.active.unwrap();
+    (
+        poker_bots::view_for_seat(&state.table, active, &[]).unwrap(),
+        p,
+    )
+}
+
+fn average(
+    view: &poker_bots::BotView,
+    action: PlayerAction,
+    closeness: f32,
+    p: &Personality,
+) -> f32 {
+    let mut rng = BotRng::from_seed(11);
+    let times: Vec<u32> = (0..400)
+        .map(|_| think_time(view, action, closeness, p, &mut rng))
+        .collect();
+    times.iter().map(|ms| *ms as f32).sum::<f32>() / times.len() as f32
+}
+
+#[test]
+fn think_time_ranges() {
+    // Every thinking time of every kind of spot sits inside the documented bounds, and a bot
+    // is never instant: even a clear fold takes a person's moment.
+    let (mut view, p) = a_view();
+    let mut rng = BotRng::from_seed(9);
+    let actions = [
+        PlayerAction::Fold,
+        PlayerAction::Check,
+        PlayerAction::Call,
+        PlayerAction::Raise {
+            to_amount: chips(60),
+        },
+        PlayerAction::AllIn,
+    ];
+    for owed in [0, 20, 400, 990] {
+        view.to_call = chips(owed);
+        for action in actions {
+            for closeness in [0.0, 0.5, 1.0] {
+                for _ in 0..200 {
+                    let ms = think_time(&view, action, closeness, &p, &mut rng);
+                    assert!((700..=11_000).contains(&ms), "{action:?} {owed} {ms}");
+                }
+            }
+        }
     }
+}
+
+#[test]
+fn think_time_follows_the_spot() {
+    let (mut view, p) = a_view();
+    view.to_call = chips(0);
+    let check = average(&view, PlayerAction::Check, 0.0, &p);
+    let easy_fold = {
+        view.to_call = chips(20);
+        average(&view, PlayerAction::Fold, 0.0, &p)
+    };
+    let close_call = average(&view, PlayerAction::Call, 1.0, &p);
+    view.to_call = chips(900);
+    let all_in = average(&view, PlayerAction::AllIn, 1.0, &p);
     assert!(
-        times.iter().all(|ms| (400..=3500).contains(ms)),
-        "{times:?}"
+        easy_fold < check,
+        "an easy preflop fold is the quickest: {easy_fold} {check}"
     );
-    assert!(times.iter().any(|ms| *ms < 900), "clear spots are quick");
-    assert!(times.iter().any(|ms| *ms > 1200), "close spots take longer");
+    assert!(check < close_call, "{check} {close_call}");
+    assert!(
+        close_call < all_in,
+        "a big decision takes the longest: {close_call} {all_in}"
+    );
+    assert!(check > 900.0 && all_in > 4_000.0, "{check} {all_in}");
+}
+
+#[test]
+fn a_slow_player_takes_longer_than_a_quick_one() {
+    let (view, mut p) = a_view();
+    p.think_speed = 1.0;
+    let quick = average(&view, PlayerAction::Call, 0.5, &p);
+    p.think_speed = 0.0;
+    let slow = average(&view, PlayerAction::Call, 0.5, &p);
+    assert!(slow > quick * 1.3, "{quick} {slow}");
+}
+
+#[test]
+fn timing_never_changes_which_hands_are_played() {
+    // The decision is made before the timing draws, and timing uses a generator of its own: two
+    // runs from the same seed give the same actions, and one timing draw is all the main stream pays.
+    let (view, p) = a_view();
+    let run = |seed: u64| {
+        let mut rng = BotRng::from_seed(seed);
+        let mut mind = BotMind::new(p, Skill::Normal);
+        let first = decide(&view, &mut mind, &mut rng);
+        (first, rng.next_u64())
+    };
+    assert_eq!(run(77), run(77));
+    let (_, after) = run(77);
+    let mut check = BotRng::from_seed(77);
+    let mut mind = BotMind::new(p, Skill::Normal);
+    let _ = decide(&view, &mut mind, &mut check);
+    assert_eq!(check.next_u64(), after);
 }
 
 #[test]

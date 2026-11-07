@@ -14,6 +14,7 @@ pub mod personality;
 pub mod rng;
 pub mod skill;
 pub mod strength;
+pub mod tuning;
 pub mod view;
 
 pub use decide::{BotMind, Decision, decide};
@@ -21,4 +22,5 @@ pub use observe::view_for_seat;
 pub use personality::{Archetype, Personality};
 pub use rng::BotRng;
 pub use skill::Skill;
+pub use tuning::Tuning;
 pub use view::{BotView, PublicAction, Reveal, SeatView};
