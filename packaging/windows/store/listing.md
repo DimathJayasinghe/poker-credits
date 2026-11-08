@@ -77,6 +77,7 @@ Made from the real screens by `docs/MICROSOFT_STORE.md` section 6 (1920 x 1080) 
 
 - 1:1 app tile icon, 300 x 300: `store-logo-300x300.png`
 - 1:1 box art, 1080 x 1080 (if the page asks for it): `box-art-1080x1080.png`
+- 9:16 poster art, 1440 x 2160 (the page asks for it): `poster-art-1440x2160.png`
 
 ## Properties
 
