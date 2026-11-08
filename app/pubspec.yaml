@@ -2,7 +2,7 @@ name: poker_credits
 description: "Chips and pots for physical-card Texas Hold'em."
 publish_to: none
 resolution: workspace
-version: 1.5.0+10
+version: 1.5.1+11
 
 environment:
   sdk: ^3.11.5
