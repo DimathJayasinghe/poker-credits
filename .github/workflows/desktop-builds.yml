@@ -81,7 +81,7 @@ jobs:
           cp packaging/linux/install.sh packaging/linux/dev.pokercredits.poker_credits.desktop '${{ matrix.output }}/'
           chmod +x '${{ matrix.output }}/install.sh'
           tar -czf poker-credits-linux-x64.tar.gz -C "$(dirname '${{ matrix.output }}')" bundle
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: poker-credits-${{ matrix.target }}
           path: |
@@ -116,7 +116,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "makeappx failed" }
           if ($info.placeholder) { Write-Warning "No Partner Center identity is set, so this package is a placeholder and must not be uploaded to the Store." }
           Get-Item $name | Format-List Name, Length
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: matrix.target == 'windows'
         with:
           name: poker-credits-msix
