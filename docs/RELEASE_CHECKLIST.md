@@ -82,4 +82,4 @@ An Android emulator pass (2026-11-08, `docs/SECURITY_AND_EDGE_CASES.md` section 
 
 Owner-facing. The whole route, the Partner Center fields and the account steps are in `docs/MICROSOFT_STORE.md`. Before each Store update: version bumped in `app/pubspec.yaml` (the MSIX version is `major.minor.patch.0`), `PRIVACY.md` and Settings > Privacy policy still true, screenshots remade if a screen changed (`docs/MICROSOFT_STORE.md` section 6), the `poker-credits-msix` artifact built with the real identity variables (never the `PLACEHOLDER` file).
 
-Automatic submission (`docs/MICROSOFT_STORE.md` section 9): a stable tag `vX.Y.Z` on a commit that is on `main` starts `store-publish.yml` once the secrets exist; check the run, then Partner Center (draft: press Submit; `MSSTORE_AUTO_COMMIT=true`: it is already in certification).
+Upload by hand: take `poker-credits-msix` from the "Desktop builds" run of the version tag (never the PLACEHOLDER file) and add it under Product > Update > Packages.

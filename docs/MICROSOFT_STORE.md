@@ -108,55 +108,13 @@ the app really looks like (policy 10.1).
   screenshots may only contain content that would merit PEGI 12, ESRB Everyone 10+ or lower. Our text and pictures are
   plain poker, but how a reviewer applies that rule to an 18+ poker app is unknown; if they object, soften the text.
 - The Partner Center pages change; field names here were taken from Microsoft Learn on 2026-11-08.
-- Automatic submission (section 9) has never run: `.github/workflows/store-publish.yml` was written from Microsoft Learn
-  (Store Developer CLI and "Publish app updates with GitHub Actions"), not tested against a live product, and it is
-  not known whether an individual account can link a Microsoft Entra application (see 9.1).
 
-## 9. Automatic submission from CI (optional, after the first release is live)
+## 9. Automatic submission: tried, not used
 
-`.github/workflows/store-publish.yml` sends the package of a **stable version tag** to Partner Center, so a release
-needs no upload by hand. Decision and limits: ADR-022.
-
-**How it runs.** You merge to `main`, bump the version, and push a tag `vX.Y.Z` (the usual release flow). The tag
-runs "Desktop builds", which makes `poker-credits-msix`. When that run succeeds, "Microsoft Store publish" starts, checks
-that the run was a tag `vX.Y.Z` on a commit that is on `main`, downloads that package, refuses the placeholder
-package or a package whose version differs from the tag, and calls `msstore publish`. Pushes to `main` without a tag do
-nothing, on purpose (ADR-022). Without the secrets below it logs a notice and stays green.
-
-### 9.1 One-time setup
-
-1. **First release by hand.** The API only updates a product that is already live: finish the submission in section 4
-   and wait until the Store shows the app.
-2. **A tenant, then a Microsoft Entra application for the API.** An individual account signs in with a personal
-   Microsoft account, so User management first shows only "Sign in with Microsoft Entra ID" (seen 2026-11-08: that page
-   kept loading and never opened). It needs a tenant linked to the account: Account settings > Organization profile >
-   **Tenants** > "Create Microsoft Entra ID" (or "Associate" an existing one), per Microsoft Learn. Only then sign in
-   there with the tenant's own account and use Microsoft Entra applications. **Unknown whether the individual account
-   can finish this** (the Partner Center pages were unreliable); if it will not work, stop: uploading the package by hand
-   (section 5) stays the route and nothing is lost.
-3. In Entra register an application, give it the **Manager** role in Partner Center, copy its tenant ID and client ID,
-   and create a client secret (it expires: note the date and renew it).
-4. Copy the **Seller ID** (Microsoft Learn: Account settings > Developer settings or Identifiers, labelled "Publisher ID"
-   or "Seller ID"; the page may differ) and the product's **Store ID** (the 12 character id on the product's overview page).
-5. GitHub > Settings > Secrets and variables > Actions. Secrets: `AZURE_AD_TENANT_ID`,
-   `AZURE_AD_APPLICATION_CLIENT_ID`, `AZURE_AD_APPLICATION_SECRET`, `SELLER_ID`. Store ID: `MSSTORE_PRODUCT_ID` as a
-   variable (or secret). Never paste any of these into a file.
-6. Optional but advised: Settings > Environments > `microsoft-store` > Required reviewers: yourself, so each
-   submission waits for one click.
-
-### 9.2 Draft first, then fully automatic
-
-Until the repository variable `MSSTORE_AUTO_COMMIT` is `true` the workflow only prepares a **draft** submission
-(`--noCommit`); open Partner Center and press Submit. After one or two releases that went well, set the variable to
-`true` and the workflow submits for certification by itself. Certification still takes Microsoft's usual time and a
-rejection arrives by e-mail: the Store, not the workflow, decides what goes live.
-
-### 9.3 By hand and when it fails
-
-- Actions > Microsoft Store publish > Run workflow, with the id of a successful "Desktop builds" run on a tag, to
-  retry without a new tag.
-- "cannot read run", "not a stable version tag", "not on main": the run is not one this workflow accepts. Tags with a
-  suffix (`v1.5.0-rc1`) are skipped on purpose.
-- "package version does not match tag": bump `version:` in `app/pubspec.yaml` before tagging.
-- `msstore publish` errors about a submission already in progress: the Store allows one at a time; finish or delete the
-  pending one in Partner Center.
+The Store Developer CLI can submit a package from GitHub Actions, but it needs a Microsoft Entra application with the
+Manager role, and that needs a tenant linked to the Partner Center account. On the owner's individual account
+(2026-11-08) Account settings > User management only offered "Sign in with Microsoft Entra ID", and that page kept
+loading and crashed, so no application could be added. Decision: ADR-022. Every release is uploaded by hand
+(section 5): download `poker-credits-msix` from the "Desktop builds" run of the version tag, then Product > Update >
+Packages. If the account ever gets a tenant, Microsoft's guide is "Publish app updates to Microsoft Store with GitHub
+Actions" on Microsoft Learn.

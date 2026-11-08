@@ -335,16 +335,12 @@ Full detail in `docs/RESILIENCE_AND_CRASH_HANDLING.md`. Summary of what is copie
 
 **Consequences.** The Store listing and policy must be kept true: a new kind of data handling changes the policy first. The Windows app has no camera, so it declares none. Verification of the package itself waits for the first CI run on Windows and for a real install (docs/MICROSOFT_STORE.md section 8).
 
-## ADR-022: Store submission from CI on stable tags
+## ADR-022: No automatic Store submission (tried, not possible on this account)
 
-**Date:** 2026-11-08. **Status:** accepted, unverified until the first live run (owner asked for automatic submission once stable code reaches `main`).
+**Date:** 2026-11-08. **Status:** rejected. The owner asked for a submission from CI when a stable version reaches `main`.
 
-**Context.** Microsoft publishes the Store Developer CLI (`msstore`) and a setup action for it; with an Entra application that has the Manager role it can update a live product from CI. Each submission is certified by Microsoft, the Store keeps one submission in flight per product, versions must rise, and a faulty build that is submitted goes to every user of the Store. The first submission cannot be made through the API.
+**Context.** Microsoft's Store Developer CLI (`msstore`) can submit a package from CI, but only for a product that is already live, and only with a Microsoft Entra application that has the Manager role in Partner Center. That needs a tenant linked to the account. The owner's account is an individual one signed in with a personal Microsoft account; its User management page offered only "Sign in with Microsoft Entra ID" and crashed when it was used.
 
-**Decision.**
-1. Trigger on a **stable version tag** (`vX.Y.Z`, on a commit contained in `main`), not on every push to `main`. A push to `main` is a work in progress; the tag is the release decision the project already makes, and the build for it already exists ("Desktop builds" runs on tags). The workflow listens for that run to succeed (`workflow_run`) and takes its `poker-credits-msix` artifact, so the package is the one CI built, not a second build.
-2. Refuse: a run that is not a successful tag push of "Desktop builds", a tag that is not `vX.Y.Z`, a commit not on `main`, the placeholder package, a package whose manifest version is not the tag's.
-3. Safe defaults: the submission is a **draft** (`--noCommit`) until the variable `MSSTORE_AUTO_COMMIT` is `true`; the job uses the environment `microsoft-store`, where a required reviewer can be added; without the secrets it logs a notice and passes.
-4. Credentials are repository secrets read only by this workflow, passed through `env:` and never into the command text. The two third-party actions are pinned to commit hashes like the others.
+**Decision.** Submit by hand. CI keeps building the package (`poker-credits-msix` on every version tag and on a pull request that touches packaging) and the owner uploads it under Product > Update > Packages (`docs/MICROSOFT_STORE.md` section 5). The workflow that was drafted for this was removed rather than kept untested and unusable. If automation is wanted later, submit on a **stable version tag** rather than on every push to `main` (certification takes time, the Store keeps one submission in flight and a bad build would go live), keep the first runs as a draft (`--noCommit`) and check that the tagged commit is on `main` and the package version equals the tag.
 
-**Consequences.** A release needs no upload by hand once set up. It cannot start until the app is live, and it is unknown whether an individual Partner Center account can link an Entra application; if not, the manual route (docs/MICROSOFT_STORE.md section 5) is unchanged. `msstore publish` with a bare `.msix` path follows Microsoft's example and has not been run here.
+**Consequences.** One manual upload per release, about a minute. Nothing else in the Store setup depends on this.
