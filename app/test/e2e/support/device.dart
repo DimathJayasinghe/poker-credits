@@ -10,6 +10,7 @@ import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/platform/host_finder_io.dart';
 import 'package:poker_credits/platform/host_server_io.dart';
 import 'package:poker_credits/platform/settings_store.dart';
+import 'package:poker_credits/platform/sound_player.dart';
 import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/provider/connection_provider.dart';
 import 'package:poker_credits/provider/host_provider.dart';
@@ -105,6 +106,9 @@ class SlowFinder implements HostFinder {
 /// socket client. Only what has no meaning without a screen (wake lock, sound, secure storage)
 /// is replaced.
 class Device {
+  /// The sound effects this phone asked for.
+  final FakeSound sound = FakeSound();
+
   Device(
     this.name, {
     Directory? dir,
@@ -126,7 +130,8 @@ class Device {
         tokenStoreProvider.overrideWithValue(this.tokens),
         wakeLockProvider.overrideWithValue(FakeWakeLock()),
         hapticsProvider.overrideWithValue(FakeHaptics()),
-        soundProvider.overrideWithValue(FakeSound()),
+        soundProvider.overrideWithValue(sound),
+        soundPlayerProvider.overrideWithValue(const SilentSoundPlayer()),
         hostFinderProvider.overrideWithValue(finder),
         settingsStoreProvider.overrideWithValue(settings),
         appVersionProvider.overrideWithValue(() async => 'e2e'),

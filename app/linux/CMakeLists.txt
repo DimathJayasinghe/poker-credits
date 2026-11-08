@@ -72,6 +72,9 @@ set_target_properties(${BINARY_NAME}
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
+# The sound plugin would link and bundle the Opus, Ogg, Vorbis and FLAC libraries. The app
+# only plays WAV files, so it skips them: a smaller package and nothing to download at build time.
+set(ENV{NO_XIPH_LIBS} "1")
 include(flutter/generated_plugins.cmake)
 
 

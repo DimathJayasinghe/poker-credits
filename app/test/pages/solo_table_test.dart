@@ -15,6 +15,7 @@ import 'package:poker_protocol/poker_protocol.dart';
 
 import '../support/fakes.dart';
 import '../support/no_scroll.dart';
+import '../support/store_shot.dart';
 
 /// The human is Dimath at seat 1 (the fake host answers `p_1`); the others are the table.
 List<SeatView> _seats({int others = 4, bool cards = true}) => <SeatView>[
@@ -667,6 +668,24 @@ void main() {
       await _close(tester);
     });
   });
+
+  // The table picture of the Microsoft Store listing (docs/MICROSOFT_STORE.md); skipped in normal runs.
+  testWidgets('store screenshot, solo table', (tester) async {
+    final view = _view(
+      active: 2,
+      seats: <SeatView>[
+        seatView(0, 'Maya', chips: 1800, hasCards: true),
+        seatView(1, 'Dimath', chips: 1450, bet: 50, hasCards: true),
+        seatView(2, 'Liam', chips: 1250, hasCards: true),
+        seatView(3, 'Zoe', chips: 900, folded: true),
+        seatView(4, 'Noor', chips: 2100, hasCards: true),
+        seatView(5, 'Eli', chips: 600, allIn: true, hasCards: true),
+      ],
+    ).copyWith(board: <PokerCard>[card('9c'), card('Td'), card('2h')], currentHighBet: 50, minRaiseTo: 100);
+    await _playing(tester, view: view, size: storeShotSize);
+    await tester.pump(const Duration(seconds: 2));
+    await saveStoreShot(tester, 'windows-table');
+  }, skip: storeShotsDir == null);
 
   group('goldens', () {
     for (final dark in <bool>[false, true]) {

@@ -82,9 +82,10 @@ void main() {
       await _launch(tester, harness);
       await tester.pumpAndSettle();
       expect(find.byType(TermsPage), findsOneWidget);
-      // The trusted Wi-Fi advice is on the page.
+      // The adults-only notice leads the page, and the trusted Wi-Fi advice follows.
       expect(find.text(termsSections.first.title.toUpperCase()), findsOneWidget);
-      expect(termsSections.first.title, contains('Wi-Fi you trust'));
+      expect(termsSections.first.title, contains('For adults'));
+      expect(termsSections[1].title, contains('Wi-Fi you trust'));
 
       final acceptButton = find.text(Strings.termsAccept.toUpperCase());
       await tester.ensureVisible(acceptButton);

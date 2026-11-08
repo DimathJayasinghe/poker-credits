@@ -15,6 +15,10 @@ class TermsSection {
 
 const List<TermsSection> termsSections = <TermsSection>[
   TermsSection(
+    'For adults, 18 and over',
+    'Poker Credits plays poker, a card game people also gamble on, so it is for adults: 18 or older, or the legal age for gambling where you live if that is higher. The app never takes bets or moves money, and chips have no cash value, but the game can still feel like gambling. If you are under age, please do not use it. If it stops being fun, stop.',
+  ),
+  TermsSection(
     'Use a Wi-Fi you trust',
     'Games run over your local network and the connection is encrypted. Even so, on a shared or public Wi-Fi (a cafe, hotel, school or office) other people on that network can see that a game is running, try to join with the room code, or block it. Joining by scanning the host\'s QR code is the safest way: it also checks you reached the right phone. When you join by room code or by typing an address, the app trusts the phone that answers the first time. Host on your own home Wi-Fi, or on your phone hotspot with a password. Give the room code only to the people at your table.',
   ),
@@ -24,7 +28,7 @@ const List<TermsSection> termsSections = <TermsSection>[
   ),
   TermsSection(
     'Just for fun',
-    'Chips here are counters for a game between friends. They have no cash value, and the app never moves money or takes bets. Play only where and with whom it is allowed, and keep it friendly. If you are under the legal age for gambling where you live, do not play for real stakes.',
+    'Chips here are counters for a game between friends. They have no cash value, and the app never moves money or takes bets. If you play for real stakes with real cards, do it only where and with whom it is allowed, and keep it friendly.',
   ),
   TermsSection(
     'Your data stays with you',

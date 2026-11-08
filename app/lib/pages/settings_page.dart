@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/pages/support_page.dart';
 import 'package:poker_credits/pages/tours.dart';
+import 'package:poker_credits/pages/privacy_page.dart';
 import 'package:poker_credits/pages/terms_page.dart';
 import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/provider/services.dart';
@@ -204,6 +205,12 @@ class _SettingsViewState extends State<SettingsView> with Refena {
                       label: Strings.termsRow,
                       caption: Strings.termsRowCaption,
                       onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TermsPage.readOnly())),
+                    ),
+                    BrutalRow(
+                      dense: true,
+                      label: Strings.privacyRow,
+                      caption: Strings.privacyRowCaption,
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PrivacyPage())),
                     ),
                     BrutalRow(
                       dense: true,

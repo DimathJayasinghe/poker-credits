@@ -15,6 +15,8 @@ import 'package:poker_credits/platform/wake_lock.dart';
 import 'package:poker_credits/provider/services.dart';
 import 'package:poker_credits/provider/settings_provider.dart';
 import 'package:poker_credits/util/haptics.dart';
+import 'package:poker_credits/model/sound_cues.dart';
+import 'package:poker_credits/platform/sound_player.dart';
 import 'package:poker_credits/util/sound.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 import 'package:refena_flutter/refena_flutter.dart';
@@ -222,6 +224,7 @@ class TestHarness {
       wakeLockProvider.overrideWithValue(wakeLock),
       hapticsProvider.overrideWithValue(haptics),
       soundProvider.overrideWithValue(sound),
+      soundPlayerProvider.overrideWithValue(const SilentSoundPlayer()),
       hostFinderProvider.overrideWithValue(finder),
       settingsStoreProvider.overrideWithValue(settings),
       appVersionProvider.overrideWithValue(() async => '0.1.0+1'),
@@ -358,13 +361,24 @@ class FakeHaptics extends Haptics {
   Future<void> tap() async => taps++;
 }
 
-class FakeSound extends Sound {
-  FakeSound();
-
-  int turns = 0;
+/// Remembers the clips it was asked to play.
+class RecordingSoundPlayer implements SoundPlayer {
+  final List<String> played = <String>[];
 
   @override
-  Future<void> yourTurn() async => turns++;
+  Future<void> play(String asset, {double volume = 1}) async => played.add(asset);
+}
+
+class FakeSound extends Sound {
+  FakeSound() : super(player: const SilentSoundPlayer());
+
+  /// Every cue asked for, in order.
+  final List<SoundCue> cues = <SoundCue>[];
+
+  int get turns => cues.where((cue) => cue == SoundCue.turn).length;
+
+  @override
+  Future<void> play(SoundCue cue) async => cues.add(cue);
 }
 
 class FakeWakeLock implements WakeLock {

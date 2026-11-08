@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poker_credits/model/sound_cues.dart';
 import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_credits/widget/brutal/brutal_keypad.dart';
 import 'package:poker_credits/main.dart';
@@ -173,6 +174,37 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect((harness.network.last.sent.single as JoinRoom).spectator, isTrue);
+    await _close(tester);
+  });
+
+  testWidgets('sound effects follow the live messages: my own cards and actions, not the table\'s, and no replay after a snapshot', (tester) async {
+    final harness = await _joined(tester);
+    expect(harness.sound.cues, isEmpty, reason: 'the first snapshot only sets the baseline');
+    harness.network.last
+      ..serverSends(holeCards('As', 'Kd', hand: 3))
+      ..serverSends(
+        const ActionPerformed(playerId: 'p_2', playerName: 'Bo', kind: ActionKind.raise, amount: 40, chipsRemaining: 900, allIn: false, auto: false),
+      )
+      ..serverSends(
+        const ActionPerformed(
+          playerId: 'p_1',
+          playerName: 'Alice',
+          kind: ActionKind.call,
+          amount: 40,
+          chipsRemaining: 900,
+          allIn: false,
+          auto: false,
+        ),
+      );
+    await tester.pump();
+    expect(harness.sound.cues, [
+      SoundCue.call,
+    ], reason: 'HOLE_CARDS of the snapshot\'s hand is a replay, Bo\'s raise is the table\'s sound, Alice\'s own call is hers');
+    harness.network.last
+      ..serverSends(StateUpdate(stateVersion: 2, view: _betting().copyWith(handNumber: 4)))
+      ..serverSends(holeCards('2c', '7d', hand: 4));
+    await tester.pump();
+    expect(harness.sound.cues, [SoundCue.call, SoundCue.deal], reason: 'a new hand: the deck is the table\'s, the two cards are mine');
     await _close(tester);
   });
 

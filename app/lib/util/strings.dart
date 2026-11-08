@@ -114,7 +114,7 @@ abstract final class Strings {
   static const String textureCaption = 'Fine grain behind the screens. Turn off for flat colour.';
   static const String sectionTable = 'Table';
   static const String soundLabel = 'Sound';
-  static const String soundCaption = 'A beep when it is your turn.';
+  static const String soundCaption = 'Soft sounds for your turn, chips and cards.';
   static const String vibrationLabel = 'Vibration';
   static const String vibrationCaption = 'A buzz when it is your turn.';
   static const String keepAwakeLabel = 'Keep screen on';
@@ -457,13 +457,18 @@ abstract final class Strings {
   static const String splashSkip = 'Tap to skip';
   static const String termsTitle = 'Before you play';
   static const String termsIntro = 'A few things to know before the first hand. It takes a minute.';
-  static const String termsAgree = 'I understand and agree';
+  static const String termsAgree = 'I am 18+ and I agree';
   static const String termsAgreeCaption = 'Required to use the app';
   static const String termsAccept = 'Accept and continue';
   static const String termsDecline = 'No thanks, close the app';
   static const String termsRow = 'Terms and safety';
-  static const String termsRowCaption = 'Play fair, play safe, your own Wi-Fi';
+  static const String termsRowCaption = 'For adults, play fair, your own Wi-Fi';
   static const String termsVersionLine = 'Version';
+  static const String privacyTitle = 'Privacy policy';
+  static const String privacyRow = 'Privacy policy';
+  static const String privacyRowCaption = 'What stays on your device, what players see';
+  static const String privacyIntro = 'What the app keeps, what other players see and what never leaves your device.';
+  static const String privacyUpdatedLine = 'Last updated';
 
   // Walkthroughs and the first-run intro
   static const String tourTitle = 'App tour';

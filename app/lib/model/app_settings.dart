@@ -4,7 +4,7 @@ import 'package:poker_protocol/poker_protocol.dart';
 
 /// The version of the terms and safety notice the player has to accept. Raise it when the notice
 /// changes in a way people must see again.
-const int currentTermsVersion = 1;
+const int currentTermsVersion = 2;
 
 /// Which theme the app uses. [system] follows the operating system.
 enum ThemeChoice { system, light, dark }

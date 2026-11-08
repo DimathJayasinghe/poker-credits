@@ -4,6 +4,7 @@ import 'package:logging/logging.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/model/join_link.dart';
 import 'package:poker_credits/model/room_state.dart';
+import 'package:poker_credits/model/sound_cues.dart';
 import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/net/features.dart';
 import 'package:poker_credits/net/pin.dart';
@@ -89,6 +90,9 @@ class SessionNotifier extends Notifier<SessionState> {
   /// live again or the user presses Retry.
   bool _rediscoveryTried = false;
 
+  /// Notices what the live messages changed and says which sound effects to play.
+  final SoundTracker _sounds = SoundTracker();
+
   @override
   SessionState init() => const SessionState();
 
@@ -106,6 +110,7 @@ class SessionNotifier extends Notifier<SessionState> {
     TokenSlot slot = TokenSlot.main,
   }) {
     unawaited(_detach());
+    _sounds.reset();
     _slot = slot;
     final client = ref.read(roomClientFactoryProvider)(uri, first);
     _client = client;
@@ -130,6 +135,7 @@ class SessionNotifier extends Notifier<SessionState> {
   /// [attach] would leave, so the screens need no special case.
   void refuse({required Uri uri, required LinkFailure failure}) {
     unawaited(_detach());
+    _sounds.reset();
     _established = false;
     state = SessionState(
       serverUri: uri.toString(),
@@ -153,6 +159,7 @@ class SessionNotifier extends Notifier<SessionState> {
     // The synchronous part of detaching (timers, subscriptions) runs at once. Closing the socket
     // can take a while when the peer is gone, so nothing that matters waits for it.
     final detaching = _detach();
+    _sounds.reset();
     state = const SessionState();
     if (forget) await ref.read(tokenStoreProvider).clear(slot: _slot);
     unawaited(detaching.catchError((Object error) => _log.info('closing the socket failed: $error')));
@@ -255,6 +262,19 @@ class SessionNotifier extends Notifier<SessionState> {
     }
     final body = envelope.body;
     state = body is Joined ? state.copyWith(room: room, playerId: body.playerId, role: body.role) : state.copyWith(room: room);
+    _playSounds(body, room);
+  }
+
+  /// Plays the effects for a message the room accepted. A skipped or stale `STATE_UPDATE` makes no
+  /// sound (the `SNAPSHOT` that follows a gap sets the baseline again).
+  void _playSounds(ServerMessage body, RoomState room) {
+    if (room.needsResync || (body is StateUpdate && body.stateVersion != room.stateVersion)) return;
+    final cues = _sounds.onMessage(body, me: state.playerId, isHost: state.isHost);
+    if (cues.isEmpty) return;
+    final sound = ref.read(soundProvider);
+    for (final cue in cues) {
+      unawaited(sound.play(cue));
+    }
   }
 
   void _onCredentials(RoomCredentials credentials) {

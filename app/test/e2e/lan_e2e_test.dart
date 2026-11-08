@@ -13,6 +13,7 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poker_credits/model/sound_cues.dart';
 import 'package:poker_bridge/poker_bridge.dart';
 import 'package:poker_credits/net/connection_state.dart';
 import 'package:poker_credits/net/pin.dart';
@@ -150,6 +151,16 @@ void main() {
       expect(chips(host), <String, int>{'Dimath': 1000, 'Ana': 995, 'Bob': 1005}, reason: 'the small blind paid the big blind; no chip is lost');
       expect(chips(ana), chips(host));
       expect(chips(bob), chips(host));
+
+      // Sound effects from the real server's messages: the table's phone plays the table, a guest
+      // only its own part, and the winner hears the win.
+      expect(host.sound.cues, containsAll(<SoundCue>[SoundCue.shuffle, SoundCue.fold, SoundCue.potWon]));
+      expect(bob.sound.cues, contains(SoundCue.win));
+      for (final guest in <Device>[ana, bob]) {
+        expect(guest.sound.cues, isNot(contains(SoundCue.shuffle)), reason: 'the riffle is the table\'s');
+      }
+      expect(ana.sound.cues, isNot(contains(SoundCue.potWon)));
+      expect(ana.sound.cues, isNot(contains(SoundCue.win)), reason: 'Bob won the pot');
     }, skip: skip);
 
     test('a spectator watches over TLS and has no seat', () async {

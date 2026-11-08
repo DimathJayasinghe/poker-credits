@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:poker_credits/net/socket_client.dart';
 import 'package:poker_credits/platform/external_links.dart';
@@ -5,6 +6,7 @@ import 'package:poker_credits/platform/host_finder.dart';
 import 'package:poker_credits/platform/host_keep_alive.dart';
 import 'package:poker_credits/platform/host_server.dart';
 import 'package:poker_credits/platform/server_address.dart';
+import 'package:poker_credits/platform/sound_player.dart';
 import 'package:poker_credits/platform/token_store.dart';
 import 'package:poker_credits/platform/wake_lock.dart';
 import 'package:poker_credits/provider/settings_provider.dart';
@@ -19,7 +21,15 @@ final hostServerProvider = Provider<HostServer>((ref) => createHostServer());
 final tokenStoreProvider = Provider<TokenStore>((ref) => createTokenStore());
 final wakeLockProvider = Provider<WakeLock>((ref) => createWakeLock());
 final hapticsProvider = Provider<Haptics>((ref) => Haptics(enabled: () => ref.read(settingsProvider).vibration));
-final soundProvider = Provider<Sound>((ref) => Sound(enabled: () => ref.read(settingsProvider).sound));
+final soundPlayerProvider = Provider<SoundPlayer>((ref) => createSoundPlayer());
+final soundProvider = Provider<Sound>(
+  (ref) => Sound(
+    player: ref.read(soundPlayerProvider),
+    enabled: () => ref.read(settingsProvider).sound,
+    // Unknown (tests, the first frame) counts as in front.
+    foreground: () => const <AppLifecycleState?>{null, AppLifecycleState.resumed}.contains(WidgetsBinding.instance.lifecycleState),
+  ),
+);
 final hostKeepAliveProvider = Provider<HostKeepAlive>((ref) => createHostKeepAlive());
 final hostFinderProvider = Provider<HostFinder>((ref) => createHostFinder());
 final externalLinksProvider = Provider<ExternalLinks>((ref) => const BrowserExternalLinks());

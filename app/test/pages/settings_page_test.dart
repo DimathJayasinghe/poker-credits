@@ -5,6 +5,8 @@ import 'package:poker_credits/main.dart';
 import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/model/hosting.dart';
 import 'package:poker_credits/pages/join_page.dart';
+import 'package:poker_credits/pages/privacy_page.dart';
+import 'package:poker_credits/util/privacy_content.dart';
 import 'package:poker_credits/pages/support_page.dart';
 import 'package:poker_credits/pages/walkthrough_page.dart';
 import 'package:poker_credits/util/strings.dart';
@@ -58,6 +60,23 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Back'));
     await tester.pumpAndSettle();
     expect(find.byType(SupportPage), findsNothing);
+  });
+
+  testWidgets('Settings opens the privacy policy, shows every section and goes back', (tester) async {
+    final harness = TestHarness();
+    await _openSettings(tester, harness);
+    await tester.scrollUntilVisible(find.text('PRIVACY POLICY'), 200, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('PRIVACY POLICY'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PrivacyPage), findsOneWidget);
+    expect(find.textContaining(privacyUpdated), findsWidgets);
+    for (final section in privacySections) {
+      await tester.scrollUntilVisible(find.text(section.title.toUpperCase()), 200, scrollable: find.byType(Scrollable).first);
+      expect(find.text(section.title.toUpperCase()), findsOneWidget);
+    }
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PrivacyPage), findsNothing);
   });
 
   testWidgets('the home bar toggles between light and dark', (tester) async {
@@ -207,14 +226,15 @@ void main() {
       expect(calls, isNotEmpty);
     });
 
-    test('sound off: no alert beep', () async {
+    test('sound off: no sound effects', () async {
       var on = false;
-      final sound = Sound(enabled: () => on);
+      final player = RecordingSoundPlayer();
+      final sound = Sound(player: player, enabled: () => on);
       await sound.yourTurn();
-      expect(calls, isEmpty);
+      expect(player.played, isEmpty);
       on = true;
       await sound.yourTurn();
-      expect(calls.single, contains('SystemSound.play'));
+      expect(player.played, ['assets/sounds/turn.wav']);
     });
   });
 
