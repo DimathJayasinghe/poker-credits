@@ -295,6 +295,37 @@ fn pause_freezes_the_clock_and_resume_gives_back_the_remaining_time() {
     assert_eq!(room.paused_remaining_ms, None);
 }
 
+/// A paused game has no legal actions, so a client that reconnected while paused (an app sent to the
+/// background and back) holds no prompt. Resuming must hand the player on turn a fresh one, or the
+/// action buttons never come back.
+#[test]
+fn resume_prompts_the_player_on_turn_again() {
+    let (mut room, _) = table_of_three();
+    let t = Timings::default();
+    room.apply(host(HostCommand::StartHand { deck: None }, 1000), &t)
+        .unwrap();
+    let actor = active_id(&room);
+    room.apply(host(HostCommand::Pause { reason: None }, 11_000), &t)
+        .unwrap();
+    let out = room
+        .apply(host(HostCommand::ResumeGame, 50_000), &t)
+        .unwrap();
+    let prompt = out.broadcasts.iter().find_map(|b| match b {
+        Broadcast::To(
+            to,
+            ServerMessage::TurnPrompt {
+                turn_deadline_ms, ..
+            },
+        ) if *to == actor => Some(*turn_deadline_ms),
+        _ => None,
+    });
+    assert_eq!(
+        prompt,
+        Some(Some(70_000)),
+        "the player on turn gets a TURN_PROMPT carrying the restored clock"
+    );
+}
+
 #[test]
 fn chips_are_conserved_through_a_hand() {
     let (mut room, _) = table_of_three();

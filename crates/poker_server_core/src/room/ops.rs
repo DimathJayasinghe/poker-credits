@@ -279,6 +279,12 @@ impl RoomState {
             .is_some_and(|player| self.is_bot(&player.id));
         let limit_ms = u64::from(self.config.turn_time_limit_seconds) * 1000;
         self.turn_deadline_ms = (limit_ms > 0 && !bot_turn).then(|| at_ms.saturating_add(limit_ms));
+        self.prompt_active_player(out);
+    }
+
+    /// Tell the player on turn what they may do. A client that joined or reconnected while the game
+    /// was paused has no prompt (a paused table has no legal actions), so a resume sends one again.
+    fn prompt_active_player(&self, out: &mut Outcome) {
         if let Some((seat, legal)) = self.game.legal_actions()
             && let Some(player) = self.player_at_seat(seat)
         {
@@ -855,6 +861,7 @@ impl RoomState {
                 resumed_by: self.host_id.clone(),
                 turn_deadline_ms: self.turn_deadline_ms,
             }));
+        self.prompt_active_player(out);
         Ok(())
     }
 
