@@ -23,6 +23,8 @@ No cards and no friends at hand? **Play alone** seats you against 1 to 9 compute
 
 - **Cards in the app (optional):** the host's device can shuffle and deal, so each player sees their own two cards privately and the showdown is handled for you. Real cards still work as before.
 - **Play alone:** pick 1 to 9 opponents and Easy, Normal or Hard. It is a freeze-out tournament with rising blinds, a result screen with your place and stats, and a personal record. Nothing leaves your device.
+- **Calm sound effects:** soft chips, cards and a gentle cue for your turn, all original and made from nothing by [`tool/sounds`](tool/sounds). One switch in Settings turns them off.
+- **For adults:** poker is a game people also gamble on, so the app is for people aged 18 or over. It never takes bets or moves money, and chips have no cash value.
 
 ## Download
 
@@ -33,6 +35,8 @@ Get the latest build from the [Releases page](https://github.com/DimathJayasingh
 | Windows | `poker-credits-windows-x64-setup.exe` (installer) or the `.zip` |
 | Android | `poker-credits-android-arm64.apk` for most phones, or `poker-credits-android.apk` for any device (allow installs from unknown sources) |
 | Linux | `poker-credits-linux-x64.tar.gz`. Unpack, then run `./install.sh` inside the folder to add it to your application menu with its icon |
+
+The Windows build is also being prepared for the Microsoft Store (see [`docs/MICROSOFT_STORE.md`](docs/MICROSOFT_STORE.md)); until it is listed, use the files above.
 
 Each release lists `SHA256SUMS` so you can verify the files.
 
@@ -86,6 +90,12 @@ Machine setup and helper scripts: [`docs/DEV_SETUP.md`](docs/DEV_SETUP.md). To r
 | [Security](docs/SECURITY_AND_EDGE_CASES.md) | Threat model and limits |
 | [Decisions](docs/DECISIONS.md) | Why things are the way they are |
 | [UI design](docs/UI_DESIGN.md) | The visual system |
+| [Privacy policy](PRIVACY.md) | What the app keeps and what other players see |
+| [Microsoft Store](docs/MICROSOFT_STORE.md) | Packaging and the Store submission |
+
+## Privacy
+
+Poker Credits has no accounts, no ads, no analytics and no tracking, and the developer runs no server the app talks to. Your name and settings stay on your device. Read the full [privacy policy](PRIVACY.md), which is also in the app under **Settings, Privacy policy**.
 
 ## Security note
 
@@ -94,5 +104,7 @@ Host mode serves TLS 1.3 on the local network with a per-phone certificate that 
 ## License
 
 [MIT](LICENSE), copyright Dimath Jayasinghe. The bundled fonts (Anton, Space Mono) are under the SIL Open Font License; their texts are next to the font files in `app/assets/fonts/`.
+
+The sound effects are original work made by `tool/sounds/make_sounds.py`, under the same MIT licence (and free to use as CC0); see [`app/assets/sounds/README.md`](app/assets/sounds/README.md).
 
 Third-party code keeps its own licences. The Rust crates are checked against a permissive-only policy (`cargo deny check`, see [`deny.toml`](deny.toml)), and the app lists every Dart, Flutter and font licence under **Settings, Open-source licences**. The computer players use no third-party poker code and no trained model; the hand evaluation and strategy are this project's own.
