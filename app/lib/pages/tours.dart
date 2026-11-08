@@ -6,14 +6,17 @@ import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/util/tour_content.dart';
 
 /// The two walkthroughs, opened from the first-run intro, Settings and the Guide.
-/// [thenOther] offers the other walkthrough on the last step.
-Future<void> openAppTour(BuildContext context, {bool thenOther = false}) {
+/// [thenOther] offers the other walkthrough on the last step. [skipToOther] also makes leaving the
+/// tour early open the poker lesson (the first-run flow), which can then be skipped on its own.
+Future<void> openAppTour(BuildContext context, {bool thenOther = false, bool skipToOther = false}) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
       builder: (_) => WalkthroughPage(
         title: Strings.tourTitle,
         steps: appTourSteps,
-        followUp: thenOther ? const WalkthroughFollowUp(label: Strings.followToLesson, title: Strings.learnTitle, steps: pokerLessonSteps) : null,
+        followUp: thenOther
+            ? WalkthroughFollowUp(label: Strings.followToLesson, title: Strings.learnTitle, steps: pokerLessonSteps, skipOpensIt: skipToOther)
+            : null,
       ),
     ),
   );

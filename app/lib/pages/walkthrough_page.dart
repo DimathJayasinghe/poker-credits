@@ -46,6 +46,15 @@ class _WalkthroughPageState extends State<WalkthroughPage> {
 
   void _end(WalkthroughEnd how) => Navigator.of(context).pop(how);
 
+  /// Every way of leaving early. A follow-up that asks for it takes over; otherwise this closes.
+  void _skip() {
+    if (widget.followUp?.skipOpensIt ?? false) {
+      _followUp();
+    } else {
+      _end(WalkthroughEnd.skipped);
+    }
+  }
+
   /// Replaces this walkthrough with the follow-up one, so leaving it returns to where this was opened.
   void _followUp() {
     final next = widget.followUp;
@@ -64,13 +73,13 @@ class _WalkthroughPageState extends State<WalkthroughPage> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _end(WalkthroughEnd.skipped);
+        if (!didPop) _skip();
       },
       child: CallbackShortcuts(
         bindings: <ShortcutActivator, VoidCallback>{
           const SingleActivator(LogicalKeyboardKey.arrowRight): () => _last ? _end(WalkthroughEnd.finished) : _go(_index + 1),
           const SingleActivator(LogicalKeyboardKey.arrowLeft): () => _go(_index - 1),
-          const SingleActivator(LogicalKeyboardKey.escape): () => _end(WalkthroughEnd.skipped),
+          const SingleActivator(LogicalKeyboardKey.escape): _skip,
         },
         child: Focus(
           autofocus: true,
@@ -80,12 +89,12 @@ class _WalkthroughPageState extends State<WalkthroughPage> {
               children: <Widget>[
                 AppTopBar(
                   title: widget.title,
-                  onBack: () => _end(WalkthroughEnd.skipped),
+                  onBack: _skip,
                   actions: <Widget>[
                     TopBarCell(
                       semanticLabel: Strings.walkSkip,
                       width: 96,
-                      onTap: () => _end(WalkthroughEnd.skipped),
+                      onTap: _skip,
                       child: Text(
                         Strings.walkSkip.toUpperCase(),
                         style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.5, color: c.ink),

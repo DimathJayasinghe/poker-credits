@@ -62,7 +62,7 @@ class _LaunchGateState extends State<LaunchGate> with Refena {
     ref.notifier(settingsProvider).update((s) => s.copyWith(introDone: true));
     switch (choice) {
       case IntroChoice.tour:
-        openAppTour(context, thenOther: true);
+        openAppTour(context, thenOther: true, skipToOther: true);
       case IntroChoice.learn:
         openLesson(context, thenOther: true);
       case IntroChoice.skip:

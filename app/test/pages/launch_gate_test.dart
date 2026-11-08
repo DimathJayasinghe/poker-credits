@@ -5,6 +5,7 @@ import 'package:poker_credits/main.dart';
 import 'package:poker_credits/model/app_settings.dart';
 import 'package:poker_credits/pages/home_page.dart';
 import 'package:poker_credits/pages/intro_page.dart';
+import 'package:poker_credits/pages/name_page.dart';
 import 'package:poker_credits/pages/walkthrough_page.dart';
 import 'package:poker_credits/pages/splash_page.dart';
 import 'package:poker_credits/pages/terms_page.dart';
@@ -168,7 +169,7 @@ void main() {
       expect(harness.settings.value.introDone, isTrue);
     });
 
-    testWidgets('the app tour opens over Home, and leaving it lands on Home', (tester) async {
+    testWidgets('skipping the app tour opens the poker lesson, and skipping that lands on Home', (tester) async {
       final harness = TestHarness(firstRun: true);
       await pastTerms(tester, harness);
       await tester.tap(find.text(Strings.introTour.toUpperCase()));
@@ -176,6 +177,11 @@ void main() {
       expect(find.byType(WalkthroughPage), findsOneWidget);
       expect(find.text(Strings.tourTitle.toUpperCase()), findsWidgets);
       expect(harness.settings.value.introDone, isTrue, reason: 'asked once, even if the app closes mid-tour');
+      await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
+      await tester.pumpAndSettle();
+      expect(find.byType(WalkthroughPage), findsOneWidget, reason: 'the lesson is next, not Home');
+      expect(find.text(Strings.learnTitle.toUpperCase()), findsWidgets);
+      expect(find.text(Strings.tourTitle.toUpperCase()), findsNothing);
       await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
       await tester.pumpAndSettle();
       expect(find.byType(HomePage), findsOneWidget);
@@ -198,7 +204,7 @@ void main() {
         await pastTerms(tester, harness);
         await tester.tap(find.text(first.toUpperCase()));
         await tester.pumpAndSettle();
-        for (var i = 0; i < 12 && find.text(followLabel.toUpperCase()).evaluate().isEmpty; i++) {
+        for (var i = 0; i < 40 && find.text(followLabel.toUpperCase()).evaluate().isEmpty; i++) {
           await tester.tap(find.text(Strings.walkNext.toUpperCase()));
           await tester.pumpAndSettle();
         }
@@ -207,6 +213,82 @@ void main() {
         expect(find.text(secondTitle.toUpperCase()), findsWidgets, reason: 'the other walkthrough opened');
         await tester.pumpWidget(const SizedBox());
       }
+    });
+
+    group('on the very first run, before the name is asked', () {
+      Future<void> introWithNameOpen(WidgetTester tester, TestHarness harness) async {
+        harness.settings.value = harness.settings.value.copyWith(acceptedTerms: currentTermsVersion);
+        await _launch(tester, harness);
+        await tester.pumpAndSettle();
+        expect(find.byType(IntroPage), findsOneWidget);
+      }
+
+      testWidgets('app tour: Skip shows the poker lesson, and Skip there shows the name step', (tester) async {
+        final harness = TestHarness(firstRun: true);
+        await introWithNameOpen(tester, harness);
+        await tester.tap(find.text(Strings.introTour.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(find.text(Strings.tourTitle.toUpperCase()), findsWidgets);
+        await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(find.text(Strings.learnTitle.toUpperCase()), findsWidgets, reason: 'skipping the app tour leads to the poker lesson');
+        expect(find.byType(NamePage), findsNothing, reason: 'not yet');
+        await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(find.byType(WalkthroughPage), findsNothing);
+        expect(find.byType(NamePage), findsOneWidget);
+      });
+
+      testWidgets('app tour: the back arrow and the back gesture also lead on to the poker lesson', (tester) async {
+        final harness = TestHarness(firstRun: true);
+        await introWithNameOpen(tester, harness);
+        await tester.tap(find.text(Strings.introTour.toUpperCase()));
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.text(Strings.learnTitle.toUpperCase()), findsWidgets);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(NamePage), findsOneWidget);
+      });
+
+      testWidgets('app tour read to the end offers the lesson, and the lesson skipped lands on the name step', (tester) async {
+        final harness = TestHarness(firstRun: true);
+        await introWithNameOpen(tester, harness);
+        await tester.tap(find.text(Strings.introTour.toUpperCase()));
+        await tester.pumpAndSettle();
+        for (var i = 0; i < 30 && find.text(Strings.followToLesson.toUpperCase()).evaluate().isEmpty; i++) {
+          await tester.tap(find.text(Strings.walkNext.toUpperCase()));
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.text(Strings.followToLesson.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(find.text(Strings.learnTitle.toUpperCase()), findsWidgets);
+        await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(find.byType(NamePage), findsOneWidget);
+      });
+
+      testWidgets('poker lesson: Skip goes straight to the name step', (tester) async {
+        final harness = TestHarness(firstRun: true);
+        await introWithNameOpen(tester, harness);
+        await tester.tap(find.text(Strings.introLearn.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(find.text(Strings.learnTitle.toUpperCase()), findsWidgets);
+        await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(find.byType(WalkthroughPage), findsNothing);
+        expect(find.byType(NamePage), findsOneWidget);
+      });
+
+      testWidgets('"I know my way" goes straight to the name step', (tester) async {
+        final harness = TestHarness(firstRun: true);
+        await introWithNameOpen(tester, harness);
+        await tester.tap(find.text(Strings.introSkip.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(find.byType(WalkthroughPage), findsNothing);
+        expect(find.byType(NamePage), findsOneWidget);
+      });
     });
 
     testWidgets('once answered, the intro never comes back', (tester) async {

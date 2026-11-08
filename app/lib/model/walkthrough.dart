@@ -45,10 +45,15 @@ enum WalkthroughEnd { finished, skipped }
 /// place. The first-run intro uses it so someone who chose one tour is still told about the other.
 @immutable
 class WalkthroughFollowUp {
-  const WalkthroughFollowUp({required this.label, required this.title, required this.steps});
+  const WalkthroughFollowUp({required this.label, required this.title, required this.steps, this.skipOpensIt = false});
 
   /// The button text.
   final String label;
   final String title;
   final List<WalkthroughStep> steps;
+
+  /// Leaving the first walkthrough early (Skip, the back arrow, the back gesture, Escape) opens this
+  /// one instead of going back. Used on a first run, where skipping the app tour should still lead to
+  /// the poker lesson, which can then be skipped on its own.
+  final bool skipOpensIt;
 }
