@@ -92,3 +92,8 @@ git config core.hooksPath .githooks
 fvm install            # Flutter from .fvmrc
 cargo --version        # rustup installs rust-toolchain.toml on first use
 ```
+
+## Sound effects
+- The clips in `app/assets/sounds/` are generated: `python3 tool/sounds/make_sounds.py` (numpy only), then `python3 tool/sounds/analyze.py` (add `--images` for spectrograms in `$TMPDIR`). Open `tool/sounds/audition.html` in a browser to listen to them one by one.
+- Linux desktop builds need `libasound2-dev` (`sudo apt install libasound2-dev`); CI installs it. Without sudo: `apt-get download libasound2-dev`, unpack it with `dpkg -x` and point `CPATH` at `usr/include`.
+- To hear what the app really outputs without using the speakers on Linux: create a null sink (`pactl load-module module-null-sink sink_name=smoke_sink`), run the app with `PIPEWIRE_NODE=smoke_sink`, and record `smoke_sink.monitor` with `parec`.

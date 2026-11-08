@@ -232,7 +232,7 @@ Players enter the server URL once (default baked in at build time) and a 4-lette
 | :--- | :--- | :--- | :--- |
 | Keep screen awake | `wakelock_plus` | Table (always), Player (while in room) | No-op where unsupported |
 | Haptics on your turn | `HapticFeedback.heavyImpact()` pattern; plugin only if a richer pattern is needed | Player | Sound + visual pulse (desktop has no haptics) |
-| Sound effects | Audio plugin (chip clink, check knock, all-in, showdown) | Table, Player | Mute toggle |
+| Sound effects | `flutter_soloud` behind `SoundPlayer`; 21 original clips (ADR-020): chips, cards, soft notes | Table, Player, solo | One on/off switch in Settings |
 | QR render | `pretty_qr_code` (used by LocalSend) | Table | Typed address |
 | QR scan | Camera-based scanner plugin | Player | Typed address |
 | Window management | `window_manager` (desktop) | Table | n/a |

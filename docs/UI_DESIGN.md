@@ -119,7 +119,7 @@ Game screens (Table, Player, Spectator) are full screen routes without the bar, 
 **Text size.** Non-game screens never cap the text scale; they are drawn denser, and past 1.3x or with the keyboard open they may scroll as a last resort (the scroll view stays in the tree as a guard, the main button stays pinned outside it). Game screens cap the scale to what fits, by height: the player screen at height over 555, the host table at usable height over 560 upright and over 330 on its side (never over 2). The wordmark and big numerals do not scale with text.
 
 **Deliberate exceptions.**
-- Settings, the Guide and the terms document scroll (they are documents or lists of unknown length). On the terms screen the "I understand and agree" switch and the Accept and Decline buttons are a footer that does not scroll, so the decision is always reachable (the footer takes at most 60% of the height and scrolls inside that only at huge text).
+- Settings, the Guide and the terms document scroll (they are documents or lists of unknown length). On the terms screen the "I am 18+ and I agree" switch and the Accept and Decline buttons are a footer that does not scroll, so the decision is always reachable (the footer takes at most 60% of the height and scrolls inside that only at huge text).
 - The Nearby games list scrolls when many games are found.
 - The host table's seat list may scroll inside its own box, with the pot, cards and every button fixed, in one case only: a seated host who plays with cards in the app, on their turn, with ten seats, on the smallest phones (seat plates would otherwise fall under 60 px).
 - The error screen shown when the app fails to start scrolls its report; the copy button stays pinned.
@@ -181,7 +181,7 @@ Cells separated by hairlines: a four-step strip, ten ranked hand cards (rank num
 ### Settings
 After the sections below, ABOUT also holds a Terms and safety row and a Support the developer row (section 9). Rows grouped by a caption cell:
 - **APPEARANCE**: Theme (System / Light / Dark), Paper texture (switch).
-- **TABLE**: Sound, Vibration, Keep the screen on during a game (switches).
+- **TABLE**: Sound, Vibration, Keep the screen on during a game (switches). Sound is one switch, on by default, and the only sound setting (no volume slider, no per-effect list: the phone's own volume decides how loud). Caption: "Soft sounds for your turn, chips and cards."
 - **YOU**: Default name (used to prefill Join).
 - **DATA**: Forget the saved game on this device (confirm dialog).
 - **ABOUT**: version, protocol version, licences.
@@ -239,3 +239,34 @@ Spec: `docs/superpowers/specs/2026-11-07-single-player-bots-design.md` section 9
 - **Thinking bar and reveals:** the opponent on turn shows a thin bar under their cards (`ThinkingBar`, in `opponent_strip.dart`) that fills with an easing curve and never reaches the end (about 4 s time constant), restarts on every new turn (hand, street, bet), stands still while paused, and is a fixed half bar with reduced motion. The flop's cards turn over one after the other (`FlipIn`, 460 ms each, 260 ms apart), the turn and river alone; a showdown turns the hands over one player after the other, then the five best cards. A run-out deals its streets 1.3 s apart (`RunoutPacer.step`; this also applies to games on the LAN). Goldens pump past the animations so they show the finished state.
 - **Tournament feel:** no bot tag anywhere (owner decision: bots look like real players).
 - The app tour has a "Play alone" step (8 steps now) and the Guide an "Alone" section with a jump chip.
+
+## 11. Sound (ADR-020, built)
+
+Sound is part of the table's feel: calm, focused, warm, never harsh. All clips are original work made by `tool/sounds/make_sounds.py` (no samples, no downloads; licence note in `app/assets/sounds/README.md`). Settings has one **Sound** switch.
+
+**Palette.** Notes: a soft felt mallet on a tine, tuned to D major pentatonic (D E F# A B), so any two overlapping cues agree. Chips: small clay discs, a short ring plus a low knock. Cards: filtered paper noise (slide, flick, snap). Check: two knuckle taps on felt. One small damped room (RT60 about 0.45 s) under everything so the sounds belong to one place. Rules the analyser enforces (`tool/sounds/analyze.py`): nothing above 6.2 kHz (master low-pass), under 2 percent of the energy above 8 kHz, peaks at or below -3 dBFS, the loudest 200 ms between -26 and -15 dBFS, no click at the start or end, no DC offset, 0.15 to 4 s long. The set is 21 files, 16-bit mono WAV at 22.05 kHz, about 0.9 MB.
+
+**Cues.**
+| Cue | When | Sound |
+| :--- | :--- | :--- |
+| turn | your turn (from the pages, with the vibration) | A, D, F# rising over a low D |
+| check | a check | two knuckle taps |
+| call | a call or a bet | a few chips (3 clips, played in turn) |
+| raise | a raise | a bigger stack (2 clips) |
+| allIn | an all-in call, bet or raise | a long chip cascade on a low swell |
+| fold | a fold | a card slid away |
+| deal | your two cards arrive (virtual cards) | two cards |
+| shuffle | a new hand at the table | the deck riffled |
+| flop, street | the flop; the turn or river | three cards; one card |
+| reveal | hands turned over | two flips and a low note |
+| win | you won the pot | D, F#, A, D rising, chips gathered |
+| potWon | somebody else won (table and solo) | chips drawn in, one soft note |
+| out, gameWon | you are out; you won the game (solo) | three falling notes; a long arpeggio |
+| levelUp | blinds went up (solo) | two soft bell notes |
+| join, leave | someone sat down or left (table) | A then D; D then A |
+
+**Who hears what.** Phones sit together at one table, so each device plays only its own part (`SoundAudience` in `app/lib/model/sound_cues.dart`): a **solo** game (the view carries blinds) plays everything on the one phone, without the riffle (the cards are dealt to you); the **table** device (host, spectator) plays the table's sounds (everyone's actions, riffle, board, reveal, pot, join, leave) and any personal ones; a **seated guest** plays only its own cards, its own actions, its own wins and losses. A room with real cards has an empty board and no result in the view (found by the real-server E2E), so there the street comes from the phase, the hands are shown when the hand reaches `showdown`, and the pot is paid when the hand enters `nextHandPrep`: a seat whose own stack grew in that very update hears `win`.
+
+**When it plays.** From live server messages only (`SoundTracker`, fed by `SessionNotifier`): a `SNAPSHOT` sets the baseline and is silent, and so is the `HOLE_CARDS` the server resends after it, so coming back to a table replays nothing. A skipped or stale `STATE_UPDATE` is silent. One closing sound per moment (game end beats pot beats reveal). `Sound` drops, never queues, the same cue within 120 ms, goes through a cue's clips in turn, and is silent when the Settings switch is off or the app is not in front. Engine errors are logged and swallowed: a phone with no audio output plays the game in silence.
+
+**Not done.** Per-effect settings, a volume slider, background music, per-seat positioning of sound.

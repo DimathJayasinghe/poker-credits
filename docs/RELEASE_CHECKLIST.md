@@ -77,3 +77,9 @@ An Android emulator pass (2026-11-08, `docs/SECURITY_AND_EDGE_CASES.md` section 
 - [ ] Tag the release commit once the builds you uploaded are the ones from that commit.
 - [ ] Keep the upload key backups, `key.properties` and its passwords out of the repository, chat, CI logs and screenshots. If any of them leaks, rotate the upload key with Play support.
 - [ ] Re-read `docs/SECURITY_AUDIT_2026-11-08.md` "Residual risks" and accept or fix each one.
+
+## Microsoft Store (Windows)
+
+Owner-facing. The whole route, the Partner Center fields and the account steps are in `docs/MICROSOFT_STORE.md`. Before each Store update: version bumped in `app/pubspec.yaml` (the MSIX version is `major.minor.patch.0`), `PRIVACY.md` and Settings > Privacy policy still true, screenshots remade if a screen changed (`docs/MICROSOFT_STORE.md` section 6), the `poker-credits-msix` artifact built with the real identity variables (never the `PLACEHOLDER` file).
+
+Automatic submission (`docs/MICROSOFT_STORE.md` section 9): a stable tag `vX.Y.Z` on a commit that is on `main` starts `store-publish.yml` once the secrets exist; check the run, then Partner Center (draft: press Submit; `MSSTORE_AUTO_COMMIT=true`: it is already in certification).

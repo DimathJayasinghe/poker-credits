@@ -28,6 +28,7 @@ Poker Credits: Flutter app + Rust engine/server for physical-card Texas Hold'em 
 | Phase-by-phase tasks | `docs/AGENT_CODING_GUIDE.md` |
 | Which model for which task, how to brief cheaper models | `docs/MODEL_STRATEGY.md` |
 | UI design system | `docs/UI_DESIGN.md` |
+| Microsoft Store (MSIX), privacy policy, listing | `docs/MICROSOFT_STORE.md` |
 | Dev setup, plugins, graphify | `docs/DEV_SETUP.md` |
 | Plan | `pocker_credit_plan.md` |
 | Virtual cards (ADR-016, built) | `docs/superpowers/specs/2026-11-07-virtual-cards-design.md` |

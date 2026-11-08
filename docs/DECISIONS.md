@@ -300,3 +300,51 @@ Full detail in `docs/RESILIENCE_AND_CRASH_HANDLING.md`. Summary of what is copie
 **Residual risks (accepted, listed in the audit):** trust on first use for code, lobby and typed-address joins; the private key sits in the app data directory as a 0600 file rather than in the platform keystore (the app sandbox protects it; a rooted device does not); no global cap on established connections after the handshake; four-character room codes (rate limited, ADR-012); a 1.3.1 host and a TLS guest cannot play together (release notes say so).
 
 **Consequences:** protocol stays v1 (the transport changed, the messages did not). `JoinLink` gains an optional `fingerprint`; the QR is longer, so its error correction is set to L to keep it scannable. `HostedRoom.fingerprint`, `DiscoveredHost.fingerprint` and `DiscoveredLobby.fingerprint` carry the pin. New dependencies: `rustls`, `tokio-rustls`, `rcgen` (all `ring`). New tests: 12 TLS integration tests, 11 unit tests, a native Dart-to-rustls interop test (`packages/poker_bridge/test/native_tls_test.dart`, run with `POKER_BRIDGE_LIB`), and a real TLS server test in the app (`test/platform/secure_channel_test.dart`, fixture in `test/fixtures/tls`).
+
+## ADR-020: Sound effects
+
+**Status:** Built 2026-11-08 on `feature/sound` (owner request: add sound effects that are copyright free and free to use, match the UI and UX, made by us if nothing fitting is found, rich, calm, focused, unique, not harsh; and one simple on/off setting). Fills the "audio" slot of ADR-009 and replaces the single `SystemSound` beep.
+
+**Decision:**
+1. **Original sounds, synthesized, not downloaded.** Free sound libraries mix licences (CC-BY needs credit, CC-BY-NC and sampling-plus forbid use, "free to use" pages often cannot show where the audio came from), and no pack would share one palette. `tool/sounds/make_sounds.py` (Python and numpy only, fixed seeds) generates all 21 clips, so there is nothing to license: they are released under the repository's MIT licence and may also be used as CC0 (`app/assets/sounds/README.md`). A change to a sound is a reviewable change to the script. `analyze.py` measures levels, brightness, clicks and length and fails on a broken rule.
+2. **One palette** (felt mallet in D major pentatonic, clay chips, paper-noise cards, knuckle taps, one small damped room, nothing above about 6 kHz, nothing starting with a click). Details: `docs/UI_DESIGN.md` section 11.
+3. **Plugin: `flutter_soloud`** 4.1.7 (MIT; Android, iOS, Linux, macOS, Windows, web; SoLoud over miniaudio; low latency; overlapping voices). Rejected: `audioplayers` (its Linux backend needs GStreamer at build and run time, which would break the "needs GTK 3 and libsecret" promise); `SystemSound` (one beep, nothing on Android). Added with the owner's approval (the audio plugin was already on the list in `AGENT_CODING_GUIDE.md` section 6). It is used only behind `SoundPlayer` (`app/lib/platform/sound_player*.dart`; web gets a silent stub, ADR-014).
+4. **`NO_XIPH_LIBS`.** The app only plays WAV, so the plugin's Opus, Ogg, Vorbis and FLAC libraries are not linked (`android/gradle.properties`, `set(ENV{NO_XIPH_LIBS} "1")` in the Linux and Windows `CMakeLists.txt`): a smaller package, no downloads at build time, no extra licences. Linux builds need `libasound2-dev` (SoLoud's ALSA backend is compiled in); the binary does not link `libasound` at run time, so a machine without it just stays silent.
+5. **Who hears what.** Phones sit together, so a device plays only its part: solo plays all, the table device the table's sounds, a seated guest only its own. Cues are derived from live server messages by a pure `SoundTracker` (replay guard on snapshots and resent `HOLE_CARDS`), not from the pages. The turn alert stays in the pages with the vibration (`TurnAlertGate`).
+6. **One setting.** The existing Sound switch is the only control (owner: keep it simple). No slider, no list. The phone's volume decides how loud; the player adds 3 dB because SoLoud pans a mono clip into stereo at -3 dB (measured).
+
+7. **The audio device is not held.** SoLoud keeps an output stream running as long as it is initialised, which holds the audio route (and keeps a Bluetooth speaker awake) while a phone sits on the table. The player starts the engine on the first cue and releases it after 45 s without one; the next cue starts it again.
+
+**Verification:** unit tests for every cue and role, replays, throttle, switch, foreground, and that every cue has a bundled and listed file and no file is unused. On Linux the real engine played all 18 cues into a virtual sink and the recording matched the files (same spectrum, exactly the expected 3 dB pan loss, no dropouts). On the Android emulator (release APK) the engine opens its output stream only once a game starts, holds no audio focus (cues mix over other audio), releases the stream after 45 s idle and reopens it on the next cue (checked with `dumpsys audio`). **Not verified:** how it sounds to a person (the author could not listen: levels, spectrograms and clicks were measured, not heard), iOS and macOS (never built here; the audio session of iOS is left at the plugin's default), a physical phone speaker.
+
+**Cost:** about 0.9 MB of clips and the plugin's native library per ABI.
+
+## ADR-021: Microsoft Store as an MSIX app, and a privacy policy
+
+**Date:** 2026-11-08. **Status:** accepted (owner asked for a privacy policy and Store readiness).
+
+**Context.** Partner Center offers an EXE/MSI product type, which requires an installer and every file in it signed with a CA certificate (policy 10.2.9) and hosted at a fixed HTTPS address, and an MSIX type, which the Store signs itself. We have no code-signing certificate and the installer is unsigned. Policy 10.5.1 requires a privacy policy for Win32 products; the owner also wanted a privacy screen in Settings.
+
+**Decision.**
+1. Publish as an **MSIX app**. The package is built in CI from the existing Flutter Windows bundle with `makeappx` and a hand-written manifest (`packaging/windows/msix`), not with the `msix` pub package: that package is not in the approved dependency list and the manifest is small. The inno installer and the zip stay for direct downloads.
+2. The package declares `internetClient`, `privateNetworkClientServer` and `runFullTrust`, nothing else (policy 10.6); `tool/msix_stage.py --check` enforces the list.
+3. Identity values come from Partner Center and are set as repository variables; without them CI builds a placeholder package that is named so and must not be uploaded. The version is `major.minor.patch.0` from `pubspec.yaml`.
+4. The **privacy policy** is plain text written from what the code does (no accounts, no analytics, no developer server; what is stored, what other players see, camera, permissions, security, choices, children). It lives in the app (Settings > Privacy policy, `privacy_content.dart`) and as `PRIVACY.md` for the Store URL; a unit test fails when they differ. The support contact is the project's issue page, not a personal e-mail address.
+5. Store screenshots are renders of the real screens made by tests (`STORE_SHOTS_DIR`), so they can be remade.
+6. The truthful age-rating answers (poker is simulated gambling) give **Microsoft 18+**, so the app says the same to its players: the Terms start with "For adults, 18 and over", the agree switch reads "I am 18+ and I agree", and `currentTermsVersion` went to 2 so existing players accept it once. We did not lower the answers to get a lower rating (policy 11.11.2 lets Microsoft re-rate).
+
+**Consequences.** The Store listing and policy must be kept true: a new kind of data handling changes the policy first. The Windows app has no camera, so it declares none. Verification of the package itself waits for the first CI run on Windows and for a real install (docs/MICROSOFT_STORE.md section 8).
+
+## ADR-022: Store submission from CI on stable tags
+
+**Date:** 2026-11-08. **Status:** accepted, unverified until the first live run (owner asked for automatic submission once stable code reaches `main`).
+
+**Context.** Microsoft publishes the Store Developer CLI (`msstore`) and a setup action for it; with an Entra application that has the Manager role it can update a live product from CI. Each submission is certified by Microsoft, the Store keeps one submission in flight per product, versions must rise, and a faulty build that is submitted goes to every user of the Store. The first submission cannot be made through the API.
+
+**Decision.**
+1. Trigger on a **stable version tag** (`vX.Y.Z`, on a commit contained in `main`), not on every push to `main`. A push to `main` is a work in progress; the tag is the release decision the project already makes, and the build for it already exists ("Desktop builds" runs on tags). The workflow listens for that run to succeed (`workflow_run`) and takes its `poker-credits-msix` artifact, so the package is the one CI built, not a second build.
+2. Refuse: a run that is not a successful tag push of "Desktop builds", a tag that is not `vX.Y.Z`, a commit not on `main`, the placeholder package, a package whose manifest version is not the tag's.
+3. Safe defaults: the submission is a **draft** (`--noCommit`) until the variable `MSSTORE_AUTO_COMMIT` is `true`; the job uses the environment `microsoft-store`, where a required reviewer can be added; without the secrets it logs a notice and passes.
+4. Credentials are repository secrets read only by this workflow, passed through `env:` and never into the command text. The two third-party actions are pinned to commit hashes like the others.
+
+**Consequences.** A release needs no upload by hand once set up. It cannot start until the app is live, and it is unknown whether an individual Partner Center account can link an Entra application; if not, the manual route (docs/MICROSOFT_STORE.md section 5) is unchanged. `msstore publish` with a bare `.msix` path follows Microsoft's example and has not been run here.
