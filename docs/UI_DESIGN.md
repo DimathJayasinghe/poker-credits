@@ -220,7 +220,7 @@ Spec and mockups: `docs/superpowers/specs/2026-11-07-virtual-cards-design.md` se
 
 - **Launch:** `LaunchGate` (splash, terms, intro, name step, Home). The splash is a flush of five cards turning over with a filling bar, tap to skip; the whole picture scales down on a short screen and its caption wraps. Reduced motion shows the cards face up at once.
 - **Terms** (`TermsPage`): five sections, an agree switch, ACCEPT disabled until ticked, DECLINE closes the app. The read-only version opens from Settings.
-- **Intro** (`IntroPage`): Take the app tour, Learn poker, or Skip. Never shown again once chosen.
+- **Intro** (`IntroPage`): Take the app tour, Learn poker, or Skip. Never shown again once chosen. Skipping the app tour from here opens Learn poker, skipping that goes to the name step; Skip, I know my way goes straight to the name step.
 - **Name step** (`NamePage`, 1.4.0): asked once, after the intro (and its tour or lesson are chosen) and before the first Home. One field, SAVE NAME or Skip for now; the name is kept as `defaultName` and prefilled on Host, Join and Play alone, and changeable in Settings. `AppSettings.nameAsked` marks it as answered; an installation that already finished the intro or has a name never sees it (migration in `AppSettings.fromJson`). Copy lives in `Strings.nameStep*`.
 - **Tours** (`WalkthroughPage`): progress cells at the top, one illustrated step per page, Back / Next / Done below, a Skip cell always present. Swipe, arrow keys and Escape work.
 - **Support** (`SupportPage`): headline, a short text from the developer, three large link rows (Star, Follow, Report a bug; the first is the accent cell) and the repository QR. Reached from Settings (About) and the bottom of the Guide.
