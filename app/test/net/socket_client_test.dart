@@ -216,6 +216,29 @@ void main() {
     }
   });
 
+  test('a rate-limit warning on a live link is not fatal, a refusal while joining is', () {
+    // The server sends RATE_LIMITED for each flooded frame and closes only on the third strike.
+    _scenario((async, net, make) {
+      final client = make(_join)..start();
+      _goLive(async, net);
+      net.last.serverSends(const ErrorMessage(code: ErrorCode.rateLimited, message: 'slow down'));
+      async.flushMicrotasks();
+      expect(client.state.phase, LinkPhase.live, reason: 'one warning must not end the session');
+      expect(client.state.failure, isNull);
+      client.close();
+    });
+    // A per-address block comes before the link is live and is followed by a close: retrying is useless.
+    _scenario((async, net, make) {
+      final client = make(_join)..start();
+      async.flushMicrotasks();
+      net.last.serverSends(const ErrorMessage(code: ErrorCode.rateLimited, message: 'blocked'));
+      async.flushMicrotasks();
+      expect(client.state.phase, LinkPhase.failed);
+      expect(client.state.failure, LinkFailure.rateLimited);
+      client.close();
+    });
+  });
+
   test('a fixable join error keeps the socket so the user can try again', () {
     _scenario((async, net, make) {
       final client = make(_join)..start();

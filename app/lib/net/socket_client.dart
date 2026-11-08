@@ -294,7 +294,10 @@ class RoomClient {
       ErrorCode.roomCrashed => LinkFailure.roomCrashed,
       ErrorCode.versionMismatch => LinkFailure.versionMismatch,
       ErrorCode.updateRequired => LinkFailure.updateRequired,
-      ErrorCode.rateLimited => LinkFailure.rateLimited,
+      // While joining or resuming this is the per-address block, followed by a close. On a live
+      // link it is only a warning for a flooded frame: the server closes after the third strike,
+      // and that ordinary drop reconnects with backoff on a fresh budget.
+      ErrorCode.rateLimited when !_state.isLive => LinkFailure.rateLimited,
       // The server closes the socket after these while joining; once live they are not about us.
       ErrorCode.roomFull || ErrorCode.spectatorsFull when !_state.isLive => LinkFailure.refused,
       _ => null,
