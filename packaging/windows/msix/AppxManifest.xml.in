@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Manifest of the Microsoft Store package (MSIX). Not used as is: .github/workflows/desktop-builds.yml
+  replaces the {{...}} fields and packs it with makeappx. The Store signs the package itself, so no
+  certificate is needed. Identity (Name, Publisher, PublisherDisplayName) must equal the values on the
+  app's "Product identity" page in Partner Center, character for character. How: docs/MICROSOFT_STORE.md.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity Name="{{IDENTITY_NAME}}" Publisher="{{PUBLISHER}}" Version="{{VERSION}}" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Poker Credits</DisplayName>
+    <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <!-- Windows 10 version 1809 or newer, as the Flutter runner needs. -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="PokerCredits" Executable="poker_credits.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Poker Credits"
+        Description="Chips and pots for physical-card Texas Hold'em."
+        BackgroundColor="#EFE5CF"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Joining a game on a server or a host outside the local network (a typed address). -->
+    <Capability Name="internetClient" />
+    <!-- Hosting a room and joining one on the local network. -->
+    <Capability Name="privateNetworkClientServer" />
+    <!-- The app is a normal desktop (Win32) program: the Flutter runner and the Rust engine are native code. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

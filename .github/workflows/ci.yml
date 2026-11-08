@@ -62,6 +62,8 @@ jobs:
         working-directory: packages/poker_bridge
       - name: Web-safety guard (ADR-014, ADR-013)
         run: bash tool/check_web_safe.sh
+      - name: Microsoft Store package manifest (ADR-021)
+        run: python3 tool/msix_stage.py --check
       - name: Web build smoke test (ADR-014)
         run: flutter build web --no-web-resources-cdn
         working-directory: app

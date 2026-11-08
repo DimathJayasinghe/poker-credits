@@ -1,6 +1,6 @@
 name: Desktop builds
 
-# Builds the Windows (zip and installer) and Linux apps and keeps them as downloadable artifacts. Runs by hand
+# Builds the Windows (zip, installer and Microsoft Store package) and Linux apps and keeps them as downloadable artifacts. Runs by hand
 # (Actions tab, once this file is on the default branch), on version tags, and on a pull request
 # that changes this file, so the first run can happen before anything is merged.
 on:
@@ -8,7 +8,7 @@ on:
   push:
     tags: ['v*']
   pull_request:
-    paths: ['.github/workflows/desktop-builds.yml']
+    paths: ['.github/workflows/desktop-builds.yml', 'packaging/windows/**', 'tool/msix_stage.py']
 
 concurrency:
   group: desktop-${{ github.ref }}
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Linux build packages
         if: matrix.target == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev lld
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev libasound2-dev lld
       # The Flutter-Rust bridge compiles the engine and server with the pinned toolchain.
       - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
       - name: Read the pinned Flutter version from .fvmrc
@@ -88,5 +88,38 @@ jobs:
             poker-credits-windows-x64.zip
             poker-credits-windows-x64-setup.exe
             poker-credits-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+      # The Microsoft Store package. It comes after the upload above on purpose: a problem in the
+      # manifest turns this job red but never costs the zip, the installer or the Linux build.
+      # The three identity values are repository variables (Settings > Secrets and variables > Actions >
+      # Variables; a secret of the same name works too, but its value is then hidden in the logs) copied from Partner Center, "Product identity"; without them the package gets
+      # placeholder values, is named so, and only proves that packing works. docs/MICROSOFT_STORE.md.
+      - name: Microsoft Store package (Windows)
+        if: matrix.target == 'windows'
+        shell: pwsh
+        env:
+          MSSTORE_IDENTITY_NAME: ${{ vars.MSSTORE_IDENTITY_NAME || secrets.MSSTORE_IDENTITY_NAME }}
+          MSSTORE_PUBLISHER: ${{ vars.MSSTORE_PUBLISHER || secrets.MSSTORE_PUBLISHER }}
+          MSSTORE_PUBLISHER_DISPLAY_NAME: ${{ vars.MSSTORE_PUBLISHER_DISPLAY_NAME || secrets.MSSTORE_PUBLISHER_DISPLAY_NAME }}
+        run: |
+          python tool/msix_stage.py --check
+          if ($LASTEXITCODE -ne 0) { throw "the MSIX manifest check failed" }
+          $stage = Join-Path $PWD 'msix-stage'
+          $json = python tool/msix_stage.py --bundle "${{ matrix.output }}" --out $stage
+          if ($LASTEXITCODE -ne 0) { throw "could not stage the MSIX folder" }
+          $info = $json | ConvertFrom-Json
+          $name = if ($info.placeholder) { 'poker-credits-windows-x64-PLACEHOLDER-do-not-submit.msix' } else { 'poker-credits-windows-x64.msix' }
+          $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" |
+            Sort-Object { [version]$_.Directory.Parent.Name } | Select-Object -Last 1
+          & $makeappx.FullName pack /d $stage /p $name /o
+          if ($LASTEXITCODE -ne 0) { throw "makeappx failed" }
+          if ($info.placeholder) { Write-Warning "No Partner Center identity is set, so this package is a placeholder and must not be uploaded to the Store." }
+          Get-Item $name | Format-List Name, Length
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: matrix.target == 'windows'
+        with:
+          name: poker-credits-msix
+          path: poker-credits-windows-x64*.msix
           if-no-files-found: error
           retention-days: 14

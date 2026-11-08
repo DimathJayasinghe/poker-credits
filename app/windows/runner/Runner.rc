@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "dev.pokercredits" "\0"
-            VALUE "FileDescription", "poker_credits" "\0"
+            VALUE "CompanyName", "Poker Credits" "\0"
+            VALUE "FileDescription", "Poker Credits" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "poker_credits" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 dev.pokercredits. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Poker Credits. MIT licence." "\0"
             VALUE "OriginalFilename", "poker_credits.exe" "\0"
-            VALUE "ProductName", "poker_credits" "\0"
+            VALUE "ProductName", "Poker Credits" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
