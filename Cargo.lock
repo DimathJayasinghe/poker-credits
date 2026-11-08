@@ -1082,7 +1082,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "poker_bots"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "poker_engine",
  "proptest",
@@ -1092,7 +1092,7 @@ dependencies = [
 
 [[package]]
 name = "poker_engine"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "proptest",
  "serde",
@@ -1102,7 +1102,7 @@ dependencies = [
 
 [[package]]
 name = "poker_server"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "anyhow",
  "poker_server_core",
@@ -1113,7 +1113,7 @@ dependencies = [
 
 [[package]]
 name = "poker_server_core"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "axum",
  "getrandom 0.4.3",
@@ -1341,7 +1341,7 @@ dependencies = [
 
 [[package]]
 name = "rust_lib_poker_bridge"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "flutter_rust_bridge",
  "poker_bots",
