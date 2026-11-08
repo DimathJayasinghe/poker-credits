@@ -15,12 +15,12 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 List<PokerCard> _cards(List<String> text) => <PokerCard>[for (final t in text) PokerCard.parse(t)];
 
-SeatView _seat(int index, String name, int chips, {bool cards = true}) => SeatView(
+SeatView _seat(int index, String name, int chips, {bool cards = true, int bet = 0}) => SeatView(
   seatIndex: index,
   playerId: 'demo_$index',
   name: name,
   chips: chips,
-  streetBet: 0,
+  streetBet: bet,
   hasFolded: false,
   isAllIn: false,
   isSittingOut: false,
@@ -214,10 +214,25 @@ class StepArtView extends StatelessWidget {
         return CustomPaint(size: const Size(215, 150), painter: _WifiLockPainter(c.onFelt, c.felt, c.accent));
       case StepArt.goal:
         return const PotDisplay(total: 240, pots: <PotView>[], fontSize: 64);
+      case StepArt.winWays:
+        return _winWays(c);
       case StepArt.holeCards:
         return CardRow(cards: _cards(const <String>['As', 'Kd']), size: CardSize.hero, gap: 16);
       case StepArt.board:
         return BoardView(shown: _cards(lessonBoard), size: CardSize.board, slotColor: c.onFelt);
+      case StepArt.sevenCards:
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            _caption(c, 'THE BOARD'),
+            const SizedBox(height: BrutalMetrics.gapS),
+            BoardView(shown: _cards(lessonBoard), size: CardSize.board, slotColor: c.onFelt),
+            const SizedBox(height: BrutalMetrics.gapL),
+            _caption(c, 'YOUR TWO CARDS'),
+            const SizedBox(height: BrutalMetrics.gapS),
+            CardRow(cards: _cards(const <String>['As', 'Kd']), size: CardSize.board, gap: 8),
+          ],
+        );
       case StepArt.rounds:
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -258,47 +273,53 @@ class StepArtView extends StatelessWidget {
             ],
           ),
         );
+      case StepArt.dealerButton:
+        return _seats(c, <(Widget, String)>[
+          (SeatPlate(seat: _seat(0, 'Alice', 1000, cards: false), isDealer: true), 'DEALER'),
+          (SeatPlate(seat: _seat(1, 'Bob', 1000, cards: false)), ''),
+          (SeatPlate(seat: _seat(2, 'Cara', 1000, cards: false)), ''),
+        ]);
       case StepArt.blinds:
+        return _seats(c, <(Widget, String)>[
+          (SeatPlate(seat: _seat(0, 'Alice', 1000, cards: false), isDealer: true), 'DEALER'),
+          (SeatPlate(seat: _seat(1, 'Bob', 995, cards: false, bet: 5), isSmallBlind: true), 'SMALL BLIND'),
+          (SeatPlate(seat: _seat(2, 'Cara', 990, cards: false, bet: 10), isBigBlind: true), 'BIG BLIND'),
+        ]);
+      case StepArt.moveFold:
+        return _moves(c, 'Fold', 'GIVE UP THIS HAND');
+      case StepArt.moveCheck:
+        return _moves(c, 'Check', 'PASS WITH NO BET');
+      case StepArt.moveCall:
+        return _moves(c, 'Call 20', 'MATCH THE BET');
+      case StepArt.moveRaise:
+        return _moves(c, 'Raise', 'BET MORE');
+      case StepArt.moveAllIn:
+        return _moves(c, 'All-in', 'BET EVERYTHING');
+      case StepArt.reveal:
         return Row(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            SizedBox(
-              width: 190,
-              child: SeatPlate(seat: _seat(0, 'Alice', 995, cards: false), isDealer: true, isSmallBlind: true),
-            ),
-            const SizedBox(width: BrutalMetrics.gapM),
-            SizedBox(
-              width: 190,
-              child: SeatPlate(seat: _seat(1, 'Bob', 990, cards: false), isBigBlind: true),
-            ),
+            _player(c, 'Alice', flushAlice),
+            const SizedBox(width: BrutalMetrics.gapXl),
+            _player(c, 'Bob', flushBob),
           ],
         );
-      case StepArt.handsTop:
-        return _handList(c, handExamples.take(5).toList());
-      case StepArt.handsBottom:
-        return _handList(c, handExamples.skip(5).toList());
+      case StepArt.handsWeakest:
+      case StepArt.handsPairs:
+      case StepArt.handsRuns:
+      case StepArt.handsFull:
+      case StepArt.handsBest:
+        final (_, weaker, stronger) = lessonHandPairs.firstWhere((p) => p.$1 == art);
+        return _handPair(c, weaker, stronger);
+      case StepArt.exampleFlush:
+        return _showdownScene(c, flushBoard, flushAlice, flushBob);
+      case StepArt.tieBreak:
+        return _versus(c, tieBreakRows);
+      case StepArt.kicker:
+        return _versus(c, kickerRows);
       case StepArt.workedExample:
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            BoardView(shown: _cards(exampleBoard), size: CardSize.board),
-            const SizedBox(height: BrutalMetrics.gapM),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                SizedBox(
-                  width: 190,
-                  child: SeatPlate(seat: _seat(0, 'Alice', 1020), isWinner: true, cards: _cards(exampleAlice)),
-                ),
-                const SizedBox(width: BrutalMetrics.gapM),
-                SizedBox(
-                  width: 190,
-                  child: SeatPlate(seat: _seat(1, 'Bob', 980), cards: _cards(exampleBob)),
-                ),
-              ],
-            ),
-          ],
-        );
+        return _showdownScene(c, exampleBoard, exampleAlice, exampleBob);
       case StepArt.words:
         return SizedBox(
           width: 400,
@@ -330,27 +351,192 @@ class StepArtView extends StatelessWidget {
     }
   }
 
-  /// A hand name beside its five cards, one row per hand.
-  Widget _handList(BrutalColors c, List<(String, List<String>)> hands) => Column(
+  TextStyle _display(BrutalColors c, double size, {Color? color}) =>
+      TextStyle(fontFamily: BrutalFonts.display, fontSize: size, height: 1.05, color: color ?? c.onFelt);
+
+  Widget _caption(BrutalColors c, String text) => Text(
+    text,
+    style: TextStyle(fontFamily: BrutalFonts.mono, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 2, color: c.onFelt),
+  );
+
+  /// Seats one under the other, each with a word beside it where there is something to say.
+  Widget _seats(BrutalColors c, List<(Widget, String)> rows) => Column(
     mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.start,
     children: <Widget>[
-      for (final (name, cards) in hands)
+      for (final (plate, word) in rows)
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3),
+          padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapXs),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
+              SizedBox(width: 200, child: plate),
               SizedBox(
-                width: 210,
-                child: Text(
-                  name.toUpperCase(),
-                  style: TextStyle(fontFamily: BrutalFonts.display, fontSize: 22, color: c.onFelt),
+                width: 190,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: BrutalMetrics.gapM),
+                  child: Text(word, style: _display(c, 26)),
                 ),
               ),
-              CardRow(cards: _cards(cards), size: CardSize.mini, gap: 3),
             ],
           ),
         ),
+    ],
+  );
+
+  /// A name over two face-up cards.
+  Widget _player(BrutalColors c, String name, List<String> cards, {bool wins = false}) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: <Widget>[
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(name.toUpperCase(), style: _display(c, 26)),
+          if (wins) ...<Widget>[const SizedBox(width: BrutalMetrics.gapS), _winsTag(c)],
+        ],
+      ),
+      const SizedBox(height: BrutalMetrics.gapS),
+      CardRow(cards: _cards(cards), size: CardSize.hero, gap: 8),
+    ],
+  );
+
+  Widget _winsTag(BrutalColors c) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+    decoration: BoxDecoration(
+      color: c.accent,
+      border: Border.all(color: c.line, width: BrutalMetrics.border),
+    ),
+    child: Text('WINS', style: _display(c, 20, color: c.onAccent)),
+  );
+
+  /// The two ways to win a pot, side by side.
+  Widget _winWays(BrutalColors c) {
+    Widget panel(String title, Widget body) => Container(
+      width: 250,
+      padding: const EdgeInsets.all(BrutalMetrics.gapM),
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border.all(color: c.line, width: BrutalMetrics.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(title, style: _display(c, 24, color: c.ink)),
+          const SizedBox(height: BrutalMetrics.gapS),
+          body,
+        ],
+      ),
+    );
+    Widget fold() => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: c.paper,
+        border: Border.all(color: c.line, width: BrutalMetrics.border),
+      ),
+      child: Text('FOLD', style: _display(c, 22, color: c.ink)),
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        panel('BEST HAND', CardRow(cards: _cards(handExamples[4].$2), size: CardSize.mini, gap: 3)),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapS),
+          child: Text('OR', style: _display(c, 30)),
+        ),
+        panel(
+          'EVERYONE ELSE',
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[fold(), const SizedBox(width: 6), fold(), const SizedBox(width: 6), fold()],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// One move as its button, large, with what it means underneath. [label] starts with the move.
+  Widget _moves(BrutalColors c, String label, String meaning) {
+    final kind = switch (label.split(' ').first) {
+      'Call' => BrutalButtonKind.info,
+      'Raise' || 'All-in' => BrutalButtonKind.primary,
+      _ => BrutalButtonKind.neutral,
+    };
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        SizedBox(
+          width: 240,
+          child: BrutalButton(label: label, kind: kind, heavy: true, onPressed: () {}),
+        ),
+        const SizedBox(height: BrutalMetrics.gapL),
+        Text(meaning, style: _display(c, 34)),
+      ],
+    );
+  }
+
+  /// Two of the ten hands, each with its name above its five cards. [weaker] and [stronger] index
+  /// [handExamples].
+  Widget _handPair(BrutalColors c, int weaker, int stronger) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: <Widget>[
+      for (final index in <int>[weaker, stronger])
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapS),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(handExamples[index].$1.toUpperCase(), style: _display(c, 28)),
+              const SizedBox(height: BrutalMetrics.gapXs),
+              CardRow(cards: _cards(handExamples[index].$2), size: CardSize.board, gap: 6),
+            ],
+          ),
+        ),
+    ],
+  );
+
+  /// Two five-card hands, one above the other, the winner tagged.
+  Widget _versus(BrutalColors c, List<(String, List<String>, bool)> rows) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: <Widget>[
+      for (final (label, cards, wins) in rows)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: BrutalMetrics.gapS),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(label.toUpperCase(), style: _display(c, 26)),
+                  if (wins) ...<Widget>[
+                    const SizedBox(width: BrutalMetrics.gapM),
+                    _winsTag(c),
+                  ],
+                ],
+              ),
+              const SizedBox(height: BrutalMetrics.gapXs),
+              CardRow(cards: _cards(cards), size: CardSize.board, gap: 6),
+            ],
+          ),
+        ),
+    ],
+  );
+
+  /// The board, and two players who show their cards; the first one wins.
+  Widget _showdownScene(BrutalColors c, List<String> board, List<String> alice, List<String> bob) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: <Widget>[
+      BoardView(shown: _cards(board), size: CardSize.board),
+      const SizedBox(height: BrutalMetrics.gapL),
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _player(c, 'Alice', alice, wins: true),
+          const SizedBox(width: BrutalMetrics.gapXl),
+          _player(c, 'Bob', bob),
+        ],
+      ),
     ],
   );
 }

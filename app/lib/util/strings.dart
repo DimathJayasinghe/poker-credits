@@ -486,7 +486,7 @@ abstract final class Strings {
   static const String introTour = 'Take the app tour';
   static const String introTourCaption = 'How hosting, joining and playing work. About 2 minutes.';
   static const String introLearn = 'Learn poker';
-  static const String introLearnCaption = 'New to Texas Hold\'em? The basics in 10 short steps.';
+  static const String introLearnCaption = 'New to Texas Hold\'em? The basics in short, simple steps.';
   static const String introSkip = 'Skip, I know my way';
   static const String nameStepTitle = 'Your name';
   static const String nameStepHeadline = 'What should we call you?';

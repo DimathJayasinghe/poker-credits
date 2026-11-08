@@ -53,7 +53,7 @@ void main() {
 
   testWidgets('learn poker, hands, phone dark', (tester) async {
     await _show(tester, WalkthroughPage(title: Strings.learnTitle, steps: pokerLessonSteps), const Size(390, 844), dark: true);
-    await _next(tester, 6);
+    await _next(tester, pokerLessonSteps.indexWhere((s) => s.art == StepArt.handsRuns));
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/learn_hands_phone_dark.png'));
   });
 

@@ -7,6 +7,7 @@ import 'package:poker_credits/util/guide_content.dart';
 import 'package:poker_credits/util/lesson_content.dart';
 import 'package:poker_credits/util/strings.dart';
 import 'package:poker_credits/util/tour_content.dart';
+import 'package:poker_credits/widget/brutal/app_shell.dart';
 import 'package:poker_protocol/poker_protocol.dart';
 
 import '../support/test_app.dart';
@@ -77,6 +78,76 @@ void main() {
       final all = <String>[...exampleBoard, ...exampleAlice, ...exampleBob];
       expect(all.map(PokerCard.parse).toSet(), hasLength(9));
       expect(lessonBoard.map(PokerCard.parse).toSet(), hasLength(5));
+    });
+
+    test('the flush example uses 9 different cards and Alice really holds five hearts', () {
+      final all = <String>[...flushBoard, ...flushAlice, ...flushBob];
+      expect(all.map(PokerCard.parse).toSet(), hasLength(9));
+      final hearts = <String>[...flushBoard, ...flushAlice].where((c) => c.endsWith('h'));
+      expect(hearts.length, greaterThanOrEqualTo(5), reason: 'Alice has a flush');
+      expect(<String>[...flushBoard, ...flushBob].where((c) => c.endsWith('h')).length, lessThan(5), reason: 'Bob has no flush');
+    });
+
+    test('the two side-by-side pictures use 10 different cards each', () {
+      for (final rows in <List<(String, List<String>, bool)>>[tieBreakRows, kickerRows]) {
+        expect(rows, hasLength(2));
+        expect(rows.where((r) => r.$3), hasLength(1), reason: 'exactly one winner is marked');
+        expect(<PokerCard>{for (final r in rows) ...r.$2.map(PokerCard.parse)}, hasLength(10));
+      }
+    });
+
+    test('the lesson is a gentle one: many short steps, short sentences, each idea once', () {
+      expect(pokerLessonSteps.length, greaterThanOrEqualTo(20), reason: 'one idea per step');
+      for (final step in pokerLessonSteps) {
+        expect(step.body.length, lessThanOrEqualTo(300), reason: '${step.title} is too long to read at a glance');
+        for (final sentence in step.body.split(RegExp(r'[.!?\n]')).where((s) => s.trim().isNotEmpty)) {
+          expect(sentence.trim().split(RegExp(r'\s+')).length, lessThanOrEqualTo(24), reason: '"$sentence" in ${step.title}');
+        }
+      }
+      expect(pokerLessonSteps.map((s) => s.title).toSet(), hasLength(pokerLessonSteps.length), reason: 'no two steps share a title');
+    });
+
+    test('the ten hands are taught weakest first, two a step, each named in the words beside its picture', () {
+      expect(lessonHandPairs, hasLength(5));
+      final seen = <int>[];
+      for (final (art, weaker, stronger) in lessonHandPairs) {
+        final step = pokerLessonSteps.firstWhere((s) => s.art == art);
+        expect(weaker, greaterThan(stronger), reason: 'handExamples lists the strongest first');
+        for (final index in <int>[weaker, stronger]) {
+          expect(step.body.toLowerCase(), contains(handExamples[index].$1.toLowerCase()), reason: step.title);
+        }
+        seen
+          ..add(weaker)
+          ..add(stronger);
+      }
+      expect(seen, <int>[9, 8, 7, 6, 5, 4, 3, 2, 1, 0], reason: 'every hand once, from high card to royal flush');
+      final order = <StepArt>[for (final (art, _, _) in lessonHandPairs) art];
+      final positions = <int>[for (final art in order) pokerLessonSteps.indexWhere((s) => s.art == art)];
+      expect(positions, orderedEquals(<int>[...positions]..sort()), reason: 'in the lesson in that order');
+    });
+
+    test('each word the lesson relies on is explained somewhere in it', () {
+      final all = pokerLessonSteps.map((s) => s.body.toLowerCase()).join('\n');
+      for (final word in <String>[
+        'pot',
+        'hole cards',
+        'board',
+        'pre-flop',
+        'flop',
+        'turn',
+        'river',
+        'dealer button',
+        'blinds',
+        'fold',
+        'check',
+        'call',
+        'raise',
+        'all-in',
+        'showdown',
+        'kicker',
+      ]) {
+        expect(all, contains(word));
+      }
     });
   });
 
@@ -221,6 +292,62 @@ void main() {
       await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
       await tester.pumpAndSettle();
       expect(find.text('open'), findsOneWidget);
+    });
+
+    testWidgets('with skipOpensIt, Skip, the back arrow, the back gesture and Escape all open the other walkthrough', (tester) async {
+      Future<void> openSkipping() async {
+        tester.view
+          ..physicalSize = const Size(390, 844)
+          ..devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          brutalHost(
+            Builder(
+              builder: (context) => TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => WalkthroughPage(
+                      title: 'Tour',
+                      steps: appTourSteps,
+                      followUp: const WalkthroughFollowUp(label: 'Next: learn poker', title: 'Lesson', steps: pokerLessonSteps, skipOpensIt: true),
+                    ),
+                  ),
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+      }
+
+      final leaves = <String, Future<void> Function()>{
+        'Skip': () => tester.tap(find.text(Strings.walkSkip.toUpperCase())),
+        'back arrow': () => tester.tap(find.descendant(of: find.byType(AppTopBar), matching: find.bySemanticsLabel(Strings.back))),
+        'back gesture': () => tester.binding.handlePopRoute(),
+        'Escape': () => tester.sendKeyEvent(LogicalKeyboardKey.escape),
+      };
+      for (final MapEntry(key: how, value: leave) in leaves.entries) {
+        await openSkipping();
+        await leave();
+        await tester.pumpAndSettle();
+        expect(find.text('LESSON'), findsOneWidget, reason: '$how opens the lesson');
+        expect(find.text(pokerLessonSteps.first.title.toUpperCase()), findsOneWidget, reason: how);
+        // The lesson has no follow-up of its own: Skip returns to where the tour was opened from.
+        await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
+        await tester.pumpAndSettle();
+        expect(find.text('open'), findsOneWidget, reason: '$how, then Skip in the lesson');
+        await tester.pumpWidget(const SizedBox());
+      }
+    });
+
+    testWidgets('without skipOpensIt, Skip still just leaves', (tester) async {
+      await openWithFollowUp(tester);
+      await tester.tap(find.text(Strings.walkSkip.toUpperCase()));
+      await tester.pumpAndSettle();
+      expect(find.text('open'), findsOneWidget);
+      expect(find.text('APP TOUR'), findsNothing);
     });
 
     testWidgets('a walkthrough opened without one shows no extra button', (tester) async {
