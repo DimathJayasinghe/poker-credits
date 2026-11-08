@@ -71,7 +71,9 @@ class ShowdownPanel extends StatelessWidget {
     final c = BrutalTheme.of(context).colors;
     final winners = _winners;
     final ordered = _ordered;
-    final shown = maxRows == null ? ordered : ordered.take(maxRows!.clamp(1, ordered.length)).toList();
+    // `take` stops at the end of the list. (Not `clamp(1, ordered.length)`: a hand everyone folded to has
+    // no revealed hands, and clamping into 1..0 throws, which blanked the whole middle of the screen.)
+    final shown = maxRows == null ? ordered : ordered.take(maxRows! < 1 ? 1 : maxRows!).toList();
     final hidden = ordered.length - shown.length;
     return BrutalCard(
       padding: const EdgeInsets.all(BrutalMetrics.gapS),

@@ -265,6 +265,34 @@ void main() {
       expect(find.text('Alice +30'), findsOneWidget);
     });
 
+    testWidgets('the compact panel of a hand everyone folded to has no hands to list and still draws', (tester) async {
+      // The player page asks for at least one row; with no revealed hand there is none to give.
+      await tester.pumpWidget(
+        brutalHost(
+          const ShowdownPanel(
+            compact: true,
+            maxRows: 1,
+            reveals: <Reveal>[],
+            board: <PokerCard>[],
+            result: HandResult(
+              uncontested: true,
+              pots: <PotResult>[
+                PotResult(
+                  potIndex: 0,
+                  amount: 30,
+                  winnerPlayerIds: <String>['p_1'],
+                  shares: <Share>[Share(playerId: 'p_1', name: 'Alice', amount: 30)],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text(Strings.wonUncontested), findsOneWidget);
+      expect(find.text('Alice +30'), findsOneWidget);
+    });
+
     testWidgets('ten hands at text scale 3 on a 320 px screen do not overflow', (tester) async {
       tester.view
         ..physicalSize = const Size(320, 640)

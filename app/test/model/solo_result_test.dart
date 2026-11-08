@@ -99,6 +99,19 @@ void main() {
       expect(SoloResult.from(done, 'p_2', const SoloStats())!.won, isTrue);
       expect(SoloResult.from(done, null, const SoloStats()), isNull);
     });
+
+    test('counts everyone who started when only I have gone out: the first out takes the last place', () {
+      // The server lists a player when they go out: at my exit the order holds just me, third of three.
+      final view =
+          roomView(
+            hand: 9,
+            seats: <SeatView>[seatView(0, 'Maya', chips: 2500), seatView(1, 'Dimath', chips: 0), seatView(2, 'Liam', chips: 500)],
+          ).copyWith(
+            finishOrder: const <Finish>[Finish(playerId: 'p_1', name: 'Dimath', place: 3)],
+          );
+      final result = SoloResult.from(view, 'p_1', const SoloStats())!;
+      expect((result.place, result.of), (3, 3));
+    });
   });
 
   test('newlyOut returns only the places not announced yet', () {

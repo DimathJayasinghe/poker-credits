@@ -241,6 +241,42 @@ void main() {
     await _close(tester);
   });
 
+  testWidgets('a paused game says it is paused, also when it is my turn, and does not wait for anyone', (tester) async {
+    final h = await _playing(tester);
+    // Dimath is at seat 1: coming back from the background leaves the game paused on my turn.
+    await _update(tester, h, _view(active: 1, paused: true));
+    expect(find.textContaining('WAITING FOR'), findsNothing);
+    expect(find.text('PAUSED'), findsOneWidget);
+    expect(find.text('RESUME'), findsOneWidget);
+    await _close(tester);
+  });
+
+  testWidgets('a hand everyone folded to still shows what was won, with no hands to list', (tester) async {
+    final h = await _playing(tester);
+    await _update(
+      tester,
+      h,
+      _view(
+        active: null,
+        result: const HandResult(
+          uncontested: true,
+          pots: <PotResult>[
+            PotResult(
+              potIndex: 0,
+              amount: 30,
+              winnerPlayerIds: <String>['p_1'],
+              shares: <Share>[Share(playerId: 'p_1', name: 'Dimath', amount: 30)],
+            ),
+          ],
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.text('Everyone else folded'), findsOneWidget);
+    expect(find.text('Dimath +30'), findsOneWidget);
+    await _close(tester);
+  });
+
   testWidgets('back asks first and a saved game is offered again on Home', (tester) async {
     final h = await _playing(tester);
     await tester.tap(find.byType(BackCell).first);
@@ -301,7 +337,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(SoloResultPage), findsOneWidget);
       expect(find.text('3RD'), findsOneWidget);
-      expect(find.text('OF 3'), findsOneWidget);
+      expect(find.text('OF 5'), findsOneWidget, reason: 'the first to go out took 5th place: five started');
       expect(find.text('HANDS PLAYED'), findsOneWidget);
       expect(find.text('BEST HAND'), findsOneWidget);
       expect(find.text('PLAY AGAIN'), findsOneWidget);

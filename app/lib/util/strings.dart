@@ -354,6 +354,8 @@ abstract final class Strings {
 
   // Player controller
   static const String yourTurn = 'Your turn';
+  static const String pausedTitle = 'Paused';
+  static const String pausedHint = 'Tap Resume to play on';
   static const String waitingFor = 'Waiting for';
   static const String waitingForHand = 'Waiting for the next hand';
   static const String yourStack = 'Your chips';

@@ -79,7 +79,11 @@ class SoloResult {
   static SoloResult? from(RoomView view, String? myId, SoloStats stats) {
     if (myId == null) return null;
     for (final finish in view.finishOrder) {
-      if (finish.playerId == myId) return SoloResult(place: finish.place, of: view.finishOrder.length, stats: stats);
+      if (finish.playerId != myId) continue;
+      // The server lists a player when they go out, so when I am the first out the order holds only me.
+      // The first to go out takes the last place, so the biggest place listed is how many started.
+      final started = view.finishOrder.fold<int>(0, (most, f) => f.place > most ? f.place : most);
+      return SoloResult(place: finish.place, of: started, stats: stats);
     }
     return null;
   }

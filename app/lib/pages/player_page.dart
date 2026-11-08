@@ -407,6 +407,11 @@ class _PlayerPageState extends State<PlayerPage> with Refena, WidgetsBindingObse
     if (finished != null) {
       title = finished.won ? Strings.soloWon : Strings.soloOut;
       detail = '${Strings.ordinal(finished.place)} ${Strings.soloOutOf} ${finished.of}';
+    } else if (view.paused) {
+      // Nobody is waiting for anyone while the game stands still, and the one who may resume it is me
+      // in a game of my own.
+      title = Strings.pausedTitle;
+      detail = solo ? Strings.pausedHint : null;
     } else if (myTurn) {
       title = Strings.yourTurn;
       detail = remaining == null ? null : '${clock(remaining)} ${Strings.turnLeft}';
