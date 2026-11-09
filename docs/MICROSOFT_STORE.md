@@ -34,7 +34,7 @@ the local network), `privateNetworkClientServer` (host and join on the local net
 
 ## 3. One-time owner steps (Partner Center)
 
-1. Partner Center > Apps and games > New product > **MSIX or PWA app**. Reserve the name **Poker Credits** (a
+1. Partner Center > Apps and games > New product > **Game** (not "MSIX or PWA app": Microsoft's page says "If you want to submit MSIX or PWA game, click on Game", and a game filed as an app is rejected under policy 10.1.21, see section 9). Reserve the name **Poker Credits** (a
    reserved name is held for a limited time; if it is taken, pick a variant without marketing words, policy 10.1.1).
    Choose an individual account name as publisher; a name that reads like a company needs a company account
    (policy 10.14).
@@ -56,7 +56,7 @@ re-checks everything at submission.
 | Page | What to enter |
 | :--- | :--- |
 | Pricing and availability | Free; all markets; visible to everyone; publish as soon as certification passes; no trial |
-| Properties | Category Entertainment. Privacy policy: paste `PRIVACY.md`, or its URL once it is on `main` (<https://github.com/DimathJayasinghe/poker-credits/blob/main/PRIVACY.md>). Website and support contact: the repository and its issues page. Win32 products always need a policy (10.5.1) |
+| Properties | Category **Games**, genre **Card + board** (a game needs at least one genre, up to three; do not pick Casino, it is described as games that let players gamble online). Privacy policy: paste `PRIVACY.md`, or its URL once it is on `main` (<https://github.com/DimathJayasinghe/poker-credits/blob/main/PRIVACY.md>). Website and support contact: the repository and its issues page. Win32 products always need a policy (10.5.1) |
 | Age ratings | The IARC questionnaire, answered truthfully (answers and the result, **Microsoft 18+**, are in `listing.md`). Policy 11.14 (gambling) applies to "real-world gambling transactions" and "payout of winnings which can be converted into items of real-world value"; the chips here have no value and nothing is paid out |
 | Packages | Upload `poker-credits-windows-x64.msix` (x64). The Store checks the identity in the manifest against the product identity and signs the package |
 | Store listing | English (US): description, short description, features, search terms (at most seven, policy 10.1.3), screenshots, logos, copyright line |
@@ -118,3 +118,9 @@ loading and crashed, so no application could be added. Decision: ADR-022. Every 
 (section 5): download `poker-credits-msix` from the "Desktop builds" run of the version tag, then Product > Update >
 Packages. If the account ever gets a tenant, Microsoft's guide is "Publish app updates to Microsoft Store with GitHub
 Actions" on Microsoft Learn.
+
+## 9. Rejected once: 10.1.21 Inaccurate Representation (2026-11-09)
+
+The first product was created as **MSIX or PWA app** with category **Entertainment**. Certification of 1.4.0.0 failed with: "The game is assigned to an app category but has game functionality. Please create a new game in a game category." Microsoft's category page says you "can't choose the Games category when updating an app that you previously published in a different category" and that a game has to be a product of type **Game** with the **Games** category and at least one genre (<https://learn.microsoft.com/windows/apps/publish/publish-your-app/msix/categories-and-subcategories>). The fix is a new product of type Game; steps 1 to 4 of section 3 are repeated for it, and if its Product identity values differ from the old product's, the three `MSSTORE_*` values are replaced and the package is rebuilt, because the Store compares the manifest identity with the product identity. This guide used to say "MSIX or PWA app" and "Entertainment"; both were wrong for a game.
+
+The Game product's Properties page also asks for Game settings; the answers and the source of the definitions are in `packaging/windows/store/listing.md` (Properties). "Local multiplayer" means players connected through a local network, not one shared device.

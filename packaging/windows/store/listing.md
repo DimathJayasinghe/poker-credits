@@ -81,11 +81,15 @@ Made from the real screens by `docs/MICROSOFT_STORE.md` section 6 (1920 x 1080) 
 
 ## Properties
 
-- Category: Entertainment.
+- Category: **Games**, genre **Card + board** (not Casino). The product must be created as type **Game**; a game filed under an app category fails certification (policy 10.1.21).
 - Privacy policy: the text of `PRIVACY.md`, or the URL `https://github.com/DimathJayasinghe/poker-credits/blob/main/PRIVACY.md` once it is on `main`.
 - Website: `https://github.com/DimathJayasinghe/poker-credits`
 - Support contact: `https://github.com/DimathJayasinghe/poker-credits/issues`
 - System requirements: leave empty (no touch, camera or other hardware is needed).
+- Display mode: leave every box unticked (no 4K, HDR, variable refresh rate or mixed reality).
+- Privacy: personal information is transmitted (the player's name goes to the other players): answer **Yes** and give the privacy policy URL above.
+- Game settings (Microsoft's definitions, <https://learn.microsoft.com/gaming/game-publishing/concepts/properties-basic-info>): **Single player** PC; **Local multiplayer** ("players connected through a local network"), minimum 2, maximum 10; **Cross-platform multiplayer** ("players on other devices or game platforms beside Xbox": a Windows PC and Android phones share a table), optional. Leave **Online multiplayer** (internet play, there is no service for it), split screen and every co-op option unticked.
+- Product declarations: leave the defaults; do not tick purchases outside the Store, accessibility-tested or generative AI.
 
 ## Age ratings (IARC questionnaire)
 
