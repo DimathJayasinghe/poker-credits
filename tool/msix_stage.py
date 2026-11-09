@@ -61,7 +61,7 @@ LOGO_SIZES = {
 
 
 def store_version() -> str:
-    """`1.5.2+12` in pubspec.yaml becomes `1.5.2.0`: the Store insists on a last part of 0."""
+    """`1.6.0+13` in pubspec.yaml becomes `1.6.0.0`: the Store insists on a last part of 0."""
     match = re.search(r"^version:\s*(\d+)\.(\d+)\.(\d+)", PUBSPEC.read_text(), re.M)
     if not match:
         raise SystemExit(f"no version in {PUBSPEC}")
