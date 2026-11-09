@@ -1,13 +1,16 @@
 //! The numbers behind a bot's judgement, gathered in one vector so they can be learned.
 //!
-//! [`Tuning::BASE`] is what was set by hand. [`Tuning::LEARNED`] is what the self-play trainer
-//! (`examples/train.rs`) found: an evolution strategy plays candidate vectors against a fixed
-//! field of bots and keeps the ones that win more chips without leaving the style envelope
-//! (how often the bot plays, folds to bets). The learned vector is copied here by hand, so the
-//! shipped bots are deterministic and need no training at run time.
+//! [`Tuning::BASE`] is what was set by hand. [`Tuning::LEARNED`] (Easy and Normal) and
+//! [`Tuning::LEARNED_HARD`] are what the self-play trainer (`examples/train.rs`) found: an
+//! evolution strategy plays candidate vectors, as a Tag-style bot of the level being trained,
+//! against a fixed field of the other five styles, and keeps the ones that win more chips without
+//! leaving the style envelope (how often the bot plays, how often it folds to bets). The learned
+//! vectors are copied here by hand, so the shipped bots are deterministic and need no training at
+//! run time. The simulations feed every bot the whole table's betting, as the live room does, so
+//! the trainer sees the same reads and ranges the game has.
 
 /// How many numbers a tuning has.
-pub const PARAMS: usize = 16;
+pub const PARAMS: usize = 19;
 
 /// One tunable number: its name, hand-set value, and the range the trainer may move it in.
 #[derive(Clone, Copy, Debug)]
@@ -33,22 +36,25 @@ const fn p(name: &'static str, base: f32, min: f32, max: f32) -> Param {
 
 /// The parameters, in the order of [`Tuning::v`].
 pub const SPEC: [Param; PARAMS] = [
-    p("pre_play", 0.42, 0.30, 0.52),
-    p("pre_slope", 0.20, 0.05, 0.35),
-    p("pre_raise", 0.25, 0.05, 0.50),
-    p("pre_premium", 0.07, 0.00, 0.20),
-    p("pre_heat", 0.35, 0.10, 0.60),
-    p("pre_committed", 0.14, 0.00, 0.30),
-    p("pre_raise_floor", 0.74, 0.60, 0.85),
-    p("post_value", 0.60, 0.50, 0.70),
+    p("pre_play", 0.3187, 0.30, 0.52),
+    p("pre_slope", 0.1319, 0.05, 0.35),
+    p("pre_raise", 0.4578, 0.05, 0.50),
+    p("pre_premium", 0.0240, 0.00, 0.20),
+    p("pre_heat", 0.4462, 0.10, 0.60),
+    p("pre_committed", 0.1928, 0.00, 0.30),
+    p("pre_raise_floor", 0.7219, 0.60, 0.85),
+    p("post_value", 0.50, 0.38, 0.70),
     p("post_many", 0.045, 0.02, 0.07),
-    p("post_margin", 0.05, -0.03, 0.12),
+    p("post_margin", 0.00, -0.12, 0.12),
     p("post_commit", 0.08, 0.00, 0.15),
-    p("post_raise_edge", 0.14, 0.08, 0.25),
+    p("post_raise_edge", 0.14, 0.05, 0.25),
     p("cbet", 0.25, 0.00, 0.50),
     p("cbet_aggr", 0.40, 0.00, 0.60),
     p("bet_size", 1.00, 0.60, 1.40),
     p("bluff_scale", 1.00, 0.40, 2.00),
+    p("pos_margin", 0.03, 0.00, 0.08),
+    p("thin_ip", 0.30, 0.00, 0.60),
+    p("semi_bluff", 0.35, 0.00, 0.80),
 ];
 
 /// The judgement numbers of a bot.
@@ -62,22 +68,28 @@ impl Tuning {
     /// The hand-set values.
     pub const BASE: Tuning = Tuning {
         v: [
-            0.42, 0.20, 0.25, 0.07, 0.35, 0.14, 0.74, 0.60, 0.045, 0.05, 0.08, 0.14, 0.25, 0.40,
-            1.00, 1.00,
+            0.3187, 0.1319, 0.4578, 0.0240, 0.4462, 0.1928, 0.7219, 0.50, 0.045, 0.00, 0.08, 0.14,
+            0.25, 0.40, 1.00, 1.00, 0.03, 0.30, 0.35,
         ],
     };
 
-    /// What the trainer learned (see the module documentation): 60 generations of 16 candidates,
-    /// 8000 hands each, seed 1 (`train 60 8000 1`). On 40 fresh seeds, paired with
-    /// [`Tuning::BASE`], it won 103 +- 34 big blinds per 100 hands more as a Tag against the
-    /// five other styles, playing 32% of its hands (BASE 20%) and folding 29% of the bets it
-    /// faced after the flop (BASE 24%), both inside the style envelope the trainer enforces. The
-    /// trainer's `post_margin` (0.106) was set by hand to 0.075 afterwards: same strength (+109 +-
-    /// 44), but it folds 25.6% of the bets it faces instead of 28.8%.
+    /// What the trainer learned for Easy and Normal (`TRAIN_SKILL=normal train 30 3000 21`). The
+    /// preflop numbers (the first seven) stay as set: they keep the six styles at a human scale
+    /// and are the ones the owner has already played against. The trainer learns the play after
+    /// the flop.
     pub const LEARNED: Tuning = Tuning {
         v: [
-            0.3187, 0.1319, 0.4578, 0.0240, 0.4462, 0.1928, 0.7219, 0.6446, 0.0475, 0.0750, 0.0660,
-            0.1120, 0.3800, 0.4904, 1.2296, 0.9460,
+            0.3187, 0.1319, 0.4578, 0.0240, 0.4462, 0.1928, 0.7219, 0.5258, 0.0616, -0.0241,
+            0.0795, 0.1815, 0.3348, 0.2798, 1.0397, 0.8415, 0.0166, 0.4243, 0.4519,
+        ],
+    };
+
+    /// What the trainer learned for Hard (`TRAIN_SKILL=hard train 30 3000 22`, same frozen
+    /// preflop numbers).
+    pub const LEARNED_HARD: Tuning = Tuning {
+        v: [
+            0.3187, 0.1319, 0.4578, 0.0240, 0.4462, 0.1928, 0.7219, 0.4740, 0.0684, -0.0350,
+            0.0547, 0.1347, 0.2947, 0.5595, 1.1041, 0.8795, 0.0563, 0.3955, 0.2033,
         ],
     };
 
@@ -103,6 +115,17 @@ impl Tuning {
         SPEC.iter()
             .position(|s| s.name == name)
             .and_then(|i| self.v.get(i).copied())
+    }
+}
+
+impl Tuning {
+    /// The numbers a bot of this level plays with.
+    #[must_use]
+    pub fn for_skill(skill: crate::skill::Skill) -> Tuning {
+        match skill {
+            crate::skill::Skill::Hard => Tuning::LEARNED_HARD,
+            crate::skill::Skill::Easy | crate::skill::Skill::Normal => Tuning::LEARNED,
+        }
     }
 }
 
@@ -146,6 +169,12 @@ pub mod idx {
     pub const BET_SIZE: usize = 14;
     /// `bluff_scale`
     pub const BLUFF_SCALE: usize = 15;
+    /// `pos_margin`
+    pub const POS_MARGIN: usize = 16;
+    /// `thin_ip`
+    pub const THIN_IP: usize = 17;
+    /// `semi_bluff`
+    pub const SEMI_BLUFF: usize = 18;
 }
 
 #[cfg(test)]

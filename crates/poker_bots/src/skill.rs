@@ -31,7 +31,7 @@ impl Skill {
     pub const fn error_rate(self) -> f32 {
         match self {
             Skill::Easy => 0.16,
-            Skill::Normal => 0.06,
+            Skill::Normal => 0.08,
             Skill::Hard => 0.02,
         }
     }
@@ -41,7 +41,7 @@ impl Skill {
     pub const fn noise(self) -> f32 {
         match self {
             Skill::Easy => 0.12,
-            Skill::Normal => 0.05,
+            Skill::Normal => 0.06,
             Skill::Hard => 0.02,
         }
     }
@@ -51,7 +51,7 @@ impl Skill {
     pub const fn read_threshold(self) -> u32 {
         match self {
             Skill::Easy => u32::MAX,
-            Skill::Normal => 25,
+            Skill::Normal => 30,
             Skill::Hard => 10,
         }
     }
@@ -61,7 +61,7 @@ impl Skill {
     pub const fn read_gain(self) -> f32 {
         match self {
             Skill::Easy => 0.0,
-            Skill::Normal => 0.5,
+            Skill::Normal => 0.4,
             Skill::Hard => 1.0,
         }
     }

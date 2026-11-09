@@ -8,7 +8,9 @@
     clippy::too_many_lines
 )]
 
-use poker_bots::{BotMind, BotRng, PublicAction, decide, view_for_seat};
+use poker_bots::decide::legalize;
+use poker_bots::{BotMind, BotRng, BotView, PublicAction, decide, view_for_seat};
+use poker_engine::PlayerAction;
 use poker_engine::validator::resolve;
 use poker_engine::{Command, Event, GameState, Phase, apply, showdown};
 
@@ -18,6 +20,9 @@ pub struct Bot {
     pub mind: BotMind,
     pub rng: BotRng,
 }
+
+/// A scripted player: a function of what the seat can see (a stand-in for a human's habit).
+pub type Script = fn(&BotView, &mut BotRng) -> PlayerAction;
 
 /// What happened to the seats in one hand.
 pub struct HandLog {
@@ -53,6 +58,17 @@ fn total(state: &GameState, i: usize) -> i64 {
 pub fn play_hand(
     state: &mut GameState,
     bots: &mut [Bot],
+    deck_rng: &mut BotRng,
+) -> Result<Option<HandLog>, String> {
+    play_hand_with(state, bots, &[], deck_rng)
+}
+
+/// Like [`play_hand`], but a seat with a script plays the script instead of the strategy (it still
+/// watches the hand, so bots keep their notes on it).
+pub fn play_hand_with(
+    state: &mut GameState,
+    bots: &mut [Bot],
+    scripts: &[Option<Script>],
     deck_rng: &mut BotRng,
 ) -> Result<Option<HandLog>, String> {
     let n = bots.len();
@@ -98,7 +114,13 @@ pub fn play_hand(
         let view =
             view_for_seat(&state.table, active, &history).ok_or("no view for the acting seat")?;
         let bot = &mut bots[index];
-        let decision = decide(&view, &mut bot.mind, &mut bot.rng);
+        let decision = match scripts.get(index).copied().flatten() {
+            Some(script) => poker_bots::Decision {
+                action: legalize(script(&view, &mut bot.rng), &view),
+                think_ms: 0,
+            },
+            None => decide(&view, &mut bot.mind, &mut bot.rng),
+        };
         let seat_ref = state.table.seat(active).unwrap();
         resolve(&state.table, seat_ref, decision.action).map_err(|e| {
             format!(
@@ -132,12 +154,17 @@ pub fn play_hand(
                 {
                     raised_preflop[usize::from(seat_no.get())] = true;
                 }
-                history.push(PublicAction {
+                let seen = PublicAction {
                     seat: seat_no,
                     street,
                     kind: *action,
                     amount: *amount,
-                });
+                };
+                history.push(seen);
+                // Everybody at the table sees every action, as in the live room.
+                for watcher in bots.iter_mut() {
+                    watcher.mind.observe_action(&seen);
+                }
             }
         }
         *state = transition.state;

@@ -4,18 +4,18 @@
 
 use std::time::Duration;
 
-use poker_engine::card::Card;
-use poker_engine::hand_rank::{HandCategory, best_of};
 use poker_engine::{ActionKind, PlayerAction};
 use poker_engine::{HandStatus, Phase};
 
-use crate::equity::equity;
+use crate::equity::equity_against;
+use crate::hand::{StraightDraw, blockers, draws, made_hand_tier, wetness};
 use crate::notes::{Notes, Reads};
 use crate::observe::num;
 use crate::personality::Personality;
+use crate::range::RangeProfile;
 use crate::rng::BotRng;
 use crate::skill::Skill;
-use crate::strength::{preflop_adjust, preflop_strength};
+use crate::strength::{preflop_adjust, preflop_strength, push_fraction, top_fraction_threshold};
 use crate::tuning::{Tuning, idx};
 use crate::view::BotView;
 use crate::view::{PublicAction, Reveal};
@@ -51,7 +51,7 @@ impl BotMind {
             mood: 0.0,
             notes: Notes::default(),
             equity_budget: Some(EQUITY_BUDGET),
-            tuning: Tuning::LEARNED,
+            tuning: Tuning::for_skill(skill),
         }
     }
 }
@@ -147,37 +147,37 @@ fn late_position(view: &BotView) -> f32 {
     }
 }
 
-fn made_hand_tier(hole: [Card; 2], board: &[Card], opponents: usize) -> f32 {
-    let mut cards = hole.to_vec();
-    cards.extend_from_slice(board);
-    let Ok(rank) = best_of(&cards) else {
-        return 0.3;
-    };
-    let top_board = board.iter().map(|c| c.rank).max();
-    let base: f32 = match rank.category() {
-        HandCategory::HighCard => 0.24,
-        HandCategory::Pair => {
-            let paired_with_hole = hole.iter().any(|h| board.iter().any(|b| b.rank == h.rank))
-                || hole[0].rank == hole[1].rank;
-            let high = top_board.is_some_and(|top| hole.iter().any(|h| h.rank >= top));
-            if paired_with_hole && high {
-                0.68
-            } else if paired_with_hole {
-                0.52
-            } else {
-                0.30
-            }
-        }
-        HandCategory::TwoPair => 0.72,
-        HandCategory::ThreeOfAKind => 0.80,
-        HandCategory::Straight => 0.86,
-        HandCategory::Flush => 0.90,
-        HandCategory::FullHouse => 0.95,
-        HandCategory::FourOfAKind | HandCategory::StraightFlush => 0.99,
-    };
-    #[allow(clippy::cast_precision_loss, reason = "at most nine opponents")]
-    let extra = opponents.saturating_sub(1) as f32;
-    base.powf(1.0 + 0.12 * extra)
+/// Why a bot bets: the size of a bet follows the intent for a weaker player (a tell a human can
+/// read) and the board for a strong one (it gives nothing away).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Intent {
+    Value,
+    Cbet,
+    Probe,
+    Bluff,
+}
+
+/// Pot fraction multiplier for a bet.
+fn bet_scale(
+    skill: Skill,
+    intent: Intent,
+    preflop: bool,
+    board: &[poker_engine::card::Card],
+) -> f32 {
+    if preflop {
+        return if intent == Intent::Bluff { 0.8 } else { 1.0 };
+    }
+    match (skill, intent) {
+        // One size for the board, whatever the hand: wet boards get bigger bets.
+        (Skill::Hard, _) => 0.7 + 0.5 * wetness(board),
+        (Skill::Normal, Intent::Value) => 1.0,
+        (Skill::Normal | Skill::Easy, Intent::Cbet) => 0.6,
+        (Skill::Normal, Intent::Probe) => 0.55,
+        (Skill::Normal, Intent::Bluff) => 0.8,
+        // A beginner's sizes say what it holds: big with a hand, small without.
+        (Skill::Easy, Intent::Value) => 1.25,
+        (Skill::Easy, Intent::Probe | Intent::Bluff) => 0.5,
+    }
 }
 
 /// Raise-to amount for the situation, as an action (an all-in when it reaches the stack).
@@ -186,10 +186,10 @@ fn sized_raise(
     mind: &BotMind,
     rng: &mut BotRng,
     preflop: bool,
-    scale: f32,
+    intent: Intent,
 ) -> PlayerAction {
     let p = &mind.personality;
-    let scale = scale * mind.tuning.at(idx::BET_SIZE);
+    let scale = bet_scale(mind.skill, intent, preflop, &view.board) * mind.tuning.at(idx::BET_SIZE);
     let my_bet = view.my_seat().map_or(0.0, |s| num(s.street_bet));
     let current = my_bet + num(view.to_call);
     let big = num(view.blinds.big_blind).max(1.0);
@@ -220,13 +220,40 @@ fn sized_raise(
     }
 }
 
+/// A beginner's habit: it keeps overvaluing or undervaluing its hands by the same amount (fixed for
+/// this bot), so a player can learn it. Between -0.05 and +0.05 of equity.
+fn easy_bias(p: &Personality) -> f32 {
+    let mix = p.size_habit * 7.3 + p.tilt * 3.1 + p.think_speed * 5.7 + p.looseness * 2.3;
+    (mix.fract() - 0.5) * 0.10
+}
+
+/// How willing a level is to bluff, as a multiplier (beginners hardly ever do).
+fn bluff_taste(skill: Skill) -> f32 {
+    match skill {
+        Skill::Easy => 0.25,
+        Skill::Normal | Skill::Hard => 1.0,
+    }
+}
+
+/// Position as the bot understands it: a beginner does not know the button is worth anything.
+fn position(view: &BotView, skill: Skill) -> f32 {
+    if skill == Skill::Easy {
+        0.5
+    } else {
+        late_position(view)
+    }
+}
+
 /// The wanted action and how close the call was (0 clear, 1 agonising).
 fn choose(view: &BotView, mind: &BotMind, rng: &mut BotRng) -> (PlayerAction, f32) {
     let skill = mind.skill;
     let p = mind.personality;
     let opponents = view.opponents_in_hand().max(1);
     let reads = mind.notes.reads(view, skill, &p);
-    let noise = rng.jitter(0.0, skill.noise());
+    let mut noise = rng.jitter(0.0, skill.noise());
+    if skill == Skill::Easy {
+        noise += easy_bias(&p);
+    }
     let tilt = mind.mood * 0.10 * p.tilt;
     if view.board.is_empty() {
         preflop(view, mind, &p, reads, noise + tilt, opponents, rng)
@@ -244,6 +271,116 @@ fn pot_odds(view: &BotView) -> f32 {
     }
 }
 
+/// Stacks this short (in big blinds) play push or fold.
+const SHORT_STACK_BB: f32 = 12.0;
+
+/// Facing a raise that puts a lot of chips at stake: the price against what the raiser holds.
+/// Beginners go by the strength of their cards.
+fn versus_raise(
+    view: &BotView,
+    mind: &BotMind,
+    rng: &mut BotRng,
+    raw: f32,
+    shift: f32,
+    reads: Reads,
+) -> (PlayerAction, f32) {
+    let t = &mind.tuning;
+    let skill = mind.skill;
+    let owed = num(view.to_call);
+    let stack = num(view.my_chips());
+    let big = num(view.blinds.big_blind).max(1.0);
+    let odds = pot_odds(view);
+    let all_in_call = owed >= stack || !view.legal.can_raise;
+    if skill.samples() == 0 {
+        let play = t.at(idx::PRE_PLAY) - t.at(idx::PRE_SLOPE) * mind.personality.looseness;
+        let s = raw + shift;
+        let closeness = 1.0 - ((s - play).abs() * 4.0).min(1.0);
+        if s >= play + 0.03 || (owed <= stack * 0.15 && s >= play - 0.1) {
+            let action = if all_in_call {
+                PlayerAction::Call
+            } else {
+                PlayerAction::AllIn
+            };
+            return (action, closeness);
+        }
+        return (PlayerAction::Fold, closeness);
+    }
+    // Only players who put chips in matter: the ones yet to act may still fold.
+    let ranges = mind
+        .notes
+        .profiles_for(view, skill, |seat| seat.hand_contrib.get() > 0);
+    let ranges = if ranges.is_empty() {
+        vec![RangeProfile::ANY]
+    } else {
+        ranges
+    };
+    let _ = rng.next_u64();
+    let mut sampler = BotRng::from_seed(spot_seed(view, &ranges));
+    let e = equity_against(
+        view.hole,
+        &[],
+        &ranges,
+        (skill.samples() / 2).max(60),
+        &mut sampler,
+        mind.equity_budget,
+    ) + shift;
+    let margin = if skill == Skill::Hard { 0.02 } else { 0.04 } + reads.caution;
+    let closeness = (1.0 - ((e - (odds + margin)).abs() * 5.0).min(1.0)).clamp(0.0, 1.0);
+    if e >= odds + margin + 0.14 && !all_in_call && owed < stack * 0.5 {
+        let stack_bb = stack / big;
+        return if stack_bb <= SHORT_STACK_BB {
+            (PlayerAction::AllIn, closeness)
+        } else {
+            (sized_raise(view, mind, rng, true, Intent::Value), closeness)
+        };
+    }
+    if e >= odds + margin {
+        (PlayerAction::Call, closeness)
+    } else {
+        (PlayerAction::Fold, closeness)
+    }
+}
+
+/// Push or fold: with a short stack the choice is all the chips or none, by position and the number
+/// of players left to act.
+fn short_stack(
+    view: &BotView,
+    mind: &BotMind,
+    rng: &mut BotRng,
+    raw: f32,
+    shift: f32,
+    reads: Reads,
+    opponents: usize,
+) -> (PlayerAction, f32) {
+    let skill = mind.skill;
+    let big = num(view.blinds.big_blind).max(1.0);
+    let stack = num(view.my_chips());
+    let owed = num(view.to_call);
+    if owed > big * 1.01 {
+        return versus_raise(view, mind, rng, raw, shift, reads);
+    }
+    let late = position(view, skill);
+    let width = push_fraction(stack / big, late, opponents);
+    let threshold = top_fraction_threshold(width);
+    let s = raw + shift;
+    let closeness = 1.0 - ((s - threshold).abs() * 5.0).min(1.0);
+    if s >= threshold && !(view.legal.can_check && owed <= 0.0) {
+        return if view.legal.can_raise {
+            (PlayerAction::AllIn, closeness)
+        } else {
+            (PlayerAction::Call, closeness)
+        };
+    }
+    if view.legal.can_check {
+        return (PlayerAction::Check, closeness);
+    }
+    // A cheap completion of the blind is still worth a look with a playable hand.
+    if owed <= stack * 0.1 && s >= threshold - 0.15 {
+        return (PlayerAction::Call, closeness);
+    }
+    (PlayerAction::Fold, closeness)
+}
+
 fn preflop(
     view: &BotView,
     mind: &BotMind,
@@ -254,10 +391,10 @@ fn preflop(
     rng: &mut BotRng,
 ) -> (PlayerAction, f32) {
     let t = &mind.tuning;
-    let bluff_boost = reads.bluff_boost * t.at(idx::BLUFF_SCALE);
-    let s = preflop_adjust(preflop_strength(view.hole), late_position(view), opponents)
-        + shift
-        + reads.strength_shift;
+    let bluff_boost = reads.bluff_boost * t.at(idx::BLUFF_SCALE) * bluff_taste(mind.skill);
+    let raw = preflop_strength(view.hole);
+    let late = position(view, mind.skill);
+    let s = preflop_adjust(raw, late, opponents) + shift + reads.strength_shift;
     let play = t.at(idx::PRE_PLAY) - t.at(idx::PRE_SLOPE) * p.looseness;
     let big = num(view.blinds.big_blind).max(1.0);
     let owed = num(view.to_call);
@@ -265,32 +402,28 @@ fn preflop(
     let facing_raise = owed > big * 1.01;
     let closeness = 1.0 - ((s - play).abs() * 4.0).min(1.0);
     let can_check = view.legal.can_check;
-    let free = if can_check {
-        PlayerAction::Check
-    } else {
-        PlayerAction::Fold
-    };
 
-    // Short stack: push or fold.
-    if stack <= big * 10.0 {
-        if s >= play + 0.03 || (owed <= stack * 0.15 && s >= play - 0.1 && !can_check) {
-            return (
-                if owed >= stack || !view.legal.can_raise {
-                    PlayerAction::Call
-                } else {
-                    PlayerAction::AllIn
-                },
-                closeness,
-            );
-        }
-        return (free, closeness);
+    if stack <= big * SHORT_STACK_BB {
+        return short_stack(
+            view,
+            mind,
+            rng,
+            raw,
+            shift + reads.strength_shift,
+            reads,
+            opponents,
+        );
+    }
+    // A raise that costs a third of the stack or more: weigh it against what the raiser holds.
+    if facing_raise && owed >= stack * 0.3 && owed > big * 3.0 {
+        return versus_raise(view, mind, rng, raw, shift + reads.strength_shift, reads);
     }
     if !facing_raise {
         if s >= play {
             return if rng.chance(
                 t.at(idx::PRE_RAISE) + (1.0 - t.at(idx::PRE_RAISE)) * p.aggression * p.aggression,
             ) {
-                (sized_raise(view, mind, rng, true, 1.0), closeness)
+                (sized_raise(view, mind, rng, true, Intent::Value), closeness)
             } else if view.legal.can_call {
                 (PlayerAction::Call, closeness)
             } else {
@@ -299,15 +432,15 @@ fn preflop(
         }
         if can_check {
             if rng.chance(p.bluff * 0.25 * bluff_boost) {
-                return (sized_raise(view, mind, rng, true, 0.8), closeness);
+                return (sized_raise(view, mind, rng, true, Intent::Bluff), closeness);
             }
             return (PlayerAction::Check, closeness);
         }
         if s >= play - 0.08 && rng.chance(p.looseness * 0.6) {
             return (PlayerAction::Call, closeness);
         }
-        if late_position(view) > 0.8 && rng.chance(p.bluff * 0.5 * bluff_boost) {
-            return (sized_raise(view, mind, rng, true, 1.0), closeness);
+        if late > 0.8 && rng.chance(p.bluff * 0.5 * bluff_boost) {
+            return (sized_raise(view, mind, rng, true, Intent::Value), closeness);
         }
         return (PlayerAction::Fold, closeness);
     }
@@ -320,19 +453,19 @@ fn preflop(
         play + 0.07 + 0.35 * heat * (1.0 - 0.5 * p.looseness) + reads.caution - 0.14 * committed;
     let raise_floor = 0.74 - 0.12 * p.aggression;
     if s >= raise_floor && rng.chance(0.5 + 0.5 * p.aggression) {
-        (sized_raise(view, mind, rng, true, 1.0), closeness)
+        (sized_raise(view, mind, rng, true, Intent::Value), closeness)
     } else if s >= call_floor {
         (PlayerAction::Call, closeness)
     } else if s >= 0.28 && rng.chance(p.bluff * 0.18 * bluff_boost) {
-        (sized_raise(view, mind, rng, true, 1.0), closeness)
+        (sized_raise(view, mind, rng, true, Intent::Value), closeness)
     } else {
         (PlayerAction::Fold, closeness)
     }
 }
 
-/// A seed that depends only on what the seat can see of the spot (its cards, the board and how
-/// many opponents are in), so equity sampling is repeatable.
-fn spot_seed(view: &BotView, opponents: usize) -> u64 {
+/// A seed that depends only on what the seat can see of the spot (its cards, the board, and who
+/// is in with what range), so equity sampling is repeatable.
+fn spot_seed(view: &BotView, ranges: &[RangeProfile]) -> u64 {
     let mut hash: u64 = 0xCBF2_9CE4_8422_2325;
     let mut mix = |byte: u64| {
         hash ^= byte;
@@ -342,7 +475,13 @@ fn spot_seed(view: &BotView, opponents: usize) -> u64 {
         mix(card.rank as u64);
         mix(card.suit as u64 + 16);
     }
-    mix(opponents as u64 + 64);
+    mix(ranges.len() as u64 + 64);
+    for range in ranges {
+        mix(u64::from(range.pre_min.to_bits()));
+        mix(u64::from(range.bluff.to_bits()));
+        mix(u64::from(range.aggressive_streets) + 128);
+        mix(u64::from(range.called_bets) + 192);
+    }
     hash
 }
 
@@ -357,6 +496,25 @@ fn was_preflop_aggressor(view: &BotView) -> bool {
         .is_some_and(|a| a.seat == view.me)
 }
 
+/// What a beginner makes of a draw: it counts the outs as part of its hand.
+fn draw_bonus(view: &BotView) -> f32 {
+    if view.board.len() >= 5 {
+        return 0.0;
+    }
+    let d = draws(view.hole, &view.board);
+    let flush = if d.flush { 0.14 } else { 0.0 };
+    let straight = match d.straight {
+        StraightDraw::OpenEnded => 0.12,
+        StraightDraw::Gutshot => 0.05,
+        StraightDraw::None => 0.0,
+    };
+    flush + straight
+}
+
+#[allow(
+    clippy::too_many_lines,
+    reason = "one decision tree, read top to bottom"
+)]
 fn postflop(
     view: &BotView,
     mind: &BotMind,
@@ -368,26 +526,42 @@ fn postflop(
 ) -> (PlayerAction, f32) {
     let skill = mind.skill;
     let t = &mind.tuning;
-    let bluff_boost = reads.bluff_boost * t.at(idx::BLUFF_SCALE);
-    let raw = if skill.samples() == 0 {
-        made_hand_tier(view.hole, &view.board, opponents)
+    let bluff_boost = reads.bluff_boost * t.at(idx::BLUFF_SCALE) * bluff_taste(skill);
+    let my_draws = draws(view.hole, &view.board);
+    // Cards that keep a rival from holding the best hand make a better bluff.
+    let blocks = if skill == Skill::Hard {
+        0.4 + 1.6 * blockers(view.hole, &view.board)
     } else {
-        // The estimate is a function of the spot alone: the same cards against the same number
-        // of opponents always sample the same deals, so a bot does not flip between a call and a
-        // fold because two runs of the same dice disagreed. One draw is still taken from `rng`
-        // so the rest of the stream does not depend on whether equity was needed.
+        1.0
+    };
+    let raw = if skill.samples() == 0 {
+        made_hand_tier(view.hole, &view.board, opponents) + draw_bonus(view)
+    } else {
+        // The estimate is a function of the spot alone: the same cards against the same rivals
+        // always sample the same deals, so a bot does not flip between a call and a fold because
+        // two runs of the same dice disagreed. One draw is still taken from `rng` so the rest of
+        // the stream does not depend on whether equity was needed.
         let _ = rng.next_u64();
-        let mut sampler = BotRng::from_seed(spot_seed(view, opponents));
-        equity(
+        let ranges = mind.notes.profiles(view, skill);
+        let mut sampler = BotRng::from_seed(spot_seed(view, &ranges));
+        equity_against(
             view.hole,
             &view.board,
-            opponents,
+            &ranges,
             skill.samples(),
             &mut sampler,
             mind.equity_budget,
         )
     };
-    let e = raw + shift + reads.strength_shift;
+    // The ranges already carry what the notes say about each rival, so only the bluff boost of
+    // the reads is used after the flop.
+    let e = raw + shift;
+    // In position (+0.5) a bot can bet thinner and call lighter than out of position (-0.5).
+    let ip = match skill {
+        Skill::Hard => position(view, skill) - 0.5,
+        Skill::Normal => 0.5 * (position(view, skill) - 0.5),
+        Skill::Easy => 0.0,
+    };
     #[allow(clippy::cast_precision_loss, reason = "at most nine opponents")]
     let many = (opponents - 1).min(5) as f32;
     let value = (t.at(idx::POST_VALUE) - t.at(idx::POST_MANY) * many - 0.08 * (p.aggression - 0.5))
@@ -395,14 +569,22 @@ fn postflop(
     #[allow(clippy::cast_precision_loss, reason = "at most nine opponents")]
     let field = opponents as f32;
     let owed = num(view.to_call);
+    let river = view.board.len() >= 5;
     if owed <= 0.0 {
         let closeness = 1.0 - ((e - value).abs() * 4.0).min(1.0);
+        // Against rivals who pay with worse hands a thinner value bet is profitable; against
+        // rivals who fold, a bet needs more behind it (the reads are neutral until there is
+        // enough to go on).
+        let e = e + ((1.0 - reads.bluff_boost).clamp(-0.2, 0.5) * 0.10).max(-0.02);
         if e >= value {
             if e >= value + 0.18 && rng.chance(p.trap * 0.6) {
                 return (PlayerAction::Check, closeness);
             }
             return if rng.chance(0.45 + 0.55 * p.aggression) {
-                (sized_raise(view, mind, rng, false, 1.0), closeness)
+                (
+                    sized_raise(view, mind, rng, false, Intent::Value),
+                    closeness,
+                )
             } else {
                 (PlayerAction::Check, closeness)
             };
@@ -414,13 +596,47 @@ fn postflop(
             && was_preflop_aggressor(view)
             && rng.chance(t.at(idx::CBET) + t.at(idx::CBET_AGGR) * p.aggression)
         {
-            return (sized_raise(view, mind, rng, false, 0.6), closeness);
+            return (sized_raise(view, mind, rng, false, Intent::Cbet), closeness);
         }
-        if e < 0.34 && rng.chance(p.bluff * 0.5 / field * bluff_boost) {
-            return (sized_raise(view, mind, rng, false, 0.8), closeness);
+        // Checked to with nothing, against one or two players who fold too often: take it.
+        if skill != Skill::Easy && opponents <= 2 && reads.bluff_boost > 1.15 && !river {
+            let steal = ((reads.bluff_boost - 1.0) * 0.45).clamp(0.0, 0.6) / field.max(1.0);
+            if rng.chance(steal) {
+                return (
+                    sized_raise(view, mind, rng, false, Intent::Bluff),
+                    closeness,
+                );
+            }
         }
-        if e >= value - 0.12 && rng.chance(0.2 + 0.4 * p.aggression) {
-            return (sized_raise(view, mind, rng, false, 0.55), closeness);
+        // A semi-bluff: a hand that can still improve bets for two reasons.
+        if skill != Skill::Easy && my_draws.any() && !river {
+            let weight = if my_draws.strong() { 1.0 } else { 0.5 };
+            let chance =
+                (t.at(idx::SEMI_BLUFF) + 0.3 * p.aggression) * weight * bluff_boost.min(1.5);
+            if rng.chance(chance) {
+                return (
+                    sized_raise(view, mind, rng, false, Intent::Bluff),
+                    closeness,
+                );
+            }
+        }
+        let river_shy = if skill == Skill::Normal && river {
+            0.7
+        } else {
+            1.0
+        };
+        if e < 0.34 && rng.chance(p.bluff * 0.5 / field * bluff_boost * blocks * river_shy) {
+            return (
+                sized_raise(view, mind, rng, false, Intent::Bluff),
+                closeness,
+            );
+        }
+        let thin = (0.2 + 0.4 * p.aggression + t.at(idx::THIN_IP) * 2.0 * ip).clamp(0.0, 1.0);
+        if e >= value - 0.12 && rng.chance(thin) {
+            return (
+                sized_raise(view, mind, rng, false, Intent::Probe),
+                closeness,
+            );
         }
         return (PlayerAction::Check, closeness);
     }
@@ -437,17 +653,44 @@ fn postflop(
     } else {
         0.0
     };
-    let margin = t.at(idx::POST_MARGIN) - 0.10 * (p.looseness - 0.5) + reads.caution - commit_bonus;
+    // Normal players over-fold to a big river bet: a hole a human can learn to use.
+    let river_leak = if skill == Skill::Normal && river {
+        0.025
+    } else {
+        0.0
+    };
+    let margin = t.at(idx::POST_MARGIN)
+        - 0.10 * (p.looseness - 0.5)
+        - commit_bonus
+        - t.at(idx::POS_MARGIN) * 2.0 * ip
+        + river_leak;
     let closeness =
         (1.0 - ((e - (odds + margin)).abs() * 4.0).min(1.0) + odds * 0.3).clamp(0.0, 1.0);
     if e >= value + t.at(idx::POST_RAISE_EDGE)
         && rng.chance(0.3 + 0.6 * p.aggression * (1.0 - p.trap))
     {
-        (sized_raise(view, mind, rng, false, 1.0), closeness)
+        (
+            sized_raise(view, mind, rng, false, Intent::Value),
+            closeness,
+        )
+    } else if skill == Skill::Hard
+        && my_draws.strong()
+        && !river
+        && left_after_call > 2.0 * pot_now
+        && rng.chance(0.5 * t.at(idx::SEMI_BLUFF) * (0.4 + p.aggression) * bluff_boost.min(1.5))
+    {
+        // Raising a draw: it wins when they fold and can still win when they call.
+        (
+            sized_raise(view, mind, rng, false, Intent::Bluff),
+            closeness,
+        )
     } else if e >= odds + margin {
         (PlayerAction::Call, closeness)
-    } else if e < 0.30 && rng.chance(p.bluff * 0.12 * bluff_boost) {
-        (sized_raise(view, mind, rng, false, 1.0), closeness)
+    } else if e < 0.30 && rng.chance(p.bluff * 0.12 * bluff_boost * blocks) {
+        (
+            sized_raise(view, mind, rng, false, Intent::Bluff),
+            closeness,
+        )
     } else {
         (PlayerAction::Fold, closeness)
     }

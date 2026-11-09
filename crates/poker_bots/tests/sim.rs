@@ -334,3 +334,68 @@ fn measure_fold_rates() {
         );
     }
 }
+
+#[test]
+fn the_harness_shows_every_bot_what_everybody_did() {
+    // The live room tells every bot about every action; the simulations must too, or the reads
+    // (and the ranges built from them) would never be exercised.
+    let kinds = [Archetype::Maniac, Archetype::Tag, Archetype::Rock];
+    let mut bots: Vec<Bot> = kinds
+        .into_iter()
+        .enumerate()
+        .map(|(i, k)| bot(k, Skill::Hard, 70 + i as u64))
+        .collect();
+    let mut state = table(&[START; 3], 10, 20);
+    let mut deck_rng = BotRng::from_seed(5);
+    for _ in 0..60 {
+        play_hand(&mut state, &mut bots, &mut deck_rng).unwrap();
+    }
+    let maniac_seat = poker_engine::SeatIndex::new(0).unwrap();
+    let seen = bots[2].mind.notes.stats(maniac_seat);
+    assert!(
+        seen.hands >= 8 && seen.vpip * 2 >= seen.hands && seen.pfr >= 2,
+        "the rock should have noted the maniac raising: {seen:?}"
+    );
+}
+
+#[test]
+fn styles_stay_at_a_human_scale() {
+    // Whatever the level, a table of the six styles plays like a real table: some tight, some
+    // wild, an average near a third of the hands, nobody playing every hand.
+    let kinds = [
+        Archetype::Rock,
+        Archetype::Tag,
+        Archetype::Lag,
+        Archetype::CallingStation,
+        Archetype::Maniac,
+        Archetype::NitTrapper,
+    ];
+    for (skill, cap, rock_cap) in [
+        (Skill::Easy, 0.52, 0.45),
+        (Skill::Normal, 0.45, 0.25),
+        (Skill::Hard, 0.45, 0.25),
+    ] {
+        let bots: Vec<Bot> = kinds
+            .into_iter()
+            .enumerate()
+            .map(|(i, k)| bot(k, skill, 200 + i as u64))
+            .collect();
+        let s = run(bots, 2500, 31);
+        let mean = s.vpip.iter().sum::<f64>() / s.vpip.len() as f64;
+        eprintln!("{skill:?}: vpip {:?} mean {mean:.2}", s.vpip);
+        assert!(
+            mean > 0.22 && mean < cap,
+            "{skill:?}: the table plays {mean:.2} of its hands"
+        );
+        assert!(
+            s.vpip[0] < rock_cap,
+            "{skill:?}: a rock plays {:.2}",
+            s.vpip[0]
+        );
+        assert!(
+            s.vpip[4] < 0.72,
+            "{skill:?}: a maniac plays {:.2}",
+            s.vpip[4]
+        );
+    }
+}

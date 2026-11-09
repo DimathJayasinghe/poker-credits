@@ -159,11 +159,11 @@ fn reads_need_enough_hands() {
             }
         }
     };
-    feed(&mut n, 24);
+    feed(&mut n, 29);
     assert_eq!(
         n.reads(&view, Skill::Normal, &trusting()),
         Reads::NEUTRAL,
-        "Normal needs 25 hands"
+        "Normal needs 30 hands"
     );
     assert_ne!(
         n.reads(&view, Skill::Hard, &trusting()),
@@ -233,10 +233,10 @@ fn a_known_bluffer_is_called_lighter_and_a_rock_is_respected() {
 
 #[test]
 fn notes_hold_only_counters() {
-    // The notes cannot contain a card: the opponent record is nine small integers.
+    // The notes cannot contain a card: the opponent record is eleven small integers.
     assert_eq!(
         std::mem::size_of::<OppStats>(),
-        9 * std::mem::size_of::<u16>()
+        11 * std::mem::size_of::<u16>()
     );
 }
 

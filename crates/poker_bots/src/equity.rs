@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use poker_engine::card::{Card, Rank, Suit};
 use poker_engine::hand_rank::best_of;
 
+use crate::range::RangeProfile;
 use crate::rng::BotRng;
 
 /// Samples taken before a time budget may stop the loop.
@@ -38,6 +39,65 @@ pub fn equity(
     rng: &mut BotRng,
     budget: Option<Duration>,
 ) -> f32 {
+    let ranges = vec![RangeProfile::ANY; opponents];
+    equity_against(hole, board, &ranges, samples, rng, budget)
+}
+
+/// Tries to deal an opponent a hand the profile would plausibly hold before giving up.
+const DEAL_TRIES: usize = 8;
+
+/// Deals the two cards at `at` and `at + 1` from the rest of the deck, trying again when the
+/// profile finds the hand unlikely. Returns the weight to give the sample: 1.0 when a hand was
+/// accepted, the (small) weight of the last hand tried when none was.
+fn deal_hand(
+    deck: &mut [Card],
+    at: usize,
+    profile: &RangeProfile,
+    board: &[Card],
+    rng: &mut BotRng,
+) -> f32 {
+    if profile.is_any() {
+        for i in at..at + 2 {
+            let remaining = u32::try_from(deck.len() - i).unwrap_or(1);
+            let j = i + usize::try_from(rng.below(remaining)).unwrap_or(0);
+            deck.swap(i, j);
+        }
+        return 1.0;
+    }
+    let mut weight = 1.0;
+    for _ in 0..DEAL_TRIES {
+        for i in at..at + 2 {
+            let remaining = u32::try_from(deck.len() - i).unwrap_or(1);
+            let j = i + usize::try_from(rng.below(remaining)).unwrap_or(0);
+            deck.swap(i, j);
+        }
+        let (Some(a), Some(b)) = (deck.get(at).copied(), deck.get(at + 1).copied()) else {
+            return 1.0;
+        };
+        weight = profile.weight([a, b], board);
+        if weight >= 1.0 || rng.unit() < weight {
+            return 1.0;
+        }
+    }
+    weight
+}
+
+/// My chance of winning against opponents whose hands are drawn from `ranges` (one profile per
+/// opponent): the hands they would bet, call or raise with are dealt more often than the rest.
+///
+/// A sample where no plausible hand turned up counts for less (its weight), so a range nobody
+/// holds still gives an answer. With `samples == 0` the answer is the neutral 0.5; no opponents
+/// gives 1.0. `budget` stops the loop early, after at least [`MIN_SAMPLES`] samples.
+#[must_use]
+pub fn equity_against(
+    hole: [Card; 2],
+    board: &[Card],
+    ranges: &[RangeProfile],
+    samples: u32,
+    rng: &mut BotRng,
+    budget: Option<Duration>,
+) -> f32 {
+    let opponents = ranges.len();
     if opponents == 0 {
         return 1.0;
     }
@@ -52,32 +112,38 @@ pub fn equity(
     }
     let started = Instant::now();
     let mut score = 0.0_f64;
+    let mut total = 0.0_f64;
     let mut done = 0_u32;
     let mut mine: Vec<Card> = Vec::with_capacity(7);
     let mut theirs: Vec<Card> = Vec::with_capacity(7);
+    let mut runout: Vec<Card> = Vec::with_capacity(5);
     while done < samples {
-        // Partial Fisher-Yates: the first `needed` cards are a uniform random draw.
-        for i in 0..needed {
+        let mut sample_weight = 1.0_f32;
+        for (k, profile) in ranges.iter().enumerate() {
+            sample_weight *= deal_hand(&mut deck, 2 * k, profile, board, rng);
+        }
+        // The rest of the board comes from what is left (a partial Fisher-Yates shuffle).
+        for i in 2 * opponents..needed {
             let remaining = u32::try_from(deck.len() - i).unwrap_or(1);
             let j = i + usize::try_from(rng.below(remaining)).unwrap_or(0);
             deck.swap(i, j);
         }
-        let drawn = deck.get(..needed).unwrap_or(&[]);
-        let (runout, hands) = drawn.split_at(missing);
+        runout.clear();
+        runout.extend(deck.get(2 * opponents..needed).unwrap_or(&[]));
         mine.clear();
         mine.extend_from_slice(&hole);
         mine.extend_from_slice(board);
-        mine.extend_from_slice(runout);
+        mine.extend_from_slice(&runout);
         let Ok(my_rank) = best_of(&mine) else {
             return 0.5;
         };
         let mut beaten = true;
         let mut ties = 1_u32;
-        for pair in hands.chunks(2) {
+        for pair in deck.get(..2 * opponents).unwrap_or(&[]).chunks(2) {
             theirs.clear();
             theirs.extend_from_slice(pair);
             theirs.extend_from_slice(board);
-            theirs.extend_from_slice(runout);
+            theirs.extend_from_slice(&runout);
             let Ok(their_rank) = best_of(&theirs) else {
                 return 0.5;
             };
@@ -90,9 +156,11 @@ pub fn equity(
                 std::cmp::Ordering::Greater => {}
             }
         }
+        let w = f64::from(sample_weight);
         if beaten {
-            score += 1.0 / f64::from(ties);
+            score += w / f64::from(ties);
         }
+        total += w;
         done += 1;
         if done >= MIN_SAMPLES
             && done.is_multiple_of(8)
@@ -101,8 +169,11 @@ pub fn equity(
             break;
         }
     }
+    if total <= 0.0 {
+        return 0.5;
+    }
     #[allow(clippy::cast_possible_truncation, reason = "a ratio in 0..=1")]
     {
-        (score / f64::from(done)) as f32
+        (score / total) as f32
     }
 }

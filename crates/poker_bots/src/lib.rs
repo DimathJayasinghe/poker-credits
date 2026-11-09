@@ -7,10 +7,12 @@
 
 pub mod decide;
 pub mod equity;
+pub mod hand;
 pub mod names;
 pub mod notes;
 pub mod observe;
 pub mod personality;
+pub mod range;
 pub mod rng;
 pub mod skill;
 pub mod strength;

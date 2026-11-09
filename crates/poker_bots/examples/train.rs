@@ -42,9 +42,17 @@ struct Score {
     fold_to_bet: f64,
 }
 
-fn bot(kind: Archetype, tuning: Tuning, seed: u64) -> Bot {
+/// The level being trained (`TRAIN_SKILL=hard`; default normal).
+fn trained_skill() -> Skill {
+    match std::env::var("TRAIN_SKILL").as_deref() {
+        Ok("hard") => Skill::Hard,
+        _ => Skill::Normal,
+    }
+}
+
+fn bot(kind: Archetype, tuning: Tuning, seed: u64, skill: Skill) -> Bot {
     let mut rng = BotRng::from_seed(seed);
-    let mut mind = BotMind::new(Personality::sample(kind, &mut rng), Skill::Normal);
+    let mut mind = BotMind::new(Personality::sample(kind, &mut rng), skill);
     mind.equity_budget = None;
     mind.tuning = tuning;
     Bot {
@@ -62,9 +70,19 @@ fn evaluate(candidate: Tuning, hands: u32, deck_seed: u64) -> Score {
         Archetype::Maniac,
         Archetype::NitTrapper,
     ];
-    let mut bots = vec![bot(Archetype::Tag, candidate, deck_seed ^ 0x0B)];
+    let mut bots = vec![bot(
+        Archetype::Tag,
+        candidate,
+        deck_seed ^ 0x0B,
+        trained_skill(),
+    )];
     for (i, kind) in field.iter().enumerate() {
-        bots.push(bot(*kind, Tuning::BASE, deck_seed ^ (100 + i as u64)));
+        bots.push(bot(
+            *kind,
+            Tuning::BASE,
+            deck_seed ^ (100 + i as u64),
+            Skill::Normal,
+        ));
     }
     let n = bots.len();
     let mut state = table(&vec![START; n], 10, 20);
@@ -127,11 +145,16 @@ fn evaluate(candidate: Tuning, hands: u32, deck_seed: u64) -> Score {
 /// Fitness: chips won, minus a penalty for leaving the style envelope.
 fn fitness(s: &Score) -> f64 {
     let mut penalty = 0.0;
-    // A Tag plays roughly a fifth to a third of its hands and does not fold to every bet.
+    // A Tag plays roughly a fifth to a third of its hands and neither folds to every bet (the
+    // owner found bots that fold too easily no fun) nor calls everything.
+    let (fold_low, fold_high) = match trained_skill() {
+        Skill::Hard => (0.30, 0.42),
+        _ => (0.28, 0.40),
+    };
     penalty += 400.0 * (0.20 - s.vpip).max(0.0);
-    penalty += 400.0 * (s.vpip - 0.32).max(0.0);
-    penalty += 400.0 * (s.fold_to_bet - 0.27).max(0.0);
-    penalty += 400.0 * (0.12 - s.fold_to_bet).max(0.0);
+    penalty += 400.0 * (s.vpip - 0.36).max(0.0);
+    penalty += 400.0 * (s.fold_to_bet - fold_high).max(0.0);
+    penalty += 400.0 * (fold_low - s.fold_to_bet).max(0.0);
     s.bb100 - penalty
 }
 
@@ -246,11 +269,18 @@ fn main() {
             noises.push(z);
             noises.push(z.map(|x| -x));
         }
+        // The preflop numbers (the first seven) keep the styles at a human scale and stay as set
+        // unless `TRAIN_FREEZE=0`: the trainer learns the play after the flop.
+        let frozen = if std::env::var("TRAIN_FREEZE").as_deref() == Ok("0") {
+            0
+        } else {
+            7
+        };
         let mut candidates: Vec<[f64; PARAMS]> = noises
             .iter()
             .map(|z| {
                 let mut u = mean;
-                for i in 0..PARAMS {
+                for i in frozen..PARAMS {
                     u[i] = (mean[i] + sigma * z[i]).clamp(0.0, 1.0);
                 }
                 u
