@@ -13,6 +13,14 @@
   <a href="https://github.com/DimathJayasinghe/poker-credits/releases/latest"><img src="https://img.shields.io/github/v/release/DimathJayasinghe/poker-credits?include_prereleases" alt="Latest release"></a>
 </p>
 
+<p align="center">
+  <a href="https://apps.microsoft.com/detail/9P9FSHQD11V3?mode=direct"><img src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Get it from Microsoft" height="44"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/DimathJayasinghe/poker-credits/releases/latest">See the latest releases</a> for the other builds (unsigned). Details in <a href="#download">Download</a>.
+</p>
+
 ## What it is
 
 Players deal and shuffle real cards. The app does the rest: blinds, the dealer button, bets, main and side pots, odd chips and payouts. One device sits on the table and shows the pot and every seat. Each player uses their own phone to fold, check, call or raise.
@@ -28,7 +36,9 @@ No cards and no friends at hand? **Play alone** seats you against 1 to 9 compute
 
 ## Download
 
-Get the latest build from the [Releases page](https://github.com/DimathJayasinghe/poker-credits/releases/latest).
+**Windows:** get it from the [Microsoft Store](https://apps.microsoft.com/detail/9P9FSHQD11V3). It installs and updates itself.
+
+For every platform, get the latest build from the [Releases page](https://github.com/DimathJayasinghe/poker-credits/releases/latest).
 
 | Platform | File |
 | :--- | :--- |
@@ -36,7 +46,7 @@ Get the latest build from the [Releases page](https://github.com/DimathJayasingh
 | Android | `poker-credits-android-arm64.apk` for most phones, or `poker-credits-android.apk` for any device (allow installs from unknown sources) |
 | Linux | `poker-credits-linux-x64.tar.gz`. Unpack, then run `./install.sh` inside the folder to add it to your application menu with its icon |
 
-The Windows build is also being prepared for the Microsoft Store (see [`docs/MICROSOFT_STORE.md`](docs/MICROSOFT_STORE.md)); until it is listed, use the files above.
+The Store build is listed in some regions only (see [`docs/MICROSOFT_STORE.md`](docs/MICROSOFT_STORE.md) section 10); anywhere it is not offered, use the files above.
 
 Each release lists `SHA256SUMS` so you can verify the files.
 

@@ -79,6 +79,11 @@ Made from the real screens by `docs/MICROSOFT_STORE.md` section 6 (1920 x 1080) 
 - 1:1 box art, 1080 x 1080 (if the page asks for it): `box-art-1080x1080.png`
 - 9:16 poster art, 1440 x 2160 (the page asks for it): `poster-art-1440x2160.png`
 
+## Pricing and availability
+
+- Price: Free. Audience: Public. Discoverable. Release: as soon as it passes certification. No trial.
+- Markets: Markets > **Show options** > untick **Türkiye** (certification 11.10.3 rejected the product for simulated gambling there) and **China (ISBN Required)** (needs a game licence), then OK and Save draft. Set this in the first submission: the module is read only after a send. Keep the future-markets box ticked.
+
 ## Properties
 
 - Category: **Games**, genre **Card + board** (not Casino). The product must be created as type **Game**; a game filed under an app category fails certification (policy 10.1.21).
