@@ -1,0 +1,62 @@
+name: iOS unsigned build
+
+# Builds the iPhone app without code signing and packs it as an .ipa that a sideloading tool (SideStore,
+# AltStore, Sideloadly) re-signs with the owner's own free Apple Account. The .ipa is NOT installable
+# as it is: iOS refuses unsigned apps.
+# Nothing here uploads to the App Store or TestFlight. Free Apple Account limits (Apple, 2026): the signature
+# lasts 7 days, 3 apps per device, 10 App IDs a week.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/ios-sideload
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: iOS (unsigned)
+    # arm64 macOS 26 image with Xcode 26.6 as the default; free and unlimited on public repositories.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # The Flutter-Rust bridge builds the engine and server for the phone through cargokit (an Xcode
+      # script phase). It needs the iPhone target of the pinned toolchain from rust-toolchain.toml.
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
+        with:
+          target: aarch64-apple-ios
+      - name: Read the pinned Flutter version from .fvmrc
+        id: fvm
+        shell: bash
+        run: echo "version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ steps.fvm.outputs.version }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build (no code signing)
+        run: flutter build ios --release --no-codesign -v
+        working-directory: app
+      - name: Pack the .ipa
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="app/build/ios/iphoneos/Runner.app"
+          test -d "$app" || { echo "Runner.app not found at $app" >&2; exit 1; }
+          rm -rf Payload && mkdir Payload
+          cp -R "$app" Payload/
+          zip -qry poker-credits-ios-unsigned.ipa Payload
+          ls -l poker-credits-ios-unsigned.ipa
+          unzip -l poker-credits-ios-unsigned.ipa | head -5
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: poker-credits-ios
+          path: poker-credits-ios-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
